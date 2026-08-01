@@ -26,6 +26,18 @@ public readonly record struct ModeState
     public ModeState CancelSelection() =>
         new(EffectiveMode, EffectiveMode, LiveArmed);
 
+    public ModeState ActivateSafeMode(TradingMode mode)
+    {
+        if (mode is TradingMode.Live)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(mode),
+                "Live mode requires the authorization workflow.");
+        }
+
+        return new(mode, mode, false);
+    }
+
     public ModeState ArmLive()
     {
         if (SelectedMode is not TradingMode.Live)
@@ -36,4 +48,11 @@ public readonly record struct ModeState
 
         return new(TradingMode.Live, TradingMode.Live, true);
     }
+
+    public ModeState DisarmTo(TradingMode safeMode = TradingMode.Simulation) =>
+        safeMode is TradingMode.Live
+            ? throw new ArgumentOutOfRangeException(
+                nameof(safeMode),
+                "Disarming requires Replay or Simulation mode.")
+            : new(safeMode, safeMode, false);
 }

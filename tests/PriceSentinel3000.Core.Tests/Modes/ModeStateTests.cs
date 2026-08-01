@@ -43,4 +43,26 @@ public sealed class ModeStateTests
 
         Assert.Throws<InvalidOperationException>(() => state.ArmLive());
     }
+
+    [Fact]
+    public void ActivatingSafeMode_CannotBypassLiveAuthorization()
+    {
+        ModeState state = ModeState.SafeDefault;
+
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => state.ActivateSafeMode(TradingMode.Live));
+    }
+
+    [Fact]
+    public void CancellingLiveFromReplay_RestoresReplay()
+    {
+        ModeState state = ModeState.SafeDefault
+            .ActivateSafeMode(TradingMode.Replay)
+            .Select(TradingMode.Live)
+            .CancelSelection();
+
+        Assert.Equal(TradingMode.Replay, state.SelectedMode);
+        Assert.Equal(TradingMode.Replay, state.EffectiveMode);
+        Assert.False(state.LiveArmed);
+    }
 }

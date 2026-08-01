@@ -7,9 +7,20 @@ Real-time price-action monitoring and simulation-first trade execution for a use
 
 ## Status
 
-The .NET 10 / WPF solution scaffold is ready. It currently provides the project
-boundaries and a safe mode-state foundation; market connectivity, strategy
-evaluation, persistence, simulation, and order execution are not implemented yet.
+Stage 2 provides a functional WPF simulation control surface on top of the .NET 10
+solution scaffold. The interface includes:
+
+- Replay / Simulation / LIVE rotary mode selection
+- Separate selected and effective modes so selecting LIVE cannot arm execution
+- The first-session LIVE risk warning with explicit I AGREE and CANCEL actions
+- Simulation starting balance, symbol, position size, entry limit, daily-loss,
+  stop-loss, buffer, polling, and reconciliation settings
+- Validated conservative defaults, a tunable 5-15 minute buffer display, session
+  state, and an in-memory activity journal
+
+Market connectivity, SQLite persistence, strategy evaluation, simulated fills,
+Robinhood authorization, and real order execution are not implemented yet. The UI
+labels those adapters offline and keeps LIVE disarmed.
 
 ## Solution layout
 
@@ -42,7 +53,7 @@ dotnet build PriceSentinel3000.sln
 dotnet test PriceSentinel3000.sln
 ```
 
-The application starts in Simulation mode. A future LIVE workflow will keep the
-selected mode separate from the effective mode and will require an explicit risk
-acknowledgment, Robinhood authorization, account checks, and successful data
-initialization before live execution can be armed.
+The application starts in Simulation mode. Its current LIVE workflow records the
+risk acknowledgment but remains effectively in Simulation. A later integration
+stage must complete Robinhood authorization, account checks, risk checks, and data
+initialization before Core will permit LIVE to be armed.
