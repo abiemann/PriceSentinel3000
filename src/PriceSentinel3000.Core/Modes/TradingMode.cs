@@ -5,6 +5,7 @@ namespace PriceSentinel3000.Core.Modes;
 /// </summary>
 public enum TradingMode
 {
+    Off,
     Replay,
     Simulation,
     Live,

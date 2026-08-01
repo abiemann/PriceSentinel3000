@@ -18,7 +18,7 @@ public readonly record struct ModeState
     public bool LiveArmed { get; }
 
     public static ModeState SafeDefault =>
-        new(TradingMode.Simulation, TradingMode.Simulation, false);
+        new(TradingMode.Off, TradingMode.Off, false);
 
     public ModeState Select(TradingMode mode) =>
         new(mode, EffectiveMode, LiveArmed);
@@ -49,10 +49,10 @@ public readonly record struct ModeState
         return new(TradingMode.Live, TradingMode.Live, true);
     }
 
-    public ModeState DisarmTo(TradingMode safeMode = TradingMode.Simulation) =>
+    public ModeState DisarmTo(TradingMode safeMode = TradingMode.Off) =>
         safeMode is TradingMode.Live
             ? throw new ArgumentOutOfRangeException(
                 nameof(safeMode),
-                "Disarming requires Replay or Simulation mode.")
+                "Disarming requires OFF, Replay, or Simulation mode.")
             : new(safeMode, safeMode, false);
 }

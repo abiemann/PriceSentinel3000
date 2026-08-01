@@ -10,7 +10,7 @@ Real-time price-action monitoring and simulation-first trade execution for a use
 Stage 2 provides a functional WPF simulation control surface on top of the .NET 10
 solution scaffold. The interface includes:
 
-- Replay / Simulation / LIVE rotary mode selection
+- OFF / Replay / Simulation / LIVE rotary mode selection, with OFF at startup
 - Separate selected and effective modes so selecting LIVE cannot arm execution
 - The first-session LIVE risk warning with explicit I AGREE and CANCEL actions
 - Simulation starting balance, symbol, position size, entry limit, daily-loss,
@@ -53,7 +53,8 @@ dotnet build PriceSentinel3000.sln
 dotnet test PriceSentinel3000.sln
 ```
 
-The application starts in Simulation mode. Its current LIVE workflow records the
-risk acknowledgment but remains effectively in Simulation. A later integration
-stage must complete Robinhood authorization, account checks, risk checks, and data
-initialization before Core will permit LIVE to be armed.
+The application starts in OFF mode and asks the user to explicitly select Replay,
+Simulation, or LIVE. Its current LIVE workflow records the risk acknowledgment but
+does not arm execution. A later integration stage must complete Robinhood
+authorization, account checks, risk checks, and data initialization before Core
+will permit LIVE to be armed.

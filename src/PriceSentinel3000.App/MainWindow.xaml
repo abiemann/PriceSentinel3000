@@ -93,9 +93,9 @@
                         <StackPanel>
                             <TextBlock Style="{StaticResource SectionLabelStyle}"
                                        Text="OPERATING MODE" />
-                            <Grid Height="170" Margin="0,10,0,0">
-                                <Canvas Width="294" Height="170">
-                                    <Grid Canvas.Left="91" Canvas.Top="4" Width="112" Height="112">
+                            <Grid Height="240" Margin="0,10,0,0">
+                                <Canvas Width="294" Height="240">
+                                    <Grid Canvas.Left="91" Canvas.Top="60" Width="112" Height="112">
                                         <Ellipse Fill="#0B1119" Stroke="#34465B" StrokeThickness="3" />
                                         <Ellipse Margin="10" Fill="#182433" Stroke="#24384C" StrokeThickness="1" />
                                         <Grid RenderTransformOrigin="0.5,0.5">
@@ -116,16 +116,20 @@
                                                  Stroke="{StaticResource AccentBrush}"
                                                  StrokeThickness="2" />
                                     </Grid>
-                                    <Button Canvas.Left="0" Canvas.Top="128" Width="80"
+                                    <Button Canvas.Left="0" Canvas.Top="100" Width="80"
                                             Style="{StaticResource ModeButtonStyle}"
                                             Tag="Replay" Click="ModeButton_Click" Content="REPLAY" />
-                                    <Button Canvas.Left="101" Canvas.Top="128" Width="92"
+                                    <Button Canvas.Left="101" Canvas.Top="4" Width="92"
                                             Style="{StaticResource ModeButtonStyle}"
                                             Tag="Simulation" Click="ModeButton_Click" Content="SIMULATION" />
-                                    <Button Canvas.Left="214" Canvas.Top="128" Width="80"
+                                    <Button Canvas.Left="214" Canvas.Top="100" Width="80"
                                             Background="#3B211E" BorderBrush="#7F3C34" Foreground="#FF9B8C"
                                             Style="{StaticResource ModeButtonStyle}"
                                             Tag="Live" Click="ModeButton_Click" Content="LIVE" />
+                                    <Button Canvas.Left="107" Canvas.Top="200" Width="80"
+                                            Background="#242B35" BorderBrush="#495666" Foreground="#B8C5D4"
+                                            Style="{StaticResource ModeButtonStyle}"
+                                            Tag="Off" Click="ModeButton_Click" Content="OFF" />
                                 </Canvas>
                             </Grid>
                             <Grid Margin="0,4,0,0">
@@ -431,9 +435,11 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Style="{StaticResource SectionLabelStyle}" Text="SESSION STATUS" />
-                            <Border Grid.Column="1" Padding="9,5" Background="#123528"
-                                    BorderBrush="#24684C" BorderThickness="1" CornerRadius="5">
-                                <TextBlock Foreground="{StaticResource AccentBrush}" FontSize="9"
+                            <Border Grid.Column="1" Padding="9,5"
+                                    Background="{Binding SessionStateBackground}"
+                                    BorderBrush="{Binding SessionStateBorder}"
+                                    BorderThickness="1" CornerRadius="5">
+                                <TextBlock Foreground="{Binding SessionStateForeground}" FontSize="9"
                                            FontWeight="Bold" Text="{Binding SessionStateLabel}" />
                             </Border>
                         </Grid>

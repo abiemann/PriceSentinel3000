@@ -45,7 +45,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _quotePollingSeconds = defaults.QuotePollingSeconds;
         _reconciliationSeconds = defaults.ReconciliationSeconds;
         _reconciliationOverlapSeconds = defaults.ReconciliationOverlapSeconds;
-        _statusMessage = "Configure a simulation session. Market data is not connected yet.";
+        _statusMessage = "Choose Replay, Simulation, or LIVE on the rotary selector to begin.";
 
         PositionSizeOptions =
         [
@@ -63,11 +63,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
             new("Buy price (%)", StopLossBasis.BuyPercentage),
         ];
 
-        StartSimulationCommand = new RelayCommand(StartSimulation, () => !IsSimulationRunning);
+        StartSimulationCommand = new RelayCommand(
+            StartSimulation,
+            () => SelectedMode is TradingMode.Simulation &&
+                  EffectiveMode is TradingMode.Simulation &&
+                  !IsSimulationRunning);
         StopSimulationCommand = new RelayCommand(StopSimulation, () => IsSimulationRunning);
 
         RebuildBufferSegments();
-        AddActivity("Application started in safe Simulation mode.");
+        AddActivity("Application started with operating mode OFF.");
         AddActivity("Stage 2 controls loaded; market and broker adapters are offline.");
     }
 
@@ -92,7 +96,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public string LiveStateLabel => LiveArmed ? "LIVE ARMED" : "LIVE DISARMED";
     public string MarketDataStatus => "ADAPTER OFFLINE";
     public string CurrentPrice => "--";
-    public string SessionStateLabel => IsSimulationRunning ? "RUNNING" : "READY";
+    public string SessionStateLabel => EffectiveMode is TradingMode.Off
+        ? "OFF"
+        : IsSimulationRunning ? "RUNNING" : "READY";
+    public string SessionStateBackground => EffectiveMode is TradingMode.Off ? "#202B39" : "#123528";
+    public string SessionStateBorder => EffectiveMode is TradingMode.Off ? "#3A4B61" : "#24684C";
+    public string SessionStateForeground => EffectiveMode is TradingMode.Off ? "#A8B6C7" : "#5EE6B1";
     public string SymbolDisplay => string.IsNullOrWhiteSpace(Symbol) ? "—" : Symbol.Trim().ToUpperInvariant();
     public string BuyingPowerDisplay => StartingBalance.ToString("C", CultureInfo.CurrentCulture);
     public string BufferCaption => $"{BufferSegments.Count} × 1 MINUTE BLOCKS";
@@ -228,9 +237,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (mode is not TradingMode.Live)
         {
             IsSimulationRunning = false;
-            StatusMessage = mode is TradingMode.Replay
-                ? "Replay selected. Recorded-session loading will be added with the data engine."
-                : "Simulation selected. Configure the account and risk controls, then start.";
+            StatusMessage = mode switch
+            {
+                TradingMode.Off => "System is OFF. Choose Replay, Simulation, or LIVE to begin.",
+                TradingMode.Replay => "Replay selected. Recorded-session loading will be added with the data engine.",
+                TradingMode.Simulation => "Simulation selected. Configure the account and risk controls, then start.",
+                _ => StatusMessage,
+            };
             AddActivity($"{mode} mode selected.");
         }
 
@@ -324,6 +337,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(EffectiveModeLabel));
         OnPropertyChanged(nameof(LiveArmed));
         OnPropertyChanged(nameof(LiveStateLabel));
+        OnPropertyChanged(nameof(SessionStateLabel));
+        OnPropertyChanged(nameof(SessionStateBackground));
+        OnPropertyChanged(nameof(SessionStateBorder));
+        OnPropertyChanged(nameof(SessionStateForeground));
+        StartSimulationCommand.RaiseCanExecuteChanged();
     }
 
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)

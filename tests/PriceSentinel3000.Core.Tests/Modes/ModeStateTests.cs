@@ -5,12 +5,12 @@ namespace PriceSentinel3000.Core.Tests.Modes;
 public sealed class ModeStateTests
 {
     [Fact]
-    public void SafeDefault_StartsInUnarmedSimulation()
+    public void SafeDefault_StartsOffAndUnarmed()
     {
         ModeState state = ModeState.SafeDefault;
 
-        Assert.Equal(TradingMode.Simulation, state.SelectedMode);
-        Assert.Equal(TradingMode.Simulation, state.EffectiveMode);
+        Assert.Equal(TradingMode.Off, state.SelectedMode);
+        Assert.Equal(TradingMode.Off, state.EffectiveMode);
         Assert.False(state.LiveArmed);
     }
 
@@ -20,7 +20,7 @@ public sealed class ModeStateTests
         ModeState state = ModeState.SafeDefault.Select(TradingMode.Live);
 
         Assert.Equal(TradingMode.Live, state.SelectedMode);
-        Assert.Equal(TradingMode.Simulation, state.EffectiveMode);
+        Assert.Equal(TradingMode.Off, state.EffectiveMode);
         Assert.False(state.LiveArmed);
     }
 
@@ -31,8 +31,8 @@ public sealed class ModeStateTests
             .Select(TradingMode.Live)
             .CancelSelection();
 
-        Assert.Equal(TradingMode.Simulation, state.SelectedMode);
-        Assert.Equal(TradingMode.Simulation, state.EffectiveMode);
+        Assert.Equal(TradingMode.Off, state.SelectedMode);
+        Assert.Equal(TradingMode.Off, state.EffectiveMode);
         Assert.False(state.LiveArmed);
     }
 
@@ -63,6 +63,19 @@ public sealed class ModeStateTests
 
         Assert.Equal(TradingMode.Replay, state.SelectedMode);
         Assert.Equal(TradingMode.Replay, state.EffectiveMode);
+        Assert.False(state.LiveArmed);
+    }
+
+    [Fact]
+    public void DisarmWithoutTarget_ReturnsToOff()
+    {
+        ModeState state = ModeState.SafeDefault
+            .Select(TradingMode.Live)
+            .ArmLive()
+            .DisarmTo();
+
+        Assert.Equal(TradingMode.Off, state.SelectedMode);
+        Assert.Equal(TradingMode.Off, state.EffectiveMode);
         Assert.False(state.LiveArmed);
     }
 }
