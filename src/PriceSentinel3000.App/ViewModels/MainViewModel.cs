@@ -91,6 +91,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public TradingMode EffectiveMode => _modeState.EffectiveMode;
     public string SelectedModeLabel => SelectedMode.ToString().ToUpperInvariant();
     public string EffectiveModeLabel => EffectiveMode.ToString().ToUpperInvariant();
+    public bool IsOffSelected => SelectedMode is TradingMode.Off;
+    public bool IsReplaySelected => SelectedMode is TradingMode.Replay;
+    public bool IsSimulationSelected => SelectedMode is TradingMode.Simulation;
+    public bool IsLiveSelected => SelectedMode is TradingMode.Live;
     public bool LiveArmed => _modeState.LiveArmed;
     public bool LiveRiskAcknowledged => _liveRiskAcknowledged;
     public string LiveStateLabel => LiveArmed ? "LIVE ARMED" : "LIVE DISARMED";
@@ -335,6 +339,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(EffectiveMode));
         OnPropertyChanged(nameof(SelectedModeLabel));
         OnPropertyChanged(nameof(EffectiveModeLabel));
+        OnPropertyChanged(nameof(IsOffSelected));
+        OnPropertyChanged(nameof(IsReplaySelected));
+        OnPropertyChanged(nameof(IsSimulationSelected));
+        OnPropertyChanged(nameof(IsLiveSelected));
         OnPropertyChanged(nameof(LiveArmed));
         OnPropertyChanged(nameof(LiveStateLabel));
         OnPropertyChanged(nameof(SessionStateLabel));

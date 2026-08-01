@@ -117,19 +117,61 @@
                                                  StrokeThickness="2" />
                                     </Grid>
                                     <Button Canvas.Left="0" Canvas.Top="100" Width="80"
-                                            Style="{StaticResource ModeButtonStyle}"
-                                            Tag="Replay" Click="ModeButton_Click" Content="REPLAY" />
+                                            Tag="Replay" Click="ModeButton_Click" Content="REPLAY">
+                                        <Button.Style>
+                                            <Style BasedOn="{StaticResource ModeButtonStyle}" TargetType="Button">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsReplaySelected}" Value="True">
+                                                        <Setter Property="Background" Value="#153D32" />
+                                                        <Setter Property="BorderBrush" Value="#2BC48A" />
+                                                        <Setter Property="Foreground" Value="#77F0C1" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
                                     <Button Canvas.Left="101" Canvas.Top="4" Width="92"
-                                            Style="{StaticResource ModeButtonStyle}"
-                                            Tag="Simulation" Click="ModeButton_Click" Content="SIMULATION" />
+                                            Tag="Simulation" Click="ModeButton_Click" Content="SIMULATION">
+                                        <Button.Style>
+                                            <Style BasedOn="{StaticResource ModeButtonStyle}" TargetType="Button">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsSimulationSelected}" Value="True">
+                                                        <Setter Property="Background" Value="#153D32" />
+                                                        <Setter Property="BorderBrush" Value="#2BC48A" />
+                                                        <Setter Property="Foreground" Value="#77F0C1" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
                                     <Button Canvas.Left="214" Canvas.Top="100" Width="80"
-                                            Background="#3B211E" BorderBrush="#7F3C34" Foreground="#FF9B8C"
-                                            Style="{StaticResource ModeButtonStyle}"
-                                            Tag="Live" Click="ModeButton_Click" Content="LIVE" />
+                                            Tag="Live" Click="ModeButton_Click" Content="LIVE">
+                                        <Button.Style>
+                                            <Style BasedOn="{StaticResource ModeButtonStyle}" TargetType="Button">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsLiveSelected}" Value="True">
+                                                        <Setter Property="Background" Value="#3B211E" />
+                                                        <Setter Property="BorderBrush" Value="#B95145" />
+                                                        <Setter Property="Foreground" Value="#FF9B8C" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
                                     <Button Canvas.Left="107" Canvas.Top="200" Width="80"
-                                            Background="#242B35" BorderBrush="#495666" Foreground="#B8C5D4"
-                                            Style="{StaticResource ModeButtonStyle}"
-                                            Tag="Off" Click="ModeButton_Click" Content="OFF" />
+                                            Tag="Off" Click="ModeButton_Click" Content="OFF">
+                                        <Button.Style>
+                                            <Style BasedOn="{StaticResource ModeButtonStyle}" TargetType="Button">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsOffSelected}" Value="True">
+                                                        <Setter Property="Background" Value="#20374B" />
+                                                        <Setter Property="BorderBrush" Value="#5F89A8" />
+                                                        <Setter Property="Foreground" Value="#CBE7F8" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
                                 </Canvas>
                             </Grid>
                             <Grid Margin="0,4,0,0">
