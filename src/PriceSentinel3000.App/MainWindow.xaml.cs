@@ -47,4 +47,10 @@ public partial class MainWindow : Window
 
         _viewModel.AcknowledgeLiveRisk();
     }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _viewModel.Dispose();
+        base.OnClosed(e);
+    }
 }

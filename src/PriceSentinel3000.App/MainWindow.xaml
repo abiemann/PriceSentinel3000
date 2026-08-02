@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:controls="clr-namespace:PriceSentinel3000.App.Controls"
         mc:Ignorable="d"
         Title="PriceSentinel 3000"
         Width="1500"
@@ -64,11 +65,11 @@
                                    Text="{Binding CurrentPrice}" />
                     </StackPanel>
                     <Border Padding="12,7"
-                            Background="#34251A"
-                            BorderBrush="#7B5426"
+                            Background="{Binding MarketDataStatusBackground}"
+                            BorderBrush="{Binding MarketDataStatusBorder}"
                             BorderThickness="1"
                             CornerRadius="6">
-                        <TextBlock Foreground="#F4B45E"
+                        <TextBlock Foreground="{Binding MarketDataStatusForeground}"
                                    FontSize="10"
                                    FontWeight="Bold"
                                    Text="{Binding MarketDataStatus}" />
@@ -323,10 +324,10 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <Button Style="{StaticResource PrimaryButtonStyle}"
-                                Command="{Binding StartSimulationCommand}"
-                                Content="START SIMULATION" />
+                                Command="{Binding StartSessionCommand}"
+                                Content="{Binding PrimaryActionLabel}" />
                         <Button Grid.Column="2" Style="{StaticResource SecondaryButtonStyle}"
-                                Command="{Binding StopSimulationCommand}" Content="STOP" />
+                                Command="{Binding StopSessionCommand}" Content="STOP" />
                     </Grid>
                 </StackPanel>
             </ScrollViewer>
@@ -351,7 +352,8 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <StackPanel>
-                                <TextBlock Style="{StaticResource SectionLabelStyle}" Text="5 SECOND PRICE ACTION" />
+                                <TextBlock Style="{StaticResource SectionLabelStyle}"
+                                           Text="{Binding PriceActionCaption}" />
                                 <TextBlock Margin="0,5,0,0"
                                            Foreground="{StaticResource PrimaryTextBrush}"
                                            FontSize="20" FontWeight="Bold" Text="{Binding SymbolDisplay}" />
@@ -360,7 +362,8 @@
                                 <TextBlock HorizontalAlignment="Right"
                                            Style="{StaticResource SectionLabelStyle}" Text="BID / ASK" />
                                 <TextBlock Margin="0,5,0,0" HorizontalAlignment="Right"
-                                           Foreground="#CBD5E1" FontSize="16" Text="-- / --" />
+                                           Foreground="#CBD5E1" FontSize="16"
+                                           Text="{Binding BidAskDisplay}" />
                             </StackPanel>
                         </Grid>
                         <Border Grid.Row="1" Margin="0,18,0,0"
@@ -374,12 +377,24 @@
                                     <Border BorderBrush="#192636" BorderThickness="0,0,0,1" />
                                     <Border />
                                 </UniformGrid>
+                                <controls:PriceChart Margin="4"
+                                                     Points="{Binding ChartPoints}" />
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasMarketData}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
                                     <TextBlock HorizontalAlignment="Center" Foreground="#5F728A"
                                                FontSize="12" FontWeight="Bold"
                                                Text="WAITING FOR MARKET DATA" />
                                     <TextBlock Margin="0,7,0,0" Foreground="#41536A" FontSize="11"
-                                               Text="The chart will activate when a data adapter is connected." />
+                                               Text="Start Simulation or Replay to activate the chart." />
                                 </StackPanel>
                             </Grid>
                         </Border>
@@ -415,8 +430,15 @@
                                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                                             <TextBlock HorizontalAlignment="Center" Foreground="#CBD5E1"
                                                        FontSize="12" FontWeight="Bold" Text="{Binding Label}" />
-                                            <TextBlock Margin="0,6,0,0" HorizontalAlignment="Center"
-                                                       Foreground="#52677F" FontSize="9" Text="{Binding State}" />
+                                            <TextBlock Margin="0,4,0,0" HorizontalAlignment="Center"
+                                                       Foreground="{Binding Foreground}" FontSize="9"
+                                                       FontWeight="Bold" Text="{Binding State}" />
+                                            <TextBlock Margin="0,3,0,0" HorizontalAlignment="Center"
+                                                       Foreground="#CBD5E1" FontSize="10"
+                                                       Text="{Binding Price}" />
+                                            <TextBlock Margin="0,2,0,0" HorizontalAlignment="Center"
+                                                       Foreground="#647990" FontSize="8"
+                                                       Text="{Binding Detail}" />
                                         </StackPanel>
                                     </Border>
                                 </DataTemplate>
@@ -434,20 +456,20 @@
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Style="{StaticResource SectionLabelStyle}" Text="STRATEGY ENGINE" />
                             <TextBlock Margin="0,6,0,0" Foreground="#CBD5E1" FontSize="14"
-                                       Text="Signals are disabled until market data is connected." />
+                                       Text="{Binding StrategyMessage}" />
                         </StackPanel>
                         <Border Grid.Column="1" Padding="12,7" VerticalAlignment="Center"
                                 Background="#202B39" BorderBrush="#3A4B61"
                                 BorderThickness="1" CornerRadius="6">
                             <TextBlock Foreground="#8EA0B7" FontSize="10"
-                                       FontWeight="Bold" Text="IDLE" />
+                                       FontWeight="Bold" Text="{Binding StrategyStateLabel}" />
                         </Border>
                     </Grid>
                 </Border>
             </Grid>
             <Grid Grid.Column="4">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="220" />
+                    <RowDefinition Height="250" />
                     <RowDefinition Height="12" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
@@ -501,8 +523,19 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Market data" />
-                            <TextBlock Grid.Column="1" Foreground="#F4B45E" FontSize="11"
-                                       FontWeight="Bold" Text="OFFLINE" />
+                            <TextBlock Grid.Column="1"
+                                       Foreground="{Binding MarketDataStatusForeground}"
+                                       FontSize="11" FontWeight="Bold"
+                                       Text="{Binding MarketDataStateLabel}" />
+                        </Grid>
+                        <Grid Margin="0,11,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Journal" />
+                            <TextBlock Grid.Column="1" Foreground="#5EE6B1" FontSize="11"
+                                       FontWeight="Bold" Text="{Binding JournalStatus}" />
                         </Grid>
                     </StackPanel>
                 </Border>
@@ -573,7 +606,7 @@
                            Foreground="#53657B"
                            FontSize="10"
                            FontWeight="SemiBold"
-                           Text="STAGE 2 · CONTROL SURFACE" />
+                           Text="STAGE 3 · DATA ENGINE" />
             </Grid>
         </Border>
     </Grid>

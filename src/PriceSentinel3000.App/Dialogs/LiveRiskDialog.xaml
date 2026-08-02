@@ -49,7 +49,7 @@
                        FontSize="13"
                        LineHeight="20"
                        TextWrapping="Wrap"
-                       Text="Stage 2 does not connect to Robinhood or arm LIVE execution. Agreeing records the warning acknowledgment only." />
+                       Text="Stage 3 does not connect to Robinhood or arm LIVE execution. Agreeing records the warning acknowledgment only." />
         </StackPanel>
 
         <Grid Grid.Row="2"

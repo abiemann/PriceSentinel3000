@@ -2,6 +2,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PriceSentinel3000.Core\PriceSentinel3000.Core.csproj" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.10" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.12" />
   </ItemGroup>
 
   <PropertyGroup>

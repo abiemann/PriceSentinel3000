@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\PriceSentinel3000.Core\PriceSentinel3000.Core.csproj" />
+    <ProjectReference Include="..\..\src\PriceSentinel3000.Infrastructure\PriceSentinel3000.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

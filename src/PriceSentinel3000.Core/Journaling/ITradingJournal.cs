@@ -1,0 +1,63 @@
+using PriceSentinel3000.Core.MarketData;
+using PriceSentinel3000.Core.Modes;
+
+namespace PriceSentinel3000.Core.Journaling;
+
+public enum QuoteIngestionKind
+{
+    WarmStart,
+    Live,
+    Reconciliation,
+    Replay,
+}
+
+public sealed record JournalSession(
+    Guid Id,
+    Instrument Instrument,
+    TradingMode Mode,
+    DateTimeOffset StartedAtUtc,
+    decimal StartingBalance,
+    string SettingsJson);
+
+public sealed record JournalSummary(int QuoteCount, int ActivityCount);
+
+public sealed record ReplaySourceSession(
+    Guid Id,
+    Instrument Instrument,
+    DateTimeOffset StartedAtUtc,
+    int QuoteCount);
+
+public interface ITradingJournal : IDisposable
+{
+    string DatabasePath { get; }
+
+    void Initialize();
+
+    JournalSession StartSession(
+        Instrument instrument,
+        TradingMode mode,
+        decimal startingBalance,
+        string settingsJson,
+        DateTimeOffset startedAtUtc);
+
+    void AppendQuotes(
+        Guid sessionId,
+        IEnumerable<MarketQuote> quotes,
+        QuoteIngestionKind ingestionKind);
+
+    void AppendActivity(
+        Guid? sessionId,
+        DateTimeOffset occurredAtUtc,
+        string level,
+        string message);
+
+    void CompleteSession(Guid sessionId, DateTimeOffset endedAtUtc, string outcome);
+
+    JournalSummary GetSummary(Guid sessionId);
+
+    ReplaySourceSession? FindLatestReplaySource(Instrument instrument);
+
+    IReadOnlyList<MarketQuote> ReadSessionQuotes(
+        Guid sourceSessionId,
+        Instrument instrument);
+}
