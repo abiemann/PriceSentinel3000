@@ -1,5 +1,7 @@
 using PriceSentinel3000.Core.MarketData;
 using PriceSentinel3000.Core.Modes;
+using PriceSentinel3000.Core.PaperTrading;
+using PriceSentinel3000.Core.Strategy;
 
 namespace PriceSentinel3000.Core.Journaling;
 
@@ -19,7 +21,12 @@ public sealed record JournalSession(
     decimal StartingBalance,
     string SettingsJson);
 
-public sealed record JournalSummary(int QuoteCount, int ActivityCount);
+public sealed record JournalSummary(
+    int QuoteCount,
+    int ActivityCount,
+    int DecisionCount,
+    int OrderCount,
+    int FillCount);
 
 public sealed record ReplaySourceSession(
     Guid Id,
@@ -50,6 +57,15 @@ public interface ITradingJournal : IDisposable
         DateTimeOffset occurredAtUtc,
         string level,
         string message);
+
+    void AppendDecision(Guid sessionId, StrategyDecision decision);
+
+    void AppendPaperFill(
+        Guid sessionId,
+        Instrument instrument,
+        PaperOrder order,
+        PaperFill fill,
+        PaperAccountSnapshot account);
 
     void CompleteSession(Guid sessionId, DateTimeOffset endedAtUtc, string outcome);
 

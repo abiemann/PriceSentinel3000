@@ -10,21 +10,35 @@ for a user-selected stock or ETF.
 
 ## Status
 
-Stage 4 replaces the synthetic feed with authenticated Robinhood MCP market data:
+Stage 5 adds an auditable paper strategy and simulated execution engine to the
+authenticated Robinhood data foundation:
 
 - OFF / Replay / Paper Trader / LIVE rotary mode selection, with OFF at startup
-- Paper Trader polls real Robinhood quotes at the configured interval and can
-  never submit a real order
+- Paper Trader polls real Robinhood quotes at the configured interval, evaluates
+  a deterministic reactionary strategy, and can never submit a real order
 - Four-minute startup history and 45-second overlap reconciliation use real
   15-second Robinhood equity bars
 - Replay accepts a ticker plus an exact local date/time and emits that historical
   15-second window as though each observation has just arrived
 - Replay duration (1-480 minutes) and playback speed (1x-100x) are tunable
-- A tunable 5-15 minute rolling buffer is analyzed as serial one-minute blocks
+- A tunable 5-15 minute rolling buffer is analyzed as individual one-minute
+  blocks and as a whole
+- Bottom detection combines a meaningful decline, lingering or separated
+  low-zone touches, a confirmed positive turn, and simple-average RSI(14)
+- Peak detection combines open-position profit, repeated peak or pullback
+  evidence, negative momentum, RSI context, and a five-minute profitable-stall exit
+- Paper buys fill at the observed ask and paper sells fill at the observed bid;
+  no fill is generated from a stale closed-market quote
+- Paper position sizing supports a fixed dollar amount or account percentage,
+  plus unlimited quantity or a user-entered maximum-share limit
+- Maximum entries, maximum daily loss, fixed/percentage stop loss, and a
+  30-second re-entry cooldown are enforced before simulated execution
 - A WPF price chart shows the real or replayed stream, current price, bid/ask,
   minute-block direction, close, and quote counts
-- SQLite WAL journaling records sessions, observations, and activities, with
-  reserved tables for decisions, paper orders, fills, positions, and risk events
+- The chart labels simulated BUY and SELL fills, while Session Status shows paper
+  buying power, equity, position, realized/unrealized P&L, and entry count
+- SQLite WAL journaling records sessions, observations, every strategy decision,
+  paper orders, fills, position snapshots, and activities
 - Separate selected and effective modes keep LIVE execution safely disarmed
 - Startup silently restores a saved Robinhood session when possible; otherwise
   the welcome dialog offers EXIT or LOGIN before opening safely in OFF mode
@@ -32,9 +46,9 @@ Stage 4 replaces the synthetic feed with authenticated Robinhood MCP market data
 - Friendly status guidance distinguishes REAL TIME, MARKET CLOSED, REPLAY,
   AUTHORIZING, and OFFLINE states
 
-Paper Trader is the safe account mode for real-price strategy testing and future
-simulated fills. The automatic signal and paper-fill engine is the next stage, so
-Stage 4 observes and journals prices but does not create trades yet. LIVE remains
+Paper Trader and Replay now create simulated trades from real Robinhood prices.
+The current thresholds are documented research defaults inferred from the example
+charts; they are a premise to test, not evidence of profitability. LIVE remains
 explicitly disarmed and no order-submission tool is called anywhere in the app.
 
 ## Paper Trader workflow
@@ -51,11 +65,31 @@ explicitly disarmed and no order-submission tool is called anywhere in the app.
 4. At each reconciliation interval, the app requests the full interval plus the
    configured overlap. Matching timestamps are verified, corrections replace old
    values, and missing bars are added to the ring buffer.
-5. If the newest venue timestamp is old, the app says **MARKET CLOSED** instead of
-   presenting the last price as a fresh real-time quote.
+5. Each fresh quote evaluates the block/whole-buffer strategy. Confirmed entries
+   and exits update only the in-memory paper account, then persist the decision,
+   order, fill, and position snapshot to SQLite.
+6. If the newest venue timestamp is old, the app says **MARKET CLOSED** and pauses
+   strategy decisions and paper fills.
 
 There is no generated-price fallback. If authorization, Robinhood, or the network
 is unavailable, the session stops and reports the failure.
+
+## Stage 5 research defaults
+
+The first deterministic detector uses the supplied labeled screenshots as a
+starting hypothesis:
+
+- simple-average RSI period: 14 observations
+- low/high touch-zone tolerance: 0.06%
+- minimum pre-turn swing: 0.10%
+- minimum 20-second reversal confirmation: 0.025%
+- bottom RSI confirmation: at or below 48 and no longer falling
+- minimum profitable peak exit: 0.04% before bid-side spread impact
+- profitable-stall fallback: five minutes with non-positive momentum
+
+These constants deliberately live in the strategy core and every decision stores
+its confidence and human-readable evidence. Replay results should be used to tune
+them later; they are not a promise that the labeled regions can be captured live.
 
 ## Replay workflow
 
@@ -67,6 +101,8 @@ is unavailable, the session stops and reports the failure.
 3. The returned observations are replayed in source-time order. Each historical
    price enters the normal ring buffer as a newly observed event, with delays
    compressed by the selected speed.
+4. Replay uses the same paper account, strategy, risk controls, fill model, chart
+   markers, and journal as Paper Trader, making a historical run reproducible.
 
 Replay does not depend on a previously recorded Paper Trader session and never
 uses the former synthetic data.

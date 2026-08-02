@@ -6,6 +6,8 @@ public sealed record PaperTraderSettings
     public decimal StartingBalance { get; init; } = 10_000m;
     public AmountBasis PositionSizeBasis { get; init; } = AmountBasis.AccountPercentage;
     public decimal PositionSizeValue { get; init; } = 5m;
+    public QuantityLimitMode QuantityLimitMode { get; init; } = QuantityLimitMode.Unlimited;
+    public decimal MaximumQuantity { get; init; } = 100m;
     public bool UnlimitedEntries { get; init; }
     public int MaximumEntriesPerDay { get; init; } = 10;
     public AmountBasis MaximumDailyLossBasis { get; init; } = AmountBasis.AccountPercentage;

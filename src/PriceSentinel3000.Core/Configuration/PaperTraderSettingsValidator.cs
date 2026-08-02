@@ -26,6 +26,12 @@ public static class PaperTraderSettingsValidator
             "Position size",
             errors);
 
+        if (settings.QuantityLimitMode is QuantityLimitMode.MaximumShares &&
+            settings.MaximumQuantity <= 0m)
+        {
+            errors.Add("Maximum trading quantity must be greater than zero.");
+        }
+
         if (!settings.UnlimitedEntries && settings.MaximumEntriesPerDay < 1)
         {
             errors.Add("Maximum entries per day must be at least one.");

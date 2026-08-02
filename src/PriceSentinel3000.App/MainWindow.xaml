@@ -286,6 +286,23 @@
                                          Text="{Binding PositionSizeValue, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
                             </Grid>
 
+                            <TextBlock Margin="0,14,0,0"
+                                       Style="{StaticResource FieldLabelStyle}" Text="Trading quantity" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="86" />
+                                </Grid.ColumnDefinitions>
+                                <ComboBox Style="{StaticResource InputComboBoxStyle}"
+                                          ItemsSource="{Binding QuantityLimitOptions}"
+                                          DisplayMemberPath="Label" SelectedValuePath="Value"
+                                          SelectedValue="{Binding QuantityLimitMode}" />
+                                <TextBox Grid.Column="2" Style="{StaticResource InputTextBoxStyle}"
+                                         IsEnabled="{Binding IsQuantityLimited}"
+                                         Text="{Binding MaximumQuantity, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                            </Grid>
+
                             <Grid Margin="0,14,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -437,7 +454,7 @@
                     <RowDefinition Height="12" />
                     <RowDefinition Height="160" />
                     <RowDefinition Height="12" />
-                    <RowDefinition Height="104" />
+                    <RowDefinition Height="120" />
                 </Grid.RowDefinitions>
 
                 <Border Style="{StaticResource CardStyle}">
@@ -556,7 +573,9 @@
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Style="{StaticResource SectionLabelStyle}" Text="STRATEGY ENGINE" />
                             <TextBlock Margin="0,6,0,0" Foreground="#CBD5E1" FontSize="14"
-                                       Text="{Binding StrategyMessage}" />
+                                       TextTrimming="CharacterEllipsis" Text="{Binding StrategyMessage}" />
+                            <TextBlock Margin="0,6,0,0" Foreground="#71859C" FontFamily="Consolas"
+                                       FontSize="10" Text="{Binding StrategyMetrics}" />
                         </StackPanel>
                         <Border Grid.Column="1" Padding="12,7" VerticalAlignment="Center"
                                 Background="#202B39" BorderBrush="#3A4B61"
@@ -569,7 +588,7 @@
             </Grid>
             <Grid Grid.Column="4">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="250" />
+                    <RowDefinition Height="338" />
                     <RowDefinition Height="12" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
@@ -607,6 +626,42 @@
                             <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Buying power" />
                             <TextBlock Grid.Column="1" Foreground="#CBD5E1"
                                        FontWeight="SemiBold" Text="{Binding BuyingPowerDisplay}" />
+                        </Grid>
+                        <Grid Margin="0,11,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Paper equity" />
+                            <TextBlock Grid.Column="1" Foreground="#CBD5E1"
+                                       FontWeight="SemiBold" Text="{Binding AccountEquityDisplay}" />
+                        </Grid>
+                        <Grid Margin="0,11,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Position" />
+                            <TextBlock Grid.Column="1" Foreground="#CBD5E1" FontSize="11"
+                                       FontWeight="SemiBold" Text="{Binding PositionDisplay}" />
+                        </Grid>
+                        <Grid Margin="0,11,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="P&amp;L (R / U)" />
+                            <TextBlock Grid.Column="1" Foreground="#CBD5E1" FontSize="11"
+                                       FontWeight="SemiBold" Text="{Binding ProfitLossDisplay}" />
+                        </Grid>
+                        <Grid Margin="0,11,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Entries" />
+                            <TextBlock Grid.Column="1" Foreground="#CBD5E1"
+                                       FontWeight="SemiBold" Text="{Binding EntriesDisplay}" />
                         </Grid>
                         <Grid Margin="0,11,0,0">
                             <Grid.ColumnDefinitions>
@@ -706,7 +761,7 @@
                            Foreground="#53657B"
                            FontSize="10"
                            FontWeight="SemiBold"
-                           Text="STAGE 4 · ROBINHOOD DATA" />
+                           Text="STAGE 5 · PAPER STRATEGY" />
             </Grid>
         </Border>
     </Grid>

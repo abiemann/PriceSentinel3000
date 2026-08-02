@@ -1,8 +1,11 @@
 using System.Globalization;
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using PriceSentinel3000.Core.Journaling;
 using PriceSentinel3000.Core.MarketData;
 using PriceSentinel3000.Core.Modes;
+using PriceSentinel3000.Core.PaperTrading;
+using PriceSentinel3000.Core.Strategy;
 
 namespace PriceSentinel3000.Infrastructure.Storage;
 
@@ -297,6 +300,103 @@ public sealed class SqliteTradingJournal : ITradingJournal
         command.ExecuteNonQuery();
     }
 
+    public void AppendDecision(Guid sessionId, StrategyDecision decision)
+    {
+        EnsureInitialized();
+        ArgumentNullException.ThrowIfNull(decision);
+
+        using SqliteConnection connection = OpenConnection();
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO decisions(
+                session_id, evaluated_at_utc, state, signal, confidence, reasons_json)
+            VALUES(
+                $session_id, $evaluated_at_utc, $state, $signal, $confidence, $reasons_json);
+            """;
+        command.Parameters.AddWithValue("$session_id", sessionId.ToString("D"));
+        command.Parameters.AddWithValue("$evaluated_at_utc", Format(decision.EvaluatedAtUtc));
+        command.Parameters.AddWithValue("$state", decision.State);
+        command.Parameters.AddWithValue("$signal", decision.Signal.ToString());
+        command.Parameters.AddWithValue("$confidence", (double)decision.Confidence);
+        command.Parameters.AddWithValue("$reasons_json", JsonSerializer.Serialize(decision.Reasons));
+        command.Prepare();
+        command.ExecuteNonQuery();
+    }
+
+    public void AppendPaperFill(
+        Guid sessionId,
+        Instrument instrument,
+        PaperOrder order,
+        PaperFill fill,
+        PaperAccountSnapshot account)
+    {
+        EnsureInitialized();
+        ArgumentNullException.ThrowIfNull(instrument);
+        ArgumentNullException.ThrowIfNull(order);
+        ArgumentNullException.ThrowIfNull(fill);
+        ArgumentNullException.ThrowIfNull(account);
+
+        using SqliteConnection connection = OpenConnection();
+        using SqliteTransaction transaction = connection.BeginTransaction();
+
+        using (SqliteCommand orderCommand = connection.CreateCommand())
+        {
+            orderCommand.Transaction = transaction;
+            orderCommand.CommandText =
+                """
+                INSERT INTO orders(
+                    id, session_id, submitted_at_utc, side, quantity,
+                    order_type, limit_price, status, broker_order_id)
+                VALUES(
+                    $id, $session_id, $submitted_at_utc, $side, $quantity,
+                    'PAPER_MARKET', NULL, 'FILLED', NULL);
+                """;
+            orderCommand.Parameters.AddWithValue("$id", order.Id.ToString("D"));
+            orderCommand.Parameters.AddWithValue("$session_id", sessionId.ToString("D"));
+            orderCommand.Parameters.AddWithValue("$submitted_at_utc", Format(order.SubmittedAtUtc));
+            orderCommand.Parameters.AddWithValue("$side", order.Side.ToString());
+            orderCommand.Parameters.AddWithValue("$quantity", (double)order.Quantity);
+            orderCommand.ExecuteNonQuery();
+        }
+
+        using (SqliteCommand fillCommand = connection.CreateCommand())
+        {
+            fillCommand.Transaction = transaction;
+            fillCommand.CommandText =
+                """
+                INSERT INTO fills(order_id, filled_at_utc, quantity, price, fees)
+                VALUES($order_id, $filled_at_utc, $quantity, $price, 0);
+                """;
+            fillCommand.Parameters.AddWithValue("$order_id", order.Id.ToString("D"));
+            fillCommand.Parameters.AddWithValue("$filled_at_utc", Format(fill.FilledAtUtc));
+            fillCommand.Parameters.AddWithValue("$quantity", (double)fill.Quantity);
+            fillCommand.Parameters.AddWithValue("$price", (double)fill.Price);
+            fillCommand.ExecuteNonQuery();
+        }
+
+        using (SqliteCommand positionCommand = connection.CreateCommand())
+        {
+            positionCommand.Transaction = transaction;
+            positionCommand.CommandText =
+                """
+                INSERT INTO positions(
+                    session_id, observed_at_utc, symbol, quantity, average_price, market_value)
+                VALUES(
+                    $session_id, $observed_at_utc, $symbol, $quantity, $average_price, $market_value);
+                """;
+            positionCommand.Parameters.AddWithValue("$session_id", sessionId.ToString("D"));
+            positionCommand.Parameters.AddWithValue("$observed_at_utc", Format(fill.FilledAtUtc));
+            positionCommand.Parameters.AddWithValue("$symbol", instrument.Symbol);
+            positionCommand.Parameters.AddWithValue("$quantity", (double)account.PositionQuantity);
+            positionCommand.Parameters.AddWithValue("$average_price", (double)account.AveragePrice);
+            positionCommand.Parameters.AddWithValue("$market_value", (double)account.MarketValue);
+            positionCommand.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+    }
+
     public void CompleteSession(Guid sessionId, DateTimeOffset endedAtUtc, string outcome)
     {
         EnsureInitialized();
@@ -327,14 +427,24 @@ public sealed class SqliteTradingJournal : ITradingJournal
             """
             SELECT
                 (SELECT COUNT(*) FROM quotes WHERE session_id = $session_id),
-                (SELECT COUNT(*) FROM activities WHERE session_id = $session_id);
+                (SELECT COUNT(*) FROM activities WHERE session_id = $session_id),
+                (SELECT COUNT(*) FROM decisions WHERE session_id = $session_id),
+                (SELECT COUNT(*) FROM orders WHERE session_id = $session_id),
+                (SELECT COUNT(*) FROM fills AS f
+                    INNER JOIN orders AS o ON o.id = f.order_id
+                    WHERE o.session_id = $session_id);
             """;
         command.Parameters.AddWithValue("$session_id", sessionId.ToString("D"));
         command.Prepare();
 
         using SqliteDataReader reader = command.ExecuteReader();
         reader.Read();
-        return new(reader.GetInt32(0), reader.GetInt32(1));
+        return new(
+            reader.GetInt32(0),
+            reader.GetInt32(1),
+            reader.GetInt32(2),
+            reader.GetInt32(3),
+            reader.GetInt32(4));
     }
 
     public ReplaySourceSession? FindLatestReplaySource(Instrument instrument)

@@ -73,6 +73,20 @@ public sealed class PaperTraderSettingsValidatorTests
         Assert.DoesNotContain(errors, error => error.Contains("Maximum entries"));
     }
 
+    [Fact]
+    public void UserSpecifiedQuantityMustBePositive()
+    {
+        PaperTraderSettings settings = PaperTraderSettings.Default with
+        {
+            QuantityLimitMode = QuantityLimitMode.MaximumShares,
+            MaximumQuantity = 0m,
+        };
+
+        IReadOnlyList<string> errors = PaperTraderSettingsValidator.Validate(settings);
+
+        Assert.Contains(errors, error => error.Contains("trading quantity"));
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(481)]

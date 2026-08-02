@@ -7,6 +7,8 @@ using PriceSentinel3000.Core.Configuration;
 using PriceSentinel3000.Core.Journaling;
 using PriceSentinel3000.Core.MarketData;
 using PriceSentinel3000.Core.Modes;
+using PriceSentinel3000.Core.PaperTrading;
+using PriceSentinel3000.Core.Strategy;
 using PriceSentinel3000.Infrastructure.MarketData;
 using PriceSentinel3000.Infrastructure.Storage;
 
@@ -23,6 +25,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private decimal _startingBalance;
     private AmountBasis _positionSizeBasis;
     private decimal _positionSizeValue;
+    private QuantityLimitMode _quantityLimitMode;
+    private decimal _maximumQuantity;
     private bool _unlimitedEntries;
     private int _maximumEntriesPerDay;
     private AmountBasis _maximumDailyLossBasis;
@@ -50,10 +54,20 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private string _marketDataStateLabel = "OFFLINE";
     private string _strategyMessage = "Select Paper Trader or Replay to start the data engine.";
     private string _strategyStateLabel = "IDLE";
+    private string _strategyMetrics = "RSI --  |  MOM --  |  CONF --";
+    private decimal _paperBuyingPower;
+    private decimal _paperEquity;
+    private decimal _paperPositionQuantity;
+    private decimal _paperAveragePrice;
+    private decimal _paperRealizedProfitLoss;
+    private decimal _paperUnrealizedProfitLoss;
+    private int _paperEntries;
     private CancellationTokenSource? _sessionCancellation;
     private JournalSession? _activeSession;
     private PriceRingBuffer? _ringBuffer;
     private MarketDataRequest? _marketDataRequest;
+    private PaperTradingEngine? _paperTradingEngine;
+    private readonly Dictionary<DateTimeOffset, ChartTradeMarker> _tradeMarkers = [];
     private bool _disposed;
 
     public MainViewModel()
@@ -75,6 +89,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _startingBalance = defaults.StartingBalance;
         _positionSizeBasis = defaults.PositionSizeBasis;
         _positionSizeValue = defaults.PositionSizeValue;
+        _quantityLimitMode = defaults.QuantityLimitMode;
+        _maximumQuantity = defaults.MaximumQuantity;
         _unlimitedEntries = defaults.UnlimitedEntries;
         _maximumEntriesPerDay = defaults.MaximumEntriesPerDay;
         _maximumDailyLossBasis = defaults.MaximumDailyLossBasis;
@@ -89,6 +105,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _replayTime = defaults.ReplayTime;
         _replayDurationMinutes = defaults.ReplayDurationMinutes;
         _replaySpeed = defaults.ReplaySpeed;
+        _paperBuyingPower = defaults.StartingBalance;
+        _paperEquity = defaults.StartingBalance;
         _statusMessage = "Choose Replay, Paper Trader, or LIVE on the rotary selector to begin.";
 
         PositionSizeOptions =
@@ -100,6 +118,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         [
             new("Fixed amount ($)", AmountBasis.FixedAmount),
             new("Account equity (%)", AmountBasis.AccountPercentage),
+        ];
+        QuantityLimitOptions =
+        [
+            new("Unlimited", QuantityLimitMode.Unlimited),
+            new("Maximum shares", QuantityLimitMode.MaximumShares),
         ];
         StopLossOptions =
         [
@@ -120,14 +143,15 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         AddActivity("Application started with operating mode OFF.");
         AddActivity(
             _journalReady
-                ? "Stage 4 data engine loaded; SQLite journal is ready."
-                : "Stage 4 data engine loaded; SQLite journal could not be initialized.",
+                ? "Stage 5 paper strategy loaded; SQLite journal is ready."
+                : "Stage 5 paper strategy loaded; SQLite journal could not be initialized.",
             _journalReady ? "INFO" : "ERROR");
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public IReadOnlyList<SelectionOption<AmountBasis>> PositionSizeOptions { get; }
+    public IReadOnlyList<SelectionOption<QuantityLimitMode>> QuantityLimitOptions { get; }
     public IReadOnlyList<SelectionOption<AmountBasis>> DailyLossOptions { get; }
     public IReadOnlyList<SelectionOption<StopLossBasis>> StopLossOptions { get; }
 
@@ -168,6 +192,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public bool HasMarketData => _hasMarketData;
     public string StrategyMessage => _strategyMessage;
     public string StrategyStateLabel => _strategyStateLabel;
+    public string StrategyMetrics => _strategyMetrics;
     public string JournalStatus => _journalReady ? "SQLITE WAL" : "OFFLINE";
     public string PriceActionCaption => $"{QuotePollingSeconds} SECOND PRICE ACTION";
     public string PrimaryActionLabel =>
@@ -195,7 +220,16 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         ? "—"
         : Symbol.Trim().ToUpperInvariant();
     public string BuyingPowerDisplay =>
-        StartingBalance.ToString("C", CultureInfo.CurrentCulture);
+        _paperBuyingPower.ToString("C", CultureInfo.CurrentCulture);
+    public string AccountEquityDisplay =>
+        _paperEquity.ToString("C", CultureInfo.CurrentCulture);
+    public string PositionDisplay => _paperPositionQuantity <= 0m
+        ? "FLAT"
+        : $"{_paperPositionQuantity:0.######} @ {_paperAveragePrice:C2}";
+    public string ProfitLossDisplay =>
+        $"{_paperRealizedProfitLoss:+$0.00;-$0.00;$0.00} / {_paperUnrealizedProfitLoss:+$0.00;-$0.00;$0.00}";
+    public string EntriesDisplay => _paperEntries.ToString(CultureInfo.InvariantCulture);
+    public bool IsQuantityLimited => QuantityLimitMode is QuantityLimitMode.MaximumShares;
     public string BufferCaption => $"{BufferSegments.Count} × 1 MINUTE BLOCKS";
 
     public string Symbol
@@ -217,6 +251,13 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         {
             if (SetField(ref _startingBalance, value))
             {
+                if (!IsSessionRunning)
+                {
+                    _paperBuyingPower = value;
+                    _paperEquity = value;
+                    OnPropertyChanged(nameof(AccountEquityDisplay));
+                }
+
                 OnPropertyChanged(nameof(BuyingPowerDisplay));
             }
         }
@@ -232,6 +273,24 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         get => _positionSizeValue;
         set => SetField(ref _positionSizeValue, value);
+    }
+
+    public QuantityLimitMode QuantityLimitMode
+    {
+        get => _quantityLimitMode;
+        set
+        {
+            if (SetField(ref _quantityLimitMode, value))
+            {
+                OnPropertyChanged(nameof(IsQuantityLimited));
+            }
+        }
+    }
+
+    public decimal MaximumQuantity
+    {
+        get => _maximumQuantity;
+        set => SetField(ref _maximumQuantity, value);
     }
 
     public bool UnlimitedEntries
@@ -587,10 +646,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _journal.AppendQuotes(_activeSession.Id, [current], QuoteIngestionKind.Live);
         _ringBuffer.Merge([current]);
         SetQuoteMarketState(current);
+        ProcessPaperObservation(current);
         RefreshMarketView();
-        _strategyStateLabel = "OBSERVING";
-        _strategyMessage = "Real prices are flowing. Any strategy orders in Paper Trader stay simulated and can never reach Robinhood.";
-        NotifyStrategyProperties();
         StatusMessage = $"Paper Trader is watching real {instrument.Symbol} prices every {settings.QuotePollingSeconds} seconds; order execution is paper-only.";
         AddActivity(
             $"Paper Trader started with {warmMerge.Added} real warm-start bars plus the current Robinhood quote; no real orders can be sent.");
@@ -633,6 +690,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                     observedAt.AddSeconds(settings.ReconciliationSeconds);
             }
 
+            ProcessPaperObservation(quote);
             RefreshMarketView();
         }
     }
@@ -699,6 +757,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             };
             _journal.AppendQuotes(_activeSession!.Id, [replayed], QuoteIngestionKind.Replay);
             _ringBuffer!.Merge([replayed]);
+            ProcessPaperObservation(replayed, allowHistoricalSource: true);
             RefreshMarketView();
         }
 
@@ -715,11 +774,24 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         TradingMode mode)
     {
         _ringBuffer = new(instrument, TimeSpan.FromMinutes(settings.BufferMinutes));
+        _paperTradingEngine = new(instrument, settings);
         _marketDataRequest = null;
+        _tradeMarkers.Clear();
         ChartPoints.Clear();
         _hasMarketData = false;
         _currentPrice = "--";
         _bidAskDisplay = "-- / --";
+        UpdatePaperAccount(new(
+            settings.StartingBalance,
+            settings.StartingBalance,
+            settings.StartingBalance,
+            0m,
+            0m,
+            0m,
+            0m,
+            0m,
+            0,
+            false));
         OnPropertyChanged(nameof(HasMarketData));
         OnPropertyChanged(nameof(CurrentPrice));
         OnPropertyChanged(nameof(BidAskDisplay));
@@ -791,7 +863,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
         foreach (MarketQuote quote in snapshot)
         {
-            ChartPoints.Add(new(quote.SourceTimestampUtc, quote.Last));
+            _tradeMarkers.TryGetValue(quote.SourceTimestampUtc, out ChartTradeMarker marker);
+            ChartPoints.Add(new(quote.SourceTimestampUtc, quote.Last, marker));
         }
 
         MarketQuote latest = snapshot[^1];
@@ -836,9 +909,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     private void SetQuoteMarketState(MarketQuote quote)
     {
-        TimeSpan age = quote.ObservedAtUtc - quote.SourceTimestampUtc;
-
-        if (age > TimeSpan.FromMinutes(2))
+        if (!IsFreshObservation(quote))
         {
             SetMarketDataState("ROBINHOOD CONNECTED", "MARKET CLOSED");
             return;
@@ -872,6 +943,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         StartingBalance = StartingBalance,
         PositionSizeBasis = PositionSizeBasis,
         PositionSizeValue = PositionSizeValue,
+        QuantityLimitMode = QuantityLimitMode,
+        MaximumQuantity = MaximumQuantity,
         UnlimitedEntries = UnlimitedEntries,
         MaximumEntriesPerDay = MaximumEntriesPerDay,
         MaximumDailyLossBasis = MaximumDailyLossBasis,
@@ -966,7 +1039,81 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         OnPropertyChanged(nameof(StrategyMessage));
         OnPropertyChanged(nameof(StrategyStateLabel));
+        OnPropertyChanged(nameof(StrategyMetrics));
     }
+
+    private void ProcessPaperObservation(
+        MarketQuote trigger,
+        bool allowHistoricalSource = false)
+    {
+        if (_ringBuffer is null ||
+            _paperTradingEngine is null ||
+            _activeSession is null)
+        {
+            return;
+        }
+
+        if (!allowHistoricalSource && !IsFreshObservation(trigger))
+        {
+            _strategyStateLabel = "MARKET CLOSED";
+            _strategyMessage = "The newest Robinhood venue timestamp is stale; paper decisions and fills are paused.";
+            _strategyMetrics = "RSI --  |  MOM --  |  CONF --";
+            NotifyStrategyProperties();
+            return;
+        }
+
+        PaperTradeResult result = _paperTradingEngine.Process(_ringBuffer.Snapshot());
+        _journal.AppendDecision(_activeSession.Id, result.Decision);
+        UpdatePaperAccount(result.Account);
+        _strategyStateLabel = result.Decision.State;
+        _strategyMessage = result.Decision.Reasons.FirstOrDefault() ?? "Observing price action.";
+        _strategyMetrics =
+            $"RSI {(result.Decision.SimpleRsi is null ? "--" : result.Decision.SimpleRsi.Value.ToString("0.0", CultureInfo.InvariantCulture))}" +
+            $"  |  MOM {result.Decision.MomentumPercent:+0.000;-0.000;0.000}%" +
+            $"  |  CONF {result.Decision.Confidence:P0}";
+        NotifyStrategyProperties();
+
+        if (result.Order is null || result.Fill is null)
+        {
+            return;
+        }
+
+        _journal.AppendPaperFill(
+            _activeSession.Id,
+            _ringBuffer.Instrument,
+            result.Order,
+            result.Fill,
+            result.Account);
+        _tradeMarkers[result.Fill.FilledAtUtc] = result.Fill.Side is PaperOrderSide.Buy
+            ? ChartTradeMarker.Buy
+            : ChartTradeMarker.Sell;
+
+        string profitLoss = result.Fill.Side is PaperOrderSide.Sell
+            ? $"; realized {result.Fill.RealizedProfitLoss:+$0.00;-$0.00;$0.00}"
+            : string.Empty;
+        AddActivity(
+            $"PAPER {result.Fill.Side.ToString().ToUpperInvariant()} filled {result.Fill.Quantity:0.######} {SymbolDisplay} @ {result.Fill.Price:C2}{profitLoss}. " +
+            $"Reason: {result.Decision.State}.");
+    }
+
+    private void UpdatePaperAccount(PaperAccountSnapshot account)
+    {
+        _paperBuyingPower = account.BuyingPower;
+        _paperEquity = account.Equity;
+        _paperPositionQuantity = account.PositionQuantity;
+        _paperAveragePrice = account.AveragePrice;
+        _paperRealizedProfitLoss = account.RealizedProfitLoss;
+        _paperUnrealizedProfitLoss = account.UnrealizedProfitLoss;
+        _paperEntries = account.EntriesToday;
+        OnPropertyChanged(nameof(BuyingPowerDisplay));
+        OnPropertyChanged(nameof(AccountEquityDisplay));
+        OnPropertyChanged(nameof(PositionDisplay));
+        OnPropertyChanged(nameof(ProfitLossDisplay));
+        OnPropertyChanged(nameof(EntriesDisplay));
+    }
+
+    private static bool IsFreshObservation(MarketQuote quote) =>
+        quote.ObservedAtUtc - quote.SourceTimestampUtc <= TimeSpan.FromMinutes(2);
 
     private bool SetField<T>(
         ref T field,

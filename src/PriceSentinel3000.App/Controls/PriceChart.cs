@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Specialized;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 using PriceSentinel3000.App.ViewModels;
@@ -95,12 +96,79 @@ public sealed class PriceChart : FrameworkElement
         var linePen = new Pen(accentBrush, 2);
         drawingContext.DrawGeometry(null, linePen, geometry);
 
+        DrawTradeMarkers(
+            drawingContext,
+            points,
+            minimum,
+            range,
+            horizontalPadding,
+            verticalPadding,
+            chartWidth,
+            chartHeight);
+
         PricePointViewModel last = points[^1];
         double lastNormalized = (double)((last.Price - minimum) / range);
         var lastPoint = new Point(
             horizontalPadding + chartWidth,
             verticalPadding + chartHeight * (1d - lastNormalized));
         drawingContext.DrawEllipse(accentBrush, null, lastPoint, 4, 4);
+    }
+
+    private void DrawTradeMarkers(
+        DrawingContext drawingContext,
+        IReadOnlyList<PricePointViewModel> points,
+        decimal minimum,
+        decimal range,
+        double horizontalPadding,
+        double verticalPadding,
+        double chartWidth,
+        double chartHeight)
+    {
+        var typeface = new Typeface("Segoe UI Semibold");
+        double pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+
+        for (int index = 0; index < points.Count; index++)
+        {
+            PricePointViewModel item = points[index];
+
+            if (item.Marker is ChartTradeMarker.None)
+            {
+                continue;
+            }
+
+            double x = horizontalPadding +
+                chartWidth * index / Math.Max(1d, points.Count - 1d);
+            double normalized = (double)((item.Price - minimum) / range);
+            double y = verticalPadding + chartHeight * (1d - normalized);
+            bool isBuy = item.Marker is ChartTradeMarker.Buy;
+            Color color = isBuy
+                ? Color.FromRgb(94, 230, 177)
+                : Color.FromRgb(255, 138, 120);
+            var brush = new SolidColorBrush(color);
+            var pen = new Pen(brush, 2);
+            double direction = isBuy ? 1d : -1d;
+            var marker = new StreamGeometry();
+
+            using (StreamGeometryContext context = marker.Open())
+            {
+                context.BeginFigure(new(x, y), isFilled: true, isClosed: true);
+                context.LineTo(new(x - 6, y + direction * 10), true, false);
+                context.LineTo(new(x + 6, y + direction * 10), true, false);
+            }
+
+            marker.Freeze();
+            drawingContext.DrawGeometry(brush, pen, marker);
+            var text = new FormattedText(
+                isBuy ? "BUY" : "SELL",
+                CultureInfo.InvariantCulture,
+                FlowDirection.LeftToRight,
+                typeface,
+                9d,
+                brush,
+                pixelsPerDip);
+            double labelY = isBuy ? y + 12d : y - text.Height - 12d;
+            drawingContext.DrawText(text, new(x - text.Width / 2d, labelY));
+        }
     }
 
     private static void OnPointsChanged(
