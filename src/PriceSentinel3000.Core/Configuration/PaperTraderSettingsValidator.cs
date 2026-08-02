@@ -48,6 +48,13 @@ public static class PaperTraderSettingsValidator
         {
             errors.Add("Stop loss must be greater than zero.");
         }
+        else if (settings.StopLossBasis is
+                     StopLossBasis.PurchasePriceDeclinePercentage &&
+                 settings.StopLossValue > 100m)
+        {
+            errors.Add("Purchase-price decline cannot exceed 100%.");
+        }
+
         if (settings.BufferMinutes is < 5 or > 15)
         {
             errors.Add("Ring buffer must be between 5 and 15 minutes.");

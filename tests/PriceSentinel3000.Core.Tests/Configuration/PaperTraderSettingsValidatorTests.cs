@@ -44,6 +44,20 @@ public sealed class PaperTraderSettingsValidatorTests
         Assert.Contains(errors, error => error.Contains("Position size percentage"));
     }
 
+    [Fact]
+    public void PurchasePriceDeclineOverOneHundredPercent_IsRejected()
+    {
+        PaperTraderSettings settings = PaperTraderSettings.Default with
+        {
+            StopLossBasis = StopLossBasis.PurchasePriceDeclinePercentage,
+            StopLossValue = 101m,
+        };
+
+        IReadOnlyList<string> errors = PaperTraderSettingsValidator.Validate(settings);
+
+        Assert.Contains(errors, error => error.Contains("Purchase-price decline"));
+    }
+
     [Theory]
     [InlineData(4)]
     [InlineData(16)]

@@ -131,8 +131,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         ];
         StopLossOptions =
         [
-            new("Position loss ($)", StopLossBasis.PositionLossAmount),
-            new("Buy price ($)", StopLossBasis.BuyPriceAmount),
+            new(
+                "Purchase price decline (%)",
+                StopLossBasis.PurchasePriceDeclinePercentage),
+            new(
+                "Total position loss ($)",
+                StopLossBasis.TotalPositionLossAmount),
         ];
 
         StartSessionCommand = new RelayCommand(

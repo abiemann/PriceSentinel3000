@@ -12,7 +12,8 @@ public sealed record PaperTraderSettings
     public int MaximumEntriesPerDay { get; init; } = 10;
     public AmountBasis MaximumDailyLossBasis { get; init; } = AmountBasis.AccountPercentage;
     public decimal MaximumDailyLossValue { get; init; } = 2m;
-    public StopLossBasis StopLossBasis { get; init; } = StopLossBasis.BuyPriceAmount;
+    public StopLossBasis StopLossBasis { get; init; } =
+        StopLossBasis.PurchasePriceDeclinePercentage;
     public decimal StopLossValue { get; init; } = 1m;
     public int BufferMinutes { get; init; } = 7;
     public int QuotePollingSeconds { get; init; } = 5;

@@ -10,8 +10,8 @@ public sealed class JsonUserPreferencesStoreTests
     {
         Assert.Equal(0, (int)QuantityLimitMode.AsManyAsPossible);
         Assert.Equal(1, (int)QuantityLimitMode.NoMoreThan);
-        Assert.Equal(0, (int)StopLossBasis.PositionLossAmount);
-        Assert.Equal(1, (int)StopLossBasis.BuyPriceAmount);
+        Assert.Equal(0, (int)StopLossBasis.TotalPositionLossAmount);
+        Assert.Equal(1, (int)StopLossBasis.PurchasePriceDeclinePercentage);
     }
 
     [Fact]
@@ -32,7 +32,7 @@ public sealed class JsonUserPreferencesStoreTests
             MaximumEntriesPerDay = 23,
             MaximumDailyLossBasis = AmountBasis.FixedAmount,
             MaximumDailyLossValue = 125m,
-            StopLossBasis = StopLossBasis.PositionLossAmount,
+            StopLossBasis = StopLossBasis.TotalPositionLossAmount,
             StopLossValue = 18m,
             BufferMinutes = 9,
             QuotePollingSeconds = 7,

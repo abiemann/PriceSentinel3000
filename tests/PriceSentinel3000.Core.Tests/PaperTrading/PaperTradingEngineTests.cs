@@ -18,7 +18,7 @@ public sealed class PaperTradingEngineTests
             PositionSizeValue = 1_000m,
             QuantityLimitMode = QuantityLimitMode.NoMoreThan,
             MaximumQuantity = 2m,
-            StopLossBasis = StopLossBasis.BuyPriceAmount,
+            StopLossBasis = StopLossBasis.PurchasePriceDeclinePercentage,
             StopLossValue = 1m,
         };
         var engine = new PaperTradingEngine(instrument, settings);
@@ -75,7 +75,7 @@ public sealed class PaperTradingEngineTests
         Assert.Equal(98.40m, sell.Fill.Price);
         Assert.Equal(0m, sell.Account.PositionQuantity);
         Assert.True(sell.Account.RealizedProfitLoss < 0m);
-        Assert.Contains("per share", sell.Decision.Reasons[0]);
+        Assert.Contains("purchase-price", sell.Decision.Reasons[0]);
     }
 
     [Fact]
@@ -153,6 +153,49 @@ public sealed class PaperTradingEngineTests
     }
 
     [Fact]
+    public void Engine_TotalPositionLossUsesCombinedDollarLoss()
+    {
+        var instrument = new Instrument("SOFI");
+        PaperTraderSettings settings = PaperTraderSettings.Default with
+        {
+            PositionSizeBasis = AmountBasis.FixedAmount,
+            PositionSizeValue = 100m,
+            QuantityLimitMode = QuantityLimitMode.NoMoreThan,
+            MaximumQuantity = 2m,
+            StopLossBasis = StopLossBasis.TotalPositionLossAmount,
+            StopLossValue = 1m,
+        };
+        var engine = new PaperTradingEngine(
+            instrument,
+            settings,
+            new ScriptedStrategy(StrategySignalKind.Buy));
+        DateTimeOffset start = new(2026, 8, 1, 16, 0, 0, TimeSpan.Zero);
+        var quotes = new List<MarketQuote>
+        {
+            Quote(instrument, start, 10m),
+        };
+
+        PaperTradeResult buy = engine.Process(quotes);
+
+        Assert.Equal(2m, buy.Fill?.Quantity);
+        Assert.Equal(10.01m, buy.Fill?.Price);
+
+        quotes.Add(Quote(instrument, start.AddSeconds(5), 9.61m));
+        PaperTradeResult beforeStop = engine.Process(quotes);
+
+        Assert.NotEqual(StrategySignalKind.StopLoss, beforeStop.Decision.Signal);
+        Assert.Equal(2m, beforeStop.Account.PositionQuantity);
+
+        quotes.Add(Quote(instrument, start.AddSeconds(10), 9.41m));
+        PaperTradeResult stopped = engine.Process(quotes);
+
+        Assert.Equal(StrategySignalKind.StopLoss, stopped.Decision.Signal);
+        Assert.Equal(PaperOrderSide.Sell, stopped.Fill?.Side);
+        Assert.Equal(0m, stopped.Account.PositionQuantity);
+        Assert.Contains("position loss", stopped.Decision.Reasons[0]);
+    }
+
+    [Fact]
     public void Engine_DailyLossLiquidatesAndLocksAccount()
     {
         var instrument = new Instrument("SOFI");
@@ -162,7 +205,7 @@ public sealed class PaperTradingEngineTests
             PositionSizeValue = 1_000m,
             MaximumDailyLossBasis = AmountBasis.FixedAmount,
             MaximumDailyLossValue = 1m,
-            StopLossBasis = StopLossBasis.PositionLossAmount,
+            StopLossBasis = StopLossBasis.TotalPositionLossAmount,
             StopLossValue = 1_000m,
         };
         var engine = new PaperTradingEngine(

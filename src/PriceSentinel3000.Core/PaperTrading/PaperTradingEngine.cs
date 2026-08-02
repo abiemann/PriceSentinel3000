@@ -149,18 +149,18 @@ public sealed class PaperTradingEngine
         decimal unrealizedLoss = Math.Max(0m, (_averagePrice - mark) * _positionQuantity);
         decimal stopLimit = _settings.StopLossBasis switch
         {
-            StopLossBasis.PositionLossAmount => _settings.StopLossValue,
-            _ => _positionQuantity * _settings.StopLossValue,
+            StopLossBasis.TotalPositionLossAmount => _settings.StopLossValue,
+            _ => _averagePrice * _positionQuantity * _settings.StopLossValue / 100m,
         };
 
         if (unrealizedLoss >= stopLimit)
         {
             string reason = _settings.StopLossBasis switch
             {
-                StopLossBasis.PositionLossAmount =>
+                StopLossBasis.TotalPositionLossAmount =>
                     $"Paper position loss ${unrealizedLoss:0.00} reached the ${stopLimit:0.00} stop.",
                 _ =>
-                    $"Paper price decline ${Math.Max(0m, _averagePrice - mark):0.00} per share reached the ${_settings.StopLossValue:0.00} buy-price stop.",
+                    $"Paper price decline {(_averagePrice == 0m ? 0m : Math.Max(0m, (_averagePrice - mark) / _averagePrice * 100m)):0.00}% reached the {_settings.StopLossValue:0.00}% purchase-price stop.",
             };
             return new(
                 latest.SourceTimestampUtc,
