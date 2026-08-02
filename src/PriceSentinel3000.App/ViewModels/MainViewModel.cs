@@ -913,10 +913,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             return;
         }
 
-        ChartPoints.Clear();
         IReadOnlyList<PriceCandle> candles = PriceCandleAggregator.Aggregate(
             snapshot,
             TimeSpan.FromSeconds(15));
+        var refreshedPoints = new List<PricePointViewModel>(candles.Count);
 
         foreach (PriceCandle candle in candles)
         {
@@ -927,7 +927,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             ChartTradeMarker marker = markedQuote is null
                 ? ChartTradeMarker.None
                 : _tradeMarkers[markedQuote.SourceTimestampUtc];
-            ChartPoints.Add(new(
+            refreshedPoints.Add(new(
                 candle.StartsAtUtc,
                 candle.Open,
                 candle.High,
@@ -936,6 +936,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 marker,
                 markedQuote?.Last));
         }
+
+        SynchronizeChartPoints(refreshedPoints);
 
         MarketQuote latest = snapshot[^1];
         _currentPrice = latest.Last.ToString("$0.00", CultureInfo.InvariantCulture);
@@ -958,6 +960,30 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         for (int index = 0; index < BufferSegments.Count; index++)
         {
             BufferSegments[index].Update(blocks[index]);
+        }
+    }
+
+    private void SynchronizeChartPoints(
+        IReadOnlyList<PricePointViewModel> refreshedPoints)
+    {
+        int sharedCount = Math.Min(ChartPoints.Count, refreshedPoints.Count);
+
+        for (int index = 0; index < sharedCount; index++)
+        {
+            if (ChartPoints[index] != refreshedPoints[index])
+            {
+                ChartPoints[index] = refreshedPoints[index];
+            }
+        }
+
+        while (ChartPoints.Count > refreshedPoints.Count)
+        {
+            ChartPoints.RemoveAt(ChartPoints.Count - 1);
+        }
+
+        for (int index = sharedCount; index < refreshedPoints.Count; index++)
+        {
+            ChartPoints.Add(refreshedPoints[index]);
         }
     }
 
