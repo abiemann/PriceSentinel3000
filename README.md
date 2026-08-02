@@ -1,8 +1,8 @@
 # PriceSentinel 3000
 
-A Windows desktop application for real-price monitoring, historical playback,
-paper-first strategy research, and guarded live execution for a user-selected
-stock or ETF.
+A Windows desktop application that connects to Robinhood Agentic Trading for
+real-time price monitoring, historical playback, paper-first strategy research,
+and guarded live execution of a user-selected stock or ETF.
 
 ![PriceSentinel 3000 showing a paused historical Replay with candlesticks, RSI, trade markers, ring buffer, and activity journal](docs/images/pricesentinel3000-replay.png)
 
@@ -26,7 +26,7 @@ execution path to the authenticated Robinhood data foundation:
 - Replay accepts a ticker plus an exact local date/time and emits that historical
   15-second window as though each observation has just arrived; it can be paused,
   resumed, or stopped without losing the captured chart and paper-account state
-- Replay local start/end range (up to 480 minutes) and playback speed (1x-100x)
+- Replay local start/end range (up to 24 hours) and playback speed (1x-100x)
   are tunable
 - A tunable 5-15 minute rolling buffer is analyzed as individual one-minute
   blocks and as a whole

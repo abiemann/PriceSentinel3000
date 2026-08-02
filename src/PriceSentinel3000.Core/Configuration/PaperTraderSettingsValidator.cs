@@ -116,9 +116,9 @@ public static class PaperTraderSettingsValidator
 
             if (!hasValidReplayRange ||
                 replayDuration < TimeSpan.FromMinutes(1) ||
-                replayDuration > TimeSpan.FromMinutes(480))
+                replayDuration > TimeSpan.FromHours(24))
             {
-                errors.Add("Replay range must be between 1 and 480 minutes.");
+                errors.Add("Replay range must be between 1 minute and 24 hours.");
             }
         }
 

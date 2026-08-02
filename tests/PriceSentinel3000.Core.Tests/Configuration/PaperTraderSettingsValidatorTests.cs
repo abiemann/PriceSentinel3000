@@ -105,7 +105,7 @@ public sealed class PaperTraderSettingsValidatorTests
     [InlineData("09:30", "09:30")]
     [InlineData("09:30", "17:31")]
     [InlineData("09:30", "09:29")]
-    public void ReplayRangeOutsideMaximumDuration_IsRejected(
+    public void ReplayRangeUpToTwentyFourHours_IsAccepted(
         string startTime,
         string endTime)
     {
@@ -117,7 +117,7 @@ public sealed class PaperTraderSettingsValidatorTests
 
         IReadOnlyList<string> errors = PaperTraderSettingsValidator.Validate(settings);
 
-        Assert.Contains(errors, error => error.Contains("Replay range"));
+        Assert.DoesNotContain(errors, error => error.Contains("Replay range"));
     }
 
     [Theory]
