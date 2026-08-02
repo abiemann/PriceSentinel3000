@@ -404,9 +404,9 @@
                                              Text="{Binding ReplayDate, UpdateSourceTrigger=LostFocus}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Local start (HH:mm)" />
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Replay speed (x)" />
                                     <TextBox Style="{StaticResource InputTextBoxStyle}"
-                                             Text="{Binding ReplayTime, UpdateSourceTrigger=LostFocus}" />
+                                             Text="{Binding ReplaySpeed, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
                                 </StackPanel>
                             </Grid>
                             <Grid Margin="0,12,0,0">
@@ -416,14 +416,14 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
-                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Replay duration (min)" />
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Local start (HH:mm)" />
                                     <TextBox Style="{StaticResource InputTextBoxStyle}"
-                                             Text="{Binding ReplayDurationMinutes, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                                             Text="{Binding ReplayTime, UpdateSourceTrigger=LostFocus}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Replay speed (x)" />
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Local end (HH:mm)" />
                                     <TextBox Style="{StaticResource InputTextBoxStyle}"
-                                             Text="{Binding ReplaySpeed, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                                             Text="{Binding ReplayEndTime, UpdateSourceTrigger=LostFocus}" />
                                 </StackPanel>
                             </Grid>
                         </StackPanel>

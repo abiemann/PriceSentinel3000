@@ -44,4 +44,64 @@ public static class ReplaySchedule
             localZone.GetUtcOffset(localTime));
         return true;
     }
+
+    public static bool TryParseLocalRange(
+        string? dateValue,
+        string? startTimeValue,
+        string? endTimeValue,
+        out DateTimeOffset replayStart,
+        out DateTimeOffset replayEnd)
+    {
+        replayEnd = default;
+
+        if (!TryParseLocal(dateValue, startTimeValue, out replayStart) ||
+            !TryParseLocal(dateValue, endTimeValue, out replayEnd))
+        {
+            return false;
+        }
+
+        if (replayEnd > replayStart)
+        {
+            return true;
+        }
+
+        if (!DateOnly.TryParseExact(
+                dateValue?.Trim(),
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out DateOnly date))
+        {
+            return false;
+        }
+
+        return TryParseLocal(
+            date.AddDays(1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            endTimeValue,
+            out replayEnd);
+    }
+
+    public static bool TryCalculateEndTime(
+        string? startTimeValue,
+        int durationMinutes,
+        out string endTimeValue)
+    {
+        endTimeValue = string.Empty;
+
+        if (durationMinutes < 1 ||
+            !TimeOnly.TryParseExact(
+                startTimeValue?.Trim(),
+                SupportedTimeFormats,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out TimeOnly startTime))
+        {
+            return false;
+        }
+
+        endTimeValue = startTime
+            .AddMinutes(durationMinutes)
+            .ToString("HH:mm", CultureInfo.InvariantCulture);
+        return true;
+    }
 }

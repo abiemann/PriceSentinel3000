@@ -20,7 +20,7 @@ authenticated Robinhood data foundation:
   15-second Robinhood equity bars
 - Replay accepts a ticker plus an exact local date/time and emits that historical
   15-second window as though each observation has just arrived
-- Replay duration (1-480 minutes) and playback speed (1x-100x) are tunable
+- Replay local start/end range (up to 480 minutes) and playback speed (1x-100x) are tunable
 - A tunable 5-15 minute rolling buffer is analyzed as individual one-minute
   blocks and as a whole
 - Bottom detection combines a meaningful decline, lingering or separated
@@ -96,7 +96,7 @@ them later; they are not a promise that the labeled regions can be captured live
 ## Replay workflow
 
 1. After the required startup login, select **Replay** and enter the ticker,
-   local date (`yyyy-MM-dd`), local start time (`HH:mm`), duration, and playback
+   local date (`yyyy-MM-dd`), local start/end times (`HH:mm`), and playback
    speed, then click **Start Replay**.
 2. One bounded request loads actual 15-second Robinhood bars for precisely that
    start/end window, using extended-hours bounds.

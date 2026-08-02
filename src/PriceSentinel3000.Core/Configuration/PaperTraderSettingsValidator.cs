@@ -86,17 +86,40 @@ public static class PaperTraderSettingsValidator
             errors.Add("Replay date must use yyyy-MM-dd format.");
         }
 
-        if (!ReplaySchedule.TryParseLocal(
+        bool hasValidReplayStart = ReplaySchedule.TryParseLocal(
                 settings.ReplayDate,
                 settings.ReplayTime,
-                out _))
+                out _);
+        if (!hasValidReplayStart)
         {
-            errors.Add("Replay time must use 24-hour HH:mm format and identify a valid local time.");
+            errors.Add("Replay start must use 24-hour HH:mm format and identify a valid local time.");
         }
 
-        if (settings.ReplayDurationMinutes is < 1 or > 480)
+        bool hasValidReplayEnd = ReplaySchedule.TryParseLocal(
+            settings.ReplayDate,
+            settings.ReplayEndTime,
+            out _);
+        if (!hasValidReplayEnd)
         {
-            errors.Add("Replay duration must be between 1 and 480 minutes.");
+            errors.Add("Replay end must use 24-hour HH:mm format and identify a valid local time.");
+        }
+
+        if (hasValidReplayStart && hasValidReplayEnd)
+        {
+            bool hasValidReplayRange = ReplaySchedule.TryParseLocalRange(
+                settings.ReplayDate,
+                settings.ReplayTime,
+                settings.ReplayEndTime,
+                out DateTimeOffset replayStart,
+                out DateTimeOffset replayEnd);
+            TimeSpan replayDuration = replayEnd - replayStart;
+
+            if (!hasValidReplayRange ||
+                replayDuration < TimeSpan.FromMinutes(1) ||
+                replayDuration > TimeSpan.FromMinutes(480))
+            {
+                errors.Add("Replay range must be between 1 and 480 minutes.");
+            }
         }
 
         if (settings.ReplaySpeed is < 1 or > 100)

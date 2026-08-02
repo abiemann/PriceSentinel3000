@@ -40,7 +40,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private int _reconciliationOverlapSeconds;
     private string _replayDate;
     private string _replayTime;
-    private int _replayDurationMinutes;
+    private string _replayEndTime;
     private decimal _replaySpeed;
     private bool _isSessionRunning;
     private bool _isStartingSession;
@@ -108,7 +108,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _reconciliationOverlapSeconds = defaults.ReconciliationOverlapSeconds;
         _replayDate = defaults.ReplayDate;
         _replayTime = defaults.ReplayTime;
-        _replayDurationMinutes = defaults.ReplayDurationMinutes;
+        _replayEndTime = defaults.ReplayEndTime;
         _replaySpeed = defaults.ReplaySpeed;
         _paperBuyingPower = defaults.StartingBalance;
         _paperEquity = defaults.StartingBalance;
@@ -403,10 +403,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         set => SetPreferenceField(ref _replayTime, value);
     }
 
-    public int ReplayDurationMinutes
+    public string ReplayEndTime
     {
-        get => _replayDurationMinutes;
-        set => SetPreferenceField(ref _replayDurationMinutes, value);
+        get => _replayEndTime;
+        set => SetPreferenceField(ref _replayEndTime, value);
     }
 
     public decimal ReplaySpeed
@@ -730,16 +730,16 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         PaperTraderSettings settings)
     {
         CancellationToken token = _sessionCancellation!.Token;
-        if (!ReplaySchedule.TryParseLocal(
+        if (!ReplaySchedule.TryParseLocalRange(
                 settings.ReplayDate,
                 settings.ReplayTime,
-                out DateTimeOffset replayStart))
+                settings.ReplayEndTime,
+                out DateTimeOffset replayStart,
+                out DateTimeOffset replayEnd))
         {
-            throw new InvalidOperationException("The Replay date or time is invalid.");
+            throw new InvalidOperationException("The Replay date, start, or end time is invalid.");
         }
 
-        DateTimeOffset replayEnd =
-            replayStart.AddMinutes(settings.ReplayDurationMinutes);
         StatusMessage = $"Loading real 15-second {instrument.Symbol} history from {replayStart:g}...";
         SetMarketDataState("ROBINHOOD LOGIN", "AUTHORIZING", isConnected: false);
         await _marketDataSource.ConnectAsync(token);
@@ -1012,7 +1012,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         ReconciliationOverlapSeconds = ReconciliationOverlapSeconds,
         ReplayDate = ReplayDate,
         ReplayTime = ReplayTime,
-        ReplayDurationMinutes = ReplayDurationMinutes,
+        ReplayEndTime = ReplayEndTime,
         ReplaySpeed = ReplaySpeed,
     };
 

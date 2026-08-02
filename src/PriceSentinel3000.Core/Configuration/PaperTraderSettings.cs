@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace PriceSentinel3000.Core.Configuration;
 
 public sealed record PaperTraderSettings
@@ -21,7 +23,11 @@ public sealed record PaperTraderSettings
     public int ReconciliationOverlapSeconds { get; init; } = 15;
     public string ReplayDate { get; init; } = GetDefaultReplayDate();
     public string ReplayTime { get; init; } = "09:30";
-    public int ReplayDurationMinutes { get; init; } = 90;
+    public string ReplayEndTime { get; init; } = "11:00";
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int ReplayDurationMinutes { get; init; }
+
     public decimal ReplaySpeed { get; init; } = 10m;
 
     public static PaperTraderSettings Default { get; } = new();

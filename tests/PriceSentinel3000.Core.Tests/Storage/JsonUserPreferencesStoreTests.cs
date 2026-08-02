@@ -40,7 +40,7 @@ public sealed class JsonUserPreferencesStoreTests
             ReconciliationOverlapSeconds = 20,
             ReplayDate = "2026-07-31",
             ReplayTime = "13:52",
-            ReplayDurationMinutes = 120,
+            ReplayEndTime = "15:52",
             ReplaySpeed = 25m,
         };
 
@@ -48,6 +48,35 @@ public sealed class JsonUserPreferencesStoreTests
         {
             Assert.True(store.Save(expected));
             Assert.Equal(expected, store.Load());
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Load_LegacyReplayDurationMigratesToLocalEndTime()
+    {
+        string directory = CreateTestDirectory();
+        string path = Path.Combine(directory, "preferences.json");
+        var store = new JsonUserPreferencesStore(path);
+
+        try
+        {
+            File.WriteAllText(
+                path,
+                """
+                {
+                  "symbol": "USO",
+                  "replayTime": "13:52",
+                  "replayDurationMinutes": 120
+                }
+                """);
+
+            PaperTraderSettings loaded = Assert.IsType<PaperTraderSettings>(store.Load());
+
+            Assert.Equal("15:52", loaded.ReplayEndTime);
         }
         finally
         {

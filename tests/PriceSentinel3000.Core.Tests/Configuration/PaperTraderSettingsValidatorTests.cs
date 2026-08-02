@@ -102,18 +102,22 @@ public sealed class PaperTraderSettingsValidatorTests
     }
 
     [Theory]
-    [InlineData(0)]
-    [InlineData(481)]
-    public void ReplayDurationOutsideRange_IsRejected(int minutes)
+    [InlineData("09:30", "09:30")]
+    [InlineData("09:30", "17:31")]
+    [InlineData("09:30", "09:29")]
+    public void ReplayRangeOutsideMaximumDuration_IsRejected(
+        string startTime,
+        string endTime)
     {
         PaperTraderSettings settings = PaperTraderSettings.Default with
         {
-            ReplayDurationMinutes = minutes,
+            ReplayTime = startTime,
+            ReplayEndTime = endTime,
         };
 
         IReadOnlyList<string> errors = PaperTraderSettingsValidator.Validate(settings);
 
-        Assert.Contains(errors, error => error.Contains("Replay duration"));
+        Assert.Contains(errors, error => error.Contains("Replay range"));
     }
 
     [Theory]
@@ -133,6 +137,19 @@ public sealed class PaperTraderSettingsValidatorTests
     }
 
     [Fact]
+    public void InvalidReplayEndTime_IsRejected()
+    {
+        PaperTraderSettings settings = PaperTraderSettings.Default with
+        {
+            ReplayEndTime = "25:00",
+        };
+
+        IReadOnlyList<string> errors = PaperTraderSettingsValidator.Validate(settings);
+
+        Assert.Contains(errors, error => error.Contains("Replay end"));
+    }
+
+    [Fact]
     public void ReplaySchedule_ParsesEnteredLocalDateAndTime()
     {
         bool parsed = ReplaySchedule.TryParseLocal(
@@ -146,6 +163,21 @@ public sealed class PaperTraderSettingsValidatorTests
         Assert.Equal(31, replayStart.Day);
         Assert.Equal(9, replayStart.Hour);
         Assert.Equal(30, replayStart.Minute);
+    }
+
+    [Fact]
+    public void ReplaySchedule_EndBeforeStartMeansTheFollowingDay()
+    {
+        bool parsed = ReplaySchedule.TryParseLocalRange(
+            "2026-07-31",
+            "23:30",
+            "00:30",
+            out DateTimeOffset replayStart,
+            out DateTimeOffset replayEnd);
+
+        Assert.True(parsed);
+        Assert.Equal(TimeSpan.FromHours(1), replayEnd - replayStart);
+        Assert.Equal(replayStart.Date.AddDays(1), replayEnd.Date);
     }
 
     [Theory]

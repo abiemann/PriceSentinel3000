@@ -25,11 +25,38 @@ public sealed class JsonUserPreferencesStore
         {
             try
             {
-                return File.Exists(_path)
-                    ? JsonSerializer.Deserialize<PaperTraderSettings>(
-                        File.ReadAllBytes(_path),
-                        JsonOptions)
-                    : null;
+                if (!File.Exists(_path))
+                {
+                    return null;
+                }
+
+                byte[] json = File.ReadAllBytes(_path);
+                PaperTraderSettings? settings =
+                    JsonSerializer.Deserialize<PaperTraderSettings>(json, JsonOptions);
+
+                if (settings is null)
+                {
+                    return null;
+                }
+
+                using JsonDocument document = JsonDocument.Parse(json);
+                bool hasReplayEndTime = document.RootElement.TryGetProperty(
+                    "replayEndTime",
+                    out _);
+
+                if (!hasReplayEndTime &&
+                    ReplaySchedule.TryCalculateEndTime(
+                        settings.ReplayTime,
+                        settings.ReplayDurationMinutes,
+                        out string migratedEndTime))
+                {
+                    settings = settings with
+                    {
+                        ReplayEndTime = migratedEndTime,
+                    };
+                }
+
+                return settings;
             }
             catch (Exception exception) when (
                 exception is IOException or
