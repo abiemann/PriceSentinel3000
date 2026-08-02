@@ -16,7 +16,7 @@ public sealed class TradingModeToAngleConverter : IValueConverter
             {
                 TradingMode.Off => 180d,
                 TradingMode.Replay => -90d,
-                TradingMode.Simulation => 0d,
+                TradingMode.PaperTrader => 0d,
                 TradingMode.Live => 90d,
                 _ => 0d,
             }

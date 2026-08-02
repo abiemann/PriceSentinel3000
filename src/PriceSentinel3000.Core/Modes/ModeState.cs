@@ -64,6 +64,6 @@ public readonly record struct ModeState
         safeMode is TradingMode.Live
             ? throw new ArgumentOutOfRangeException(
                 nameof(safeMode),
-                "Disarming requires OFF, Replay, or Simulation mode.")
+                "Disarming requires OFF, Replay, or Paper Trader mode.")
             : new(safeMode, safeMode, false);
 }

@@ -1,6 +1,6 @@
 namespace PriceSentinel3000.Core.Configuration;
 
-public sealed record SimulationSettings
+public sealed record PaperTraderSettings
 {
     public string Symbol { get; init; } = "SOFI";
     public decimal StartingBalance { get; init; } = 10_000m;
@@ -16,6 +16,8 @@ public sealed record SimulationSettings
     public int QuotePollingSeconds { get; init; } = 5;
     public int ReconciliationSeconds { get; init; } = 45;
     public int ReconciliationOverlapSeconds { get; init; } = 15;
+    public int ReplayLookbackDays { get; init; } = 7;
+    public decimal ReplaySpeed { get; init; } = 10m;
 
-    public static SimulationSettings Default { get; } = new();
+    public static PaperTraderSettings Default { get; } = new();
 }

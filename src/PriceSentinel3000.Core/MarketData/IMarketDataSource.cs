@@ -1,15 +1,27 @@
 namespace PriceSentinel3000.Core.MarketData;
 
-public interface IMarketDataSource
+public interface IMarketDataSource : IAsyncDisposable
 {
     string Name { get; }
-    bool IsSynthetic { get; }
 
-    IReadOnlyList<MarketQuote> GetHistory(
+    Task ConnectAsync(CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<MarketQuote>> GetHistoryAsync(
         MarketDataRequest request,
         DateTimeOffset fromUtc,
         DateTimeOffset throughUtc,
-        DateTimeOffset observedAtUtc);
+        DateTimeOffset observedAtUtc,
+        CancellationToken cancellationToken);
 
-    MarketQuote GetQuote(MarketDataRequest request, DateTimeOffset sourceTimestampUtc);
+    Task<MarketQuote> GetQuoteAsync(
+        MarketDataRequest request,
+        DateTimeOffset observedAtUtc,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<MarketQuote>> GetReplayHistoryAsync(
+        Instrument instrument,
+        DateTimeOffset throughUtc,
+        int lookbackDays,
+        DateTimeOffset observedAtUtc,
+        CancellationToken cancellationToken);
 }

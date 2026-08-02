@@ -16,7 +16,7 @@ public partial class MainWindow : Window
         DataContext = _viewModel;
     }
 
-    private void ModeButton_Click(object sender, RoutedEventArgs e)
+    private async void ModeButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string modeName } ||
             !Enum.TryParse(modeName, ignoreCase: true, out TradingMode requestedMode))
@@ -45,7 +45,7 @@ public partial class MainWindow : Window
             }
         }
 
-        _viewModel.AcknowledgeLiveRisk();
+        await _viewModel.AcknowledgeLiveRiskAsync();
     }
 
     protected override void OnClosed(EventArgs e)

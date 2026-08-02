@@ -26,7 +26,7 @@ public sealed class SqliteTradingJournalTests
                 new(2026, 8, 1, 16, 0, 0, TimeSpan.Zero);
             JournalSession session = journal.StartSession(
                 instrument,
-                TradingMode.Simulation,
+                TradingMode.PaperTrader,
                 10_000m,
                 "{}",
                 start);

@@ -34,7 +34,7 @@
                     <TextBlock Foreground="{StaticResource AccentBrush}"
                                FontSize="10"
                                FontWeight="Bold"
-                               Text="MARKET MONITOR / SIMULATION LAB" />
+                               Text="MARKET MONITOR / PAPER TRADING LAB" />
                     <TextBlock Margin="0,3,0,0"
                                Foreground="{StaticResource PrimaryTextBrush}"
                                FontSize="25"
@@ -131,12 +131,12 @@
                                             </Style>
                                         </Button.Style>
                                     </Button>
-                                    <Button Canvas.Left="101" Canvas.Top="4" Width="92"
-                                            Tag="Simulation" Click="ModeButton_Click" Content="SIMULATION">
+                                    <Button Canvas.Left="92" Canvas.Top="4" Width="110"
+                                            Tag="PaperTrader" Click="ModeButton_Click" Content="PAPER TRADER">
                                         <Button.Style>
                                             <Style BasedOn="{StaticResource ModeButtonStyle}" TargetType="Button">
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsSimulationSelected}" Value="True">
+                                                    <DataTrigger Binding="{Binding IsPaperTraderSelected}" Value="True">
                                                         <Setter Property="Background" Value="#153D32" />
                                                         <Setter Property="BorderBrush" Value="#2BC48A" />
                                                         <Setter Property="Foreground" Value="#77F0C1" />
@@ -180,7 +180,7 @@
 
                     <Border Margin="0,12,0,0" Style="{StaticResource CardStyle}">
                         <StackPanel>
-                            <TextBlock Style="{StaticResource SectionLabelStyle}" Text="SIMULATION ACCOUNT" />
+                            <TextBlock Style="{StaticResource SectionLabelStyle}" Text="PAPER ACCOUNT" />
                             <Grid Margin="0,14,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="100" />
@@ -314,6 +314,23 @@
                                              Text="{Binding ReconciliationOverlapSeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
                                 </StackPanel>
                             </Grid>
+                            <Grid Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Replay lookback (days)" />
+                                    <TextBox Style="{StaticResource InputTextBoxStyle}"
+                                             Text="{Binding ReplayLookbackDays, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Replay speed (x)" />
+                                    <TextBox Style="{StaticResource InputTextBoxStyle}"
+                                             Text="{Binding ReplaySpeed, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                                </StackPanel>
+                            </Grid>
                         </StackPanel>
                     </Border>
 
@@ -394,7 +411,7 @@
                                                FontSize="12" FontWeight="Bold"
                                                Text="WAITING FOR MARKET DATA" />
                                     <TextBlock Margin="0,7,0,0" Foreground="#41536A" FontSize="11"
-                                               Text="Start Simulation or Replay to activate the chart." />
+                                               Text="Start Paper Trader or Replay to activate the chart." />
                                 </StackPanel>
                             </Grid>
                         </Border>
@@ -514,8 +531,8 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Broker execution" />
-                            <TextBlock Grid.Column="1" Foreground="#FF8A78" FontSize="11"
-                                       FontWeight="Bold" Text="{Binding LiveStateLabel}" />
+                            <TextBlock Grid.Column="1" Foreground="{Binding BrokerExecutionForeground}" FontSize="11"
+                                       FontWeight="Bold" Text="{Binding BrokerExecutionLabel}" />
                         </Grid>
                         <Grid Margin="0,11,0,0">
                             <Grid.ColumnDefinitions>
@@ -606,7 +623,7 @@
                            Foreground="#53657B"
                            FontSize="10"
                            FontWeight="SemiBold"
-                           Text="STAGE 3 · DATA ENGINE" />
+                           Text="STAGE 4 · ROBINHOOD DATA" />
             </Grid>
         </Border>
     </Grid>

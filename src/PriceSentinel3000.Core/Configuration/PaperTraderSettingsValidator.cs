@@ -1,8 +1,8 @@
 namespace PriceSentinel3000.Core.Configuration;
 
-public static class SimulationSettingsValidator
+public static class PaperTraderSettingsValidator
 {
-    public static IReadOnlyList<string> Validate(SimulationSettings settings)
+    public static IReadOnlyList<string> Validate(PaperTraderSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
@@ -67,6 +67,16 @@ public static class SimulationSettingsValidator
             settings.ReconciliationOverlapSeconds > settings.ReconciliationSeconds)
         {
             errors.Add("Reconciliation overlap must be at least 5 seconds and no longer than the reconciliation interval.");
+        }
+
+        if (settings.ReplayLookbackDays is < 1 or > 30)
+        {
+            errors.Add("Replay lookback must be between 1 and 30 days.");
+        }
+
+        if (settings.ReplaySpeed is < 1 or > 100)
+        {
+            errors.Add("Replay speed must be between 1x and 100x.");
         }
 
         return errors;

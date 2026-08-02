@@ -7,6 +7,6 @@ public enum TradingMode
 {
     Off,
     Replay,
-    Simulation,
+    PaperTrader,
     Live,
 }

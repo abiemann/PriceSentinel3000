@@ -16,7 +16,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 {
     private static readonly TimeSpan MaximumWarmStart = TimeSpan.FromMinutes(4);
 
-    private readonly IMarketDataSource _syntheticDataSource;
+    private readonly IMarketDataSource _marketDataSource;
     private readonly ITradingJournal _journal;
     private ModeState _modeState = ModeState.SafeDefault;
     private string _symbol;
@@ -33,7 +33,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private int _quotePollingSeconds;
     private int _reconciliationSeconds;
     private int _reconciliationOverlapSeconds;
+    private int _replayLookbackDays;
+    private decimal _replaySpeed;
     private bool _isSessionRunning;
+    private bool _isStartingSession;
     private bool _liveRiskAcknowledged;
     private bool _journalReady;
     private bool _hasMarketData;
@@ -43,7 +46,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private string _bidAskDisplay = "-- / --";
     private string _marketDataStatus = "ADAPTER OFFLINE";
     private string _marketDataStateLabel = "OFFLINE";
-    private string _strategyMessage = "Select Simulation or Replay to start the data engine.";
+    private string _strategyMessage = "Select Paper Trader or Replay to start the data engine.";
     private string _strategyStateLabel = "IDLE";
     private CancellationTokenSource? _sessionCancellation;
     private JournalSession? _activeSession;
@@ -53,19 +56,19 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public MainViewModel()
         : this(
-            new SyntheticMarketDataSource(),
+            RobinhoodMcpMarketDataSource.CreateDefault(),
             new SqliteTradingJournal(AppDataPaths.JournalDatabase))
     {
     }
 
     internal MainViewModel(
-        IMarketDataSource syntheticDataSource,
+        IMarketDataSource marketDataSource,
         ITradingJournal journal)
     {
-        _syntheticDataSource = syntheticDataSource;
+        _marketDataSource = marketDataSource;
         _journal = journal;
 
-        SimulationSettings defaults = SimulationSettings.Default;
+        PaperTraderSettings defaults = PaperTraderSettings.Default;
         _symbol = defaults.Symbol;
         _startingBalance = defaults.StartingBalance;
         _positionSizeBasis = defaults.PositionSizeBasis;
@@ -80,7 +83,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _quotePollingSeconds = defaults.QuotePollingSeconds;
         _reconciliationSeconds = defaults.ReconciliationSeconds;
         _reconciliationOverlapSeconds = defaults.ReconciliationOverlapSeconds;
-        _statusMessage = "Choose Replay, Simulation, or LIVE on the rotary selector to begin.";
+        _replayLookbackDays = defaults.ReplayLookbackDays;
+        _replaySpeed = defaults.ReplaySpeed;
+        _statusMessage = "Choose Replay, Paper Trader, or LIVE on the rotary selector to begin.";
 
         PositionSizeOptions =
         [
@@ -100,9 +105,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
         StartSessionCommand = new RelayCommand(
             StartSelectedSession,
-            () => SelectedMode is TradingMode.Simulation or TradingMode.Replay &&
+            () => SelectedMode is TradingMode.PaperTrader or TradingMode.Replay &&
                   EffectiveMode == SelectedMode &&
-                  !IsSessionRunning);
+                  !IsSessionRunning &&
+                  !_isStartingSession);
         StopSessionCommand = new RelayCommand(StopSession, () => IsSessionRunning);
 
         RebuildBufferSegments();
@@ -130,15 +136,27 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public TradingMode SelectedMode => _modeState.SelectedMode;
     public TradingMode EffectiveMode => _modeState.EffectiveMode;
-    public string SelectedModeLabel => SelectedMode.ToString().ToUpperInvariant();
-    public string EffectiveModeLabel => EffectiveMode.ToString().ToUpperInvariant();
+    public string SelectedModeLabel => FormatMode(SelectedMode);
+    public string EffectiveModeLabel => FormatMode(EffectiveMode);
     public bool IsOffSelected => SelectedMode is TradingMode.Off;
     public bool IsReplaySelected => SelectedMode is TradingMode.Replay;
-    public bool IsSimulationSelected => SelectedMode is TradingMode.Simulation;
+    public bool IsPaperTraderSelected => SelectedMode is TradingMode.PaperTrader;
     public bool IsLiveSelected => SelectedMode is TradingMode.Live;
     public bool LiveArmed => _modeState.LiveArmed;
     public bool LiveRiskAcknowledged => _liveRiskAcknowledged;
-    public string LiveStateLabel => LiveArmed ? "LIVE ARMED" : "LIVE DISARMED";
+    public string BrokerExecutionLabel => EffectiveMode switch
+    {
+        TradingMode.PaperTrader => "PAPER ONLY",
+        TradingMode.Live when LiveArmed => "LIVE ARMED",
+        TradingMode.Live => "LIVE DISARMED",
+        _ => "DISABLED",
+    };
+    public string BrokerExecutionForeground => EffectiveMode switch
+    {
+        TradingMode.PaperTrader => "#5EE6B1",
+        TradingMode.Live => "#FF8A78",
+        _ => "#8EA0B7",
+    };
     public string MarketDataStatus => _marketDataStatus;
     public string MarketDataStateLabel => _marketDataStateLabel;
     public string CurrentPrice => _currentPrice;
@@ -149,7 +167,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public string JournalStatus => _journalReady ? "SQLITE WAL" : "OFFLINE";
     public string PriceActionCaption => $"{QuotePollingSeconds} SECOND PRICE ACTION";
     public string PrimaryActionLabel =>
-        SelectedMode is TradingMode.Replay ? "START REPLAY" : "START SIMULATION";
+        SelectedMode is TradingMode.Replay ? "START REPLAY" : "START PAPER TRADER";
     public string SessionStateLabel => EffectiveMode is TradingMode.Off
         ? "OFF"
         : EffectiveMode is TradingMode.Live && !LiveArmed ? "DISARMED"
@@ -284,6 +302,18 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         set => SetField(ref _reconciliationOverlapSeconds, value);
     }
 
+    public int ReplayLookbackDays
+    {
+        get => _replayLookbackDays;
+        set => SetField(ref _replayLookbackDays, value);
+    }
+
+    public decimal ReplaySpeed
+    {
+        get => _replaySpeed;
+        set => SetField(ref _replaySpeed, value);
+    }
+
     public bool IsSessionRunning
     {
         get => _isSessionRunning;
@@ -306,7 +336,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public void RequestModeSelection(TradingMode mode)
     {
-        if (IsSessionRunning)
+        if (IsSessionRunning || _isStartingSession)
         {
             StopActiveSession("MODE_CHANGED", "The active data session was stopped before changing modes.");
         }
@@ -319,12 +349,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         {
             StatusMessage = mode switch
             {
-                TradingMode.Off => "System is OFF. Choose Replay, Simulation, or LIVE to begin.",
-                TradingMode.Replay => "Replay selected. Start to play the latest SQLite-recorded simulation for this symbol.",
-                TradingMode.Simulation => "Simulation selected. Configure the account and data timing, then start.",
+                TradingMode.Off => "System is OFF. Choose Replay, Paper Trader, or LIVE to begin.",
+                TradingMode.Replay => "Replay selected. Start to stream recent Robinhood history as new observations.",
+                TradingMode.PaperTrader => "Paper Trader selected. Configure the paper account, then start the real Robinhood price feed.",
                 _ => StatusMessage,
             };
-            AddActivity($"{mode} mode selected.");
+            AddActivity($"{FormatMode(mode)} mode selected.");
         }
 
         NotifyModeProperties();
@@ -338,14 +368,46 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         NotifyModeProperties();
     }
 
-    public void AcknowledgeLiveRisk()
+    public async Task AcknowledgeLiveRiskAsync()
     {
         _liveRiskAcknowledged = true;
         _modeState = _modeState.ActivateLiveDisarmed();
-        StatusMessage = "LIVE mode is effective, but broker execution remains disarmed until Robinhood authorization is connected.";
-        AddActivity("LIVE mode entered disarmed; waiting for the future Robinhood authorization adapter.");
+        _sessionCancellation?.Cancel();
+        _sessionCancellation?.Dispose();
+        _sessionCancellation = new();
+        _isStartingSession = true;
+        StatusMessage = "LIVE mode is effective and disarmed. Connecting to Robinhood for authorization...";
+        AddActivity("LIVE mode entered disarmed; Robinhood authorization started.");
         OnPropertyChanged(nameof(LiveRiskAcknowledged));
         NotifyModeProperties();
+
+        try
+        {
+            SetMarketDataState("ROBINHOOD LOGIN", "AUTHORIZING", isConnected: false);
+            await _marketDataSource.ConnectAsync(_sessionCancellation.Token);
+            SetMarketDataState("ROBINHOOD READY", "CONNECTED");
+            StatusMessage = "Robinhood authorization is connected. LIVE order execution remains disarmed in this stage.";
+            AddActivity("Robinhood authorization connected; LIVE execution remains disarmed.");
+        }
+        catch (OperationCanceledException)
+        {
+            if (!_disposed)
+            {
+                StatusMessage = "Robinhood login was cancelled.";
+                AddActivity("Robinhood login was cancelled.", "WARNING");
+            }
+        }
+        catch (Exception exception)
+        {
+            SetMarketDataState("ADAPTER OFFLINE", "OFFLINE", isConnected: false);
+            StatusMessage = $"Robinhood login failed: {exception.Message}";
+            AddActivity($"Robinhood login failed: {exception.Message}", "ERROR");
+        }
+        finally
+        {
+            _isStartingSession = false;
+            StartSessionCommand.RaiseCanExecuteChanged();
+        }
     }
 
     public void Dispose()
@@ -356,6 +418,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
 
         _disposed = true;
+        _sessionCancellation?.Cancel();
 
         if (_activeSession is not null)
         {
@@ -363,13 +426,14 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
 
         _sessionCancellation?.Dispose();
+        _marketDataSource.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _journal.Dispose();
     }
 
     private async void StartSelectedSession()
     {
-        SimulationSettings settings = CreateSettings();
-        IReadOnlyList<string> errors = SimulationSettingsValidator.Validate(settings);
+        PaperTraderSettings settings = CreateSettings();
+        IReadOnlyList<string> errors = PaperTraderSettingsValidator.Validate(settings);
 
         if (errors.Count > 0)
         {
@@ -394,6 +458,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         var instrument = new Instrument(Symbol, AssetClass.Equity);
         _modeState = _modeState.ActivateSafeMode(SelectedMode);
         NotifyModeProperties();
+        _sessionCancellation?.Cancel();
+        _sessionCancellation?.Dispose();
+        _sessionCancellation = new();
+        _isStartingSession = true;
+        StartSessionCommand.RaiseCanExecuteChanged();
 
         try
         {
@@ -403,7 +472,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             }
             else
             {
-                await StartSyntheticSimulationAsync(instrument, settings);
+                await StartPaperTraderAsync(instrument, settings);
             }
         }
         catch (OperationCanceledException)
@@ -414,13 +483,22 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             AddActivity($"Data engine error: {exception.Message}", "ERROR");
             StopActiveSession("ERROR", $"Data engine stopped: {exception.Message}");
         }
+        finally
+        {
+            _isStartingSession = false;
+            StartSessionCommand.RaiseCanExecuteChanged();
+        }
     }
 
-    private async Task StartSyntheticSimulationAsync(
+    private async Task StartPaperTraderAsync(
         Instrument instrument,
-        SimulationSettings settings)
+        PaperTraderSettings settings)
     {
-        PrepareDataSession(instrument, settings, TradingMode.Simulation);
+        CancellationToken token = _sessionCancellation!.Token;
+        StatusMessage = "Connecting to Robinhood. Complete the secure browser login if it opens.";
+        SetMarketDataState("ROBINHOOD LOGIN", "AUTHORIZING", isConnected: false);
+        await _marketDataSource.ConnectAsync(token);
+        PrepareDataSession(instrument, settings, TradingMode.PaperTrader);
         DateTimeOffset now = DateTimeOffset.UtcNow;
         TimeSpan warmStart = TimeSpan.FromMinutes(
             Math.Min(settings.BufferMinutes, (int)MaximumWarmStart.TotalMinutes));
@@ -428,33 +506,43 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             instrument,
             TimeSpan.FromSeconds(settings.QuotePollingSeconds),
             warmStart);
-        IReadOnlyList<MarketQuote> history = _syntheticDataSource.GetHistory(
+        IReadOnlyList<MarketQuote> history = await _marketDataSource.GetHistoryAsync(
             _marketDataRequest,
             now - warmStart,
             now,
-            now);
+            now,
+            token);
         _journal.AppendQuotes(_activeSession!.Id, history, QuoteIngestionKind.WarmStart);
         QuoteMergeResult warmMerge = _ringBuffer!.Merge(history);
-        SetMarketDataState("SYNTHETIC FEED", "SYNTHETIC");
+        MarketQuote current = await _marketDataSource.GetQuoteAsync(
+            _marketDataRequest,
+            DateTimeOffset.UtcNow,
+            token);
+        _journal.AppendQuotes(_activeSession.Id, [current], QuoteIngestionKind.Live);
+        _ringBuffer.Merge([current]);
+        SetQuoteMarketState(current);
         RefreshMarketView();
         _strategyStateLabel = "OBSERVING";
-        _strategyMessage = "Stage 3 is measuring price action; automated buy/sell signals remain disabled.";
+        _strategyMessage = "Real prices are flowing. Any strategy orders in Paper Trader stay simulated and can never reach Robinhood.";
         NotifyStrategyProperties();
-        StatusMessage = $"Simulation is running for {instrument.Symbol}. Four-minute warm start loaded; live points arrive every {settings.QuotePollingSeconds} seconds.";
+        StatusMessage = $"Paper Trader is watching real {instrument.Symbol} prices every {settings.QuotePollingSeconds} seconds; order execution is paper-only.";
         AddActivity(
-            $"Synthetic simulation started with {warmMerge.Added} warm-start quotes; no orders can be sent.");
+            $"Paper Trader started with {warmMerge.Added} real warm-start bars plus the current Robinhood quote; no real orders can be sent.");
 
         DateTimeOffset nextReconciliation =
             DateTimeOffset.UtcNow.AddSeconds(settings.ReconciliationSeconds);
-        CancellationToken token = _sessionCancellation!.Token;
 
         while (true)
         {
             await Task.Delay(_marketDataRequest.PollingInterval, token);
             DateTimeOffset observedAt = DateTimeOffset.UtcNow;
-            MarketQuote quote = _syntheticDataSource.GetQuote(_marketDataRequest, observedAt);
+            MarketQuote quote = await _marketDataSource.GetQuoteAsync(
+                _marketDataRequest,
+                observedAt,
+                token);
             _journal.AppendQuotes(_activeSession!.Id, [quote], QuoteIngestionKind.Live);
             _ringBuffer.Merge([quote]);
+            SetQuoteMarketState(quote);
 
             if (observedAt >= nextReconciliation)
             {
@@ -462,18 +550,19 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                     observedAt.AddSeconds(
                         -(settings.ReconciliationSeconds +
                           settings.ReconciliationOverlapSeconds));
-                IReadOnlyList<MarketQuote> verification = _syntheticDataSource.GetHistory(
+                IReadOnlyList<MarketQuote> verification = await _marketDataSource.GetHistoryAsync(
                     _marketDataRequest,
                     from,
                     observedAt,
-                    observedAt);
+                    observedAt,
+                    token);
                 _journal.AppendQuotes(
                     _activeSession.Id,
                     verification,
                     QuoteIngestionKind.Reconciliation);
                 QuoteMergeResult merge = _ringBuffer.Merge(verification);
                 AddActivity(
-                    $"Reconciled {verification.Count} overlapping quotes: {merge.Duplicates} verified, {merge.Corrected} corrected.");
+                    $"Robinhood history reconciled {verification.Count} bars: {merge.Duplicates} verified, {merge.Corrected} corrected, {merge.Added} gaps filled.");
                 nextReconciliation =
                     observedAt.AddSeconds(settings.ReconciliationSeconds);
             }
@@ -484,50 +573,61 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     private async Task StartReplayAsync(
         Instrument instrument,
-        SimulationSettings settings)
+        PaperTraderSettings settings)
     {
-        ReplaySourceSession? source = _journal.FindLatestReplaySource(instrument);
+        CancellationToken token = _sessionCancellation!.Token;
+        StatusMessage = "Connecting to Robinhood and loading recent 15-second history for Replay...";
+        SetMarketDataState("ROBINHOOD LOGIN", "AUTHORIZING", isConnected: false);
+        await _marketDataSource.ConnectAsync(token);
+        DateTimeOffset observedAt = DateTimeOffset.UtcNow;
+        IReadOnlyList<MarketQuote> historicalQuotes =
+            await _marketDataSource.GetReplayHistoryAsync(
+                instrument,
+                observedAt,
+                settings.ReplayLookbackDays,
+                observedAt,
+                token);
 
-        if (source is null)
+        if (historicalQuotes.Count == 0)
         {
-            StatusMessage = $"No recorded simulation exists for {instrument.Symbol}. Run Simulation first, then return to Replay.";
-            AddActivity($"Replay could not start: no simulation data exists for {instrument.Symbol}.", "WARNING");
-            return;
-        }
-
-        IReadOnlyList<MarketQuote> recordedQuotes =
-            _journal.ReadSessionQuotes(source.Id, instrument);
-
-        if (recordedQuotes.Count == 0)
-        {
-            StatusMessage = $"The latest {instrument.Symbol} session contains no replayable quotes.";
-            AddActivity($"Replay source {source.Id:D} contained no quotes.", "WARNING");
+            SetMarketDataState("ROBINHOOD READY", "NO HISTORY");
+            StatusMessage = $"Robinhood returned no replayable {instrument.Symbol} trades in the last {settings.ReplayLookbackDays} days.";
+            AddActivity($"Replay found no historical {instrument.Symbol} observations.", "WARNING");
             return;
         }
 
         PrepareDataSession(instrument, settings, TradingMode.Replay);
-        SetMarketDataState("SQLITE REPLAY", "REPLAY");
+        SetMarketDataState("ROBINHOOD HISTORY", "REPLAY");
         _strategyStateLabel = "REPLAYING";
-        _strategyMessage = "Recorded observations are being replayed; strategy orders remain disabled.";
+        _strategyMessage = "Historical Robinhood prices are arriving as a new stream. Orders are simulated only.";
         NotifyStrategyProperties();
-        TimeSpan replayDelay = TimeSpan.FromMilliseconds(
-            Math.Clamp(settings.QuotePollingSeconds * 100, 100, 1_000));
-        StatusMessage = $"Replaying {recordedQuotes.Count} distinct {instrument.Symbol} quotes from SQLite at 10× speed.";
+        DateTimeOffset firstSource = historicalQuotes[0].SourceTimestampUtc;
+        DateTimeOffset lastSource = historicalQuotes[^1].SourceTimestampUtc;
+        StatusMessage = $"Replaying {historicalQuotes.Count} real {instrument.Symbol} observations from {firstSource.ToLocalTime():g} at {settings.ReplaySpeed:0.#}x speed.";
         AddActivity(
-            $"Replay started from simulation {source.Id:D} with {recordedQuotes.Count} distinct quotes.");
-        CancellationToken token = _sessionCancellation!.Token;
+            $"Historical Replay loaded {historicalQuotes.Count} Robinhood observations through {lastSource.ToLocalTime():g}.");
 
-        foreach (MarketQuote recorded in recordedQuotes)
+        for (int index = 0; index < historicalQuotes.Count; index++)
         {
-            await Task.Delay(replayDelay, token);
-            MarketQuote replayed = recorded with { ObservedAtUtc = DateTimeOffset.UtcNow };
+            if (index > 0)
+            {
+                await Task.Delay(CalculateReplayDelay(
+                    historicalQuotes[index - 1].SourceTimestampUtc,
+                    historicalQuotes[index].SourceTimestampUtc,
+                    settings.ReplaySpeed), token);
+            }
+
+            MarketQuote replayed = historicalQuotes[index] with
+            {
+                ObservedAtUtc = DateTimeOffset.UtcNow,
+            };
             _journal.AppendQuotes(_activeSession!.Id, [replayed], QuoteIngestionKind.Replay);
             _ringBuffer!.Merge([replayed]);
             RefreshMarketView();
         }
 
         JournalSummary summary = _journal.GetSummary(_activeSession!.Id);
-        AddActivity($"Replay completed after {summary.QuoteCount} recorded observations.");
+        AddActivity($"Historical Replay completed after {summary.QuoteCount} real observations.");
         StopActiveSession(
             "COMPLETED",
             $"Replay completed for {instrument.Symbol}. The chart remains available for inspection.");
@@ -535,11 +635,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     private void PrepareDataSession(
         Instrument instrument,
-        SimulationSettings settings,
+        PaperTraderSettings settings,
         TradingMode mode)
     {
-        _sessionCancellation?.Dispose();
-        _sessionCancellation = new();
         _ringBuffer = new(instrument, TimeSpan.FromMinutes(settings.BufferMinutes));
         _marketDataRequest = null;
         ChartPoints.Clear();
@@ -594,7 +692,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _strategyStateLabel = "IDLE";
         _strategyMessage = ChartPoints.Count > 0
             ? "The captured chart remains visible; start another session when ready."
-            : "Select Simulation or Replay to start the data engine.";
+            : "Select Paper Trader or Replay to start the data engine.";
         NotifyStrategyProperties();
         StatusMessage = statusMessage;
     }
@@ -622,8 +720,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
         MarketQuote latest = snapshot[^1];
         _currentPrice = latest.Last.ToString("$0.00", CultureInfo.InvariantCulture);
-        _bidAskDisplay =
-            $"{latest.Bid.ToString("0.00", CultureInfo.InvariantCulture)} / {latest.Ask.ToString("0.00", CultureInfo.InvariantCulture)}";
+        _bidAskDisplay = latest.HasTwoSidedMarket
+            ? $"{latest.Bid.ToString("0.00", CultureInfo.InvariantCulture)} / {latest.Ask.ToString("0.00", CultureInfo.InvariantCulture)}"
+            : "-- / --";
         _hasMarketData = true;
         OnPropertyChanged(nameof(CurrentPrice));
         OnPropertyChanged(nameof(BidAskDisplay));
@@ -659,7 +758,39 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(MarketDataStatusForeground));
     }
 
-    private SimulationSettings CreateSettings() => new()
+    private void SetQuoteMarketState(MarketQuote quote)
+    {
+        TimeSpan age = quote.ObservedAtUtc - quote.SourceTimestampUtc;
+
+        if (age > TimeSpan.FromMinutes(2))
+        {
+            SetMarketDataState("ROBINHOOD CONNECTED", "MARKET CLOSED");
+            return;
+        }
+
+        SetMarketDataState("ROBINHOOD REAL PRICES", "REAL TIME");
+    }
+
+    private static TimeSpan CalculateReplayDelay(
+        DateTimeOffset previous,
+        DateTimeOffset current,
+        decimal speed)
+    {
+        double milliseconds =
+            (current - previous).TotalMilliseconds / decimal.ToDouble(speed);
+        return TimeSpan.FromMilliseconds(
+            Math.Clamp(double.IsFinite(milliseconds) ? milliseconds : 20d,
+                20d,
+                2_000d));
+    }
+
+    private static string FormatMode(TradingMode mode) => mode switch
+    {
+        TradingMode.PaperTrader => "PAPER TRADER",
+        _ => mode.ToString().ToUpperInvariant(),
+    };
+
+    private PaperTraderSettings CreateSettings() => new()
     {
         Symbol = Symbol.Trim().ToUpperInvariant(),
         StartingBalance = StartingBalance,
@@ -675,6 +806,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         QuotePollingSeconds = QuotePollingSeconds,
         ReconciliationSeconds = ReconciliationSeconds,
         ReconciliationOverlapSeconds = ReconciliationOverlapSeconds,
+        ReplayLookbackDays = ReplayLookbackDays,
+        ReplaySpeed = ReplaySpeed,
     };
 
     private void RebuildBufferSegments()
@@ -738,10 +871,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(EffectiveModeLabel));
         OnPropertyChanged(nameof(IsOffSelected));
         OnPropertyChanged(nameof(IsReplaySelected));
-        OnPropertyChanged(nameof(IsSimulationSelected));
+        OnPropertyChanged(nameof(IsPaperTraderSelected));
         OnPropertyChanged(nameof(IsLiveSelected));
         OnPropertyChanged(nameof(LiveArmed));
-        OnPropertyChanged(nameof(LiveStateLabel));
+        OnPropertyChanged(nameof(BrokerExecutionLabel));
+        OnPropertyChanged(nameof(BrokerExecutionForeground));
         OnPropertyChanged(nameof(PrimaryActionLabel));
         OnPropertyChanged(nameof(SessionStateLabel));
         OnPropertyChanged(nameof(SessionStateBackground));

@@ -14,4 +14,10 @@ public static class AppDataPaths
 
     public static string JournalDatabase =>
         Path.Combine(ApplicationDirectory, "journal.db");
+
+    public static string RobinhoodTokenCache =>
+        Path.Combine(ApplicationDirectory, "robinhood-tokens.dat");
+
+    public static string RobinhoodClientRegistration =>
+        Path.Combine(ApplicationDirectory, "robinhood-client.dat");
 }

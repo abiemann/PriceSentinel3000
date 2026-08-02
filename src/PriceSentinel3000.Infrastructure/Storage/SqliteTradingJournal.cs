@@ -351,7 +351,7 @@ public sealed class SqliteTradingJournal : ITradingJournal
             INNER JOIN quotes AS q ON q.session_id = s.id
             WHERE s.symbol = $symbol
               AND s.asset_class = $asset_class
-              AND s.mode = 'Simulation'
+              AND s.mode = 'PaperTrader'
             GROUP BY s.id, s.started_at_utc
             ORDER BY s.started_at_utc DESC
             LIMIT 1;
