@@ -2,6 +2,6 @@ namespace PriceSentinel3000.Core.Configuration;
 
 public enum QuantityLimitMode
 {
-    Unlimited,
-    MaximumShares,
+    AsManyAsPossible = 0,
+    NoMoreThan = 1,
 }

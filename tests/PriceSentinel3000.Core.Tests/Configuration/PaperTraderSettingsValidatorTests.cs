@@ -78,7 +78,7 @@ public sealed class PaperTraderSettingsValidatorTests
     {
         PaperTraderSettings settings = PaperTraderSettings.Default with
         {
-            QuantityLimitMode = QuantityLimitMode.MaximumShares,
+            QuantityLimitMode = QuantityLimitMode.NoMoreThan,
             MaximumQuantity = 0m,
         };
 

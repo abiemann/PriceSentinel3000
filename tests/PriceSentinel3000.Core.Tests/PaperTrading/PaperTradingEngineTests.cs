@@ -16,9 +16,9 @@ public sealed class PaperTradingEngineTests
         {
             PositionSizeBasis = AmountBasis.FixedAmount,
             PositionSizeValue = 1_000m,
-            QuantityLimitMode = QuantityLimitMode.MaximumShares,
+            QuantityLimitMode = QuantityLimitMode.NoMoreThan,
             MaximumQuantity = 2m,
-            StopLossBasis = StopLossBasis.BuyPercentage,
+            StopLossBasis = StopLossBasis.BuyPriceAmount,
             StopLossValue = 1m,
         };
         var engine = new PaperTradingEngine(instrument, settings);
@@ -42,7 +42,22 @@ public sealed class PaperTradingEngineTests
         Assert.Equal(2m, buy.Account.PositionQuantity);
         Assert.Equal(1, buy.Account.EntriesToday);
 
-        DateTimeOffset stopTime = quotes[^1].SourceTimestampUtc.AddSeconds(5);
+        DateTimeOffset beforeStopTime = quotes[^1].SourceTimestampUtc.AddSeconds(5);
+        quotes.Add(new(
+            instrument,
+            beforeStopTime,
+            beforeStopTime,
+            98.80m,
+            98.82m,
+            98.81m,
+            2_000m));
+
+        PaperTradeResult beforeStop = engine.Process(quotes);
+
+        Assert.NotEqual(StrategySignalKind.StopLoss, beforeStop.Decision.Signal);
+        Assert.Equal(2m, beforeStop.Account.PositionQuantity);
+
+        DateTimeOffset stopTime = beforeStopTime.AddSeconds(5);
         quotes.Add(new(
             instrument,
             stopTime,
@@ -60,6 +75,7 @@ public sealed class PaperTradingEngineTests
         Assert.Equal(98.40m, sell.Fill.Price);
         Assert.Equal(0m, sell.Account.PositionQuantity);
         Assert.True(sell.Account.RealizedProfitLoss < 0m);
+        Assert.Contains("per share", sell.Decision.Reasons[0]);
     }
 
     [Fact]
@@ -146,7 +162,7 @@ public sealed class PaperTradingEngineTests
             PositionSizeValue = 1_000m,
             MaximumDailyLossBasis = AmountBasis.FixedAmount,
             MaximumDailyLossValue = 1m,
-            StopLossBasis = StopLossBasis.FixedAmount,
+            StopLossBasis = StopLossBasis.PositionLossAmount,
             StopLossValue = 1_000m,
         };
         var engine = new PaperTradingEngine(

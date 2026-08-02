@@ -126,13 +126,13 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         ];
         QuantityLimitOptions =
         [
-            new("Unlimited", QuantityLimitMode.Unlimited),
-            new("Maximum shares", QuantityLimitMode.MaximumShares),
+            new("As many as possible", QuantityLimitMode.AsManyAsPossible),
+            new("No more than", QuantityLimitMode.NoMoreThan),
         ];
         StopLossOptions =
         [
-            new("Position loss ($)", StopLossBasis.FixedAmount),
-            new("Buy price (%)", StopLossBasis.BuyPercentage),
+            new("Position loss ($)", StopLossBasis.PositionLossAmount),
+            new("Buy price ($)", StopLossBasis.BuyPriceAmount),
         ];
 
         StartSessionCommand = new RelayCommand(
@@ -236,7 +236,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public string ProfitLossDisplay =>
         $"{_paperRealizedProfitLoss:+$0.00;-$0.00;$0.00} / {_paperUnrealizedProfitLoss:+$0.00;-$0.00;$0.00}";
     public string EntriesDisplay => _paperEntries.ToString(CultureInfo.InvariantCulture);
-    public bool IsQuantityLimited => QuantityLimitMode is QuantityLimitMode.MaximumShares;
+    public bool IsQuantityLimited => QuantityLimitMode is QuantityLimitMode.NoMoreThan;
     public string BufferCaption => $"{BufferSegments.Count} × 1 MINUTE BLOCKS";
 
     public string Symbol

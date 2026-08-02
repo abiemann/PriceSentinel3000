@@ -2,6 +2,6 @@ namespace PriceSentinel3000.Core.Configuration;
 
 public enum StopLossBasis
 {
-    FixedAmount,
-    BuyPercentage,
+    PositionLossAmount = 0,
+    BuyPriceAmount = 1,
 }

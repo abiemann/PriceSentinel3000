@@ -26,7 +26,7 @@ public static class PaperTraderSettingsValidator
             "Position size",
             errors);
 
-        if (settings.QuantityLimitMode is QuantityLimitMode.MaximumShares &&
+        if (settings.QuantityLimitMode is QuantityLimitMode.NoMoreThan &&
             settings.MaximumQuantity <= 0m)
         {
             errors.Add("Maximum trading quantity must be greater than zero.");
@@ -48,12 +48,6 @@ public static class PaperTraderSettingsValidator
         {
             errors.Add("Stop loss must be greater than zero.");
         }
-        else if (settings.StopLossBasis is StopLossBasis.BuyPercentage &&
-                 settings.StopLossValue > 100)
-        {
-            errors.Add("Stop-loss percentage cannot exceed 100%.");
-        }
-
         if (settings.BufferMinutes is < 5 or > 15)
         {
             errors.Add("Ring buffer must be between 5 and 15 minutes.");

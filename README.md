@@ -31,9 +31,9 @@ authenticated Robinhood data foundation:
   Historical Replay has no bid/ask series, so its simulated fills use the bar
   close; no fill is generated from a stale closed-market quote
 - Paper position sizing supports a fixed dollar amount or account percentage,
-  plus unlimited quantity or a user-entered maximum-share limit
-- Maximum entries, maximum daily loss, fixed/percentage stop loss, and a
-  30-second re-entry cooldown are enforced before simulated execution
+  plus "As many as possible" or a user-entered "No more than" share limit
+- Maximum entries, maximum daily loss, total-position/per-share dollar stop
+  loss, and a 30-second re-entry cooldown are enforced before simulated execution
 - The WPF chart always renders 15-second candlesticks. Replay preserves
   Robinhood's true OHLC bars, while Paper Trader aggregates incoming quotes into
   live candles; the chart also shows current price, bid/ask, and minute blocks

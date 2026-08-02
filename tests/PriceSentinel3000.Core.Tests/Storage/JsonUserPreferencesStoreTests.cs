@@ -6,6 +6,15 @@ namespace PriceSentinel3000.Core.Tests.Storage;
 public sealed class JsonUserPreferencesStoreTests
 {
     [Fact]
+    public void UpdatedChoiceEnums_PreserveSavedNumericValues()
+    {
+        Assert.Equal(0, (int)QuantityLimitMode.AsManyAsPossible);
+        Assert.Equal(1, (int)QuantityLimitMode.NoMoreThan);
+        Assert.Equal(0, (int)StopLossBasis.PositionLossAmount);
+        Assert.Equal(1, (int)StopLossBasis.BuyPriceAmount);
+    }
+
+    [Fact]
     public void SaveAndLoad_RoundTripsEveryEditableSetting()
     {
         string directory = CreateTestDirectory();
@@ -17,13 +26,13 @@ public sealed class JsonUserPreferencesStoreTests
             StartingBalance = 12_345.67m,
             PositionSizeBasis = AmountBasis.FixedAmount,
             PositionSizeValue = 450m,
-            QuantityLimitMode = QuantityLimitMode.MaximumShares,
+            QuantityLimitMode = QuantityLimitMode.NoMoreThan,
             MaximumQuantity = 17m,
             UnlimitedEntries = true,
             MaximumEntriesPerDay = 23,
             MaximumDailyLossBasis = AmountBasis.FixedAmount,
             MaximumDailyLossValue = 125m,
-            StopLossBasis = StopLossBasis.FixedAmount,
+            StopLossBasis = StopLossBasis.PositionLossAmount,
             StopLossValue = 18m,
             BufferMinutes = 9,
             QuotePollingSeconds = 7,
