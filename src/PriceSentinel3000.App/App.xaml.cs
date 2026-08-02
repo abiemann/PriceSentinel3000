@@ -6,20 +6,28 @@ namespace PriceSentinel3000.App;
 
 public partial class App : Application
 {
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         var viewModel = new MainViewModel();
-        var welcome = new WelcomeDialog(
-            viewModel.ConnectRobinhoodAtStartupAsync);
+        using var restoreCancellation =
+            new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        bool restored = await viewModel.TryRestoreRobinhoodAtStartupAsync(
+            restoreCancellation.Token);
 
-        if (welcome.ShowDialog() is not true)
+        if (!restored)
         {
-            viewModel.Dispose();
-            Shutdown();
-            return;
+            var welcome = new WelcomeDialog(
+                viewModel.ConnectRobinhoodAtStartupAsync);
+
+            if (welcome.ShowDialog() is not true)
+            {
+                viewModel.Dispose();
+                Shutdown();
+                return;
+            }
         }
 
         var mainWindow = new MainWindow(viewModel);

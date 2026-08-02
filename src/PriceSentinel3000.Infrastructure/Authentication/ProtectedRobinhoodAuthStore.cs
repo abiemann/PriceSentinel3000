@@ -23,6 +23,22 @@ public sealed class ProtectedRobinhoodAuthStore : ITokenCache
         _registrationPath = Path.GetFullPath(registrationPath);
     }
 
+    public bool HasCachedAuthentication
+    {
+        get
+        {
+            lock (_gate)
+            {
+                TokenContainer? tokens = ReadProtected<TokenContainer>(_tokenPath);
+                DynamicClientRegistrationResponse? registration =
+                    ReadProtected<DynamicClientRegistrationResponse>(
+                        _registrationPath);
+                return !string.IsNullOrWhiteSpace(tokens?.AccessToken) &&
+                       !string.IsNullOrWhiteSpace(registration?.ClientId);
+            }
+        }
+    }
+
     public ValueTask<TokenContainer?> GetTokensAsync(
         CancellationToken cancellationToken)
     {

@@ -8,12 +8,16 @@ using PriceSentinel3000.Infrastructure.Storage;
 
 namespace PriceSentinel3000.Infrastructure.MarketData;
 
-public sealed class RobinhoodMcpMarketDataSource : IMarketDataSource
+public sealed class RobinhoodMcpMarketDataSource :
+    IMarketDataSource,
+    ICachedAuthenticationMarketDataSource
 {
     private static readonly Uri Endpoint =
         new("https://agent.robinhood.com/mcp/trading");
     internal static TimeSpan InteractiveAuthorizationTimeout { get; } =
         TimeSpan.FromMinutes(5);
+    internal static TimeSpan CachedAuthorizationTimeout { get; } =
+        TimeSpan.FromSeconds(15);
     private readonly SemaphoreSlim _connectionGate = new(1, 1);
     private readonly ProtectedRobinhoodAuthStore _authStore;
     private McpClient? _client;
@@ -26,12 +30,42 @@ public sealed class RobinhoodMcpMarketDataSource : IMarketDataSource
 
     public string Name => "ROBINHOOD MCP";
 
+    public bool HasCachedAuthentication =>
+        _authStore.HasCachedAuthentication;
+
     public static RobinhoodMcpMarketDataSource CreateDefault() =>
         new(new ProtectedRobinhoodAuthStore(
             AppDataPaths.RobinhoodTokenCache,
             AppDataPaths.RobinhoodClientRegistration));
 
-    public async Task ConnectAsync(CancellationToken cancellationToken)
+    public Task ConnectAsync(CancellationToken cancellationToken) =>
+        ConnectCoreAsync(allowInteractiveAuthorization: true, cancellationToken);
+
+    public async Task<bool> TryConnectUsingCachedAuthenticationAsync(
+        CancellationToken cancellationToken)
+    {
+        if (!HasCachedAuthentication)
+        {
+            return false;
+        }
+
+        try
+        {
+            await ConnectCoreAsync(
+                    allowInteractiveAuthorization: false,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task ConnectCoreAsync(
+        bool allowInteractiveAuthorization,
+        CancellationToken cancellationToken)
     {
         if (_client is not null)
         {
@@ -52,8 +86,9 @@ public sealed class RobinhoodMcpMarketDataSource : IMarketDataSource
             var oauth = new ClientOAuthOptions
             {
                 RedirectUri = RobinhoodBrowserAuthorization.RedirectUri,
-                AuthorizationCallbackHandler =
-                    RobinhoodBrowserAuthorization.AuthorizeAsync,
+                AuthorizationCallbackHandler = allowInteractiveAuthorization
+                    ? RobinhoodBrowserAuthorization.AuthorizeAsync
+                    : DeclineInteractiveAuthorizationAsync,
                 TokenCache = _authStore,
                 ClientId = registration?.ClientId,
                 ClientSecret = registration?.ClientSecret,
@@ -81,7 +116,9 @@ public sealed class RobinhoodMcpMarketDataSource : IMarketDataSource
             {
                 var clientOptions = new McpClientOptions
                 {
-                    InitializationTimeout = InteractiveAuthorizationTimeout,
+                    InitializationTimeout = allowInteractiveAuthorization
+                        ? InteractiveAuthorizationTimeout
+                        : CachedAuthorizationTimeout,
                 };
                 _client = await McpClient.CreateAsync(
                         transport,
@@ -99,6 +136,16 @@ public sealed class RobinhoodMcpMarketDataSource : IMarketDataSource
         {
             _connectionGate.Release();
         }
+    }
+
+    private static Task<AuthorizationResult?>
+        DeclineInteractiveAuthorizationAsync(
+            AuthorizationCallbackContext callbackContext,
+            CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(callbackContext);
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult<AuthorizationResult?>(null);
     }
 
     public async Task<IReadOnlyList<MarketQuote>> GetHistoryAsync(

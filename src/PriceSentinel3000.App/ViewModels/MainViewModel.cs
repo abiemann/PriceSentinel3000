@@ -448,6 +448,34 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
+    public async Task<bool> TryRestoreRobinhoodAtStartupAsync(
+        CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_marketDataSource is not ICachedAuthenticationMarketDataSource cached ||
+            !cached.HasCachedAuthentication)
+        {
+            return false;
+        }
+
+        StatusMessage = "Restoring the saved Robinhood connection...";
+        SetMarketDataState("ROBINHOOD LOGIN", "RESTORING", isConnected: false);
+
+        if (!await cached.TryConnectUsingCachedAuthenticationAsync(
+                cancellationToken))
+        {
+            SetMarketDataState("ADAPTER OFFLINE", "OFFLINE", isConnected: false);
+            StatusMessage = "The saved Robinhood connection needs authorization.";
+            return false;
+        }
+
+        SetMarketDataState("ROBINHOOD READY", "CONNECTED");
+        StatusMessage = "Robinhood is connected. Choose Replay, Paper Trader, or LIVE to begin.";
+        AddActivity("Saved Robinhood connection restored; operating mode remains OFF.");
+        return true;
+    }
+
     public void Dispose()
     {
         if (_disposed)

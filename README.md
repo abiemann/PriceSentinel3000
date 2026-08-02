@@ -26,8 +26,8 @@ Stage 4 replaces the synthetic feed with authenticated Robinhood MCP market data
 - SQLite WAL journaling records sessions, observations, and activities, with
   reserved tables for decisions, paper orders, fills, positions, and risk events
 - Separate selected and effective modes keep LIVE execution safely disarmed
-- Startup is gated by a welcome dialog: EXIT closes the app, while LOGIN must
-  establish Robinhood authorization before the workspace opens safely in OFF mode
+- Startup silently restores a saved Robinhood session when possible; otherwise
+  the welcome dialog offers EXIT or LOGIN before opening safely in OFF mode
 - The first LIVE selection still shows the loss warning before entering disarmed LIVE
 - Friendly status guidance distinguishes REAL TIME, MARKET CLOSED, REPLAY,
   AUTHORIZING, and OFFLINE states
@@ -39,10 +39,11 @@ explicitly disarmed and no order-submission tool is called anywhere in the app.
 
 ## Paper Trader workflow
 
-1. At startup, click **LOGIN** and complete Robinhood's hosted browser
+1. On the first startup, click **LOGIN** and complete Robinhood's hosted browser
    authorization. Being signed in is only the first step: finish the on-screen
    connection approval and wait for the PriceSentinel completion page.
-   PriceSentinel never asks for or stores a Robinhood password.
+   PriceSentinel never asks for or stores a Robinhood password. Later launches
+   silently restore the encrypted saved session and open the workspace directly.
 2. Select **Paper Trader**, enter a stock or ETF symbol and paper starting balance,
    configure the risk and timing settings, then click **Start Paper Trader**.
 3. The app loads up to four minutes of real 15-second history, obtains the current
@@ -79,6 +80,11 @@ The app allows up to five minutes for interactive browser authorization. While t
 browser is open, the disabled LOGIN button reads
 **WAITING FOR APPROVAL**; EXIT cancels the attempt. If authorization times out,
 LOGIN becomes available for a clean retry.
+
+At startup, a saved token is tried without permitting an interactive browser
+redirect. A valid access token or refresh token opens the main window directly.
+If the cache is missing, invalid, revoked, corrupt, or cannot be verified, the
+welcome dialog appears and offers LOGIN or EXIT.
 
 The OAuth client cache format was updated with the MCP C# SDK 2.0 migration. The
 first run after upgrading re-registers PriceSentinel once; this does not modify

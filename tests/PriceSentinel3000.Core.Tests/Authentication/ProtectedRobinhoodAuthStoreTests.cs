@@ -19,6 +19,8 @@ public sealed class ProtectedRobinhoodAuthStoreTests
 
         try
         {
+            Assert.False(store.HasCachedAuthentication);
+
             var tokens = new TokenContainer
             {
                 AccessToken = "test-access-secret",
@@ -34,7 +36,10 @@ public sealed class ProtectedRobinhoodAuthStoreTests
             };
 
             await store.StoreTokensAsync(tokens, CancellationToken.None);
+            Assert.False(store.HasCachedAuthentication);
+
             await store.StoreRegistrationAsync(registration, CancellationToken.None);
+            Assert.True(store.HasCachedAuthentication);
 
             TokenContainer? restoredTokens =
                 await store.GetTokensAsync(CancellationToken.None);
