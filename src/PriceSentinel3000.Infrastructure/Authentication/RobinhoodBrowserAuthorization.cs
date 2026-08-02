@@ -11,13 +11,25 @@ public static class RobinhoodBrowserAuthorization
     public static Uri RedirectUri { get; } =
         new("http://127.0.0.1:17843/callback/");
 
-    public static async Task<string?> AuthorizeAsync(
+    public static Task<string?> AuthorizeAsync(
         Uri authorizationUri,
         Uri redirectUri,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) =>
+        AuthorizeAsync(
+            authorizationUri,
+            redirectUri,
+            cancellationToken,
+            OpenBrowser);
+
+    internal static async Task<string?> AuthorizeAsync(
+        Uri authorizationUri,
+        Uri redirectUri,
+        CancellationToken cancellationToken,
+        Action<Uri> openAuthorization)
     {
         ArgumentNullException.ThrowIfNull(authorizationUri);
         ArgumentNullException.ThrowIfNull(redirectUri);
+        ArgumentNullException.ThrowIfNull(openAuthorization);
         await AuthorizationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
 
         try
@@ -26,10 +38,7 @@ public static class RobinhoodBrowserAuthorization
             listener.Prefixes.Add(redirectUri.AbsoluteUri);
             listener.Start();
 
-            Process.Start(new ProcessStartInfo(authorizationUri.AbsoluteUri)
-            {
-                UseShellExecute = true,
-            });
+            openAuthorization(authorizationUri);
 
             CancellationTokenRegistration registration =
                 cancellationToken.Register(listener.Stop);
@@ -92,6 +101,12 @@ public static class RobinhoodBrowserAuthorization
             AuthorizationGate.Release();
         }
     }
+
+    private static void OpenBrowser(Uri authorizationUri) =>
+        Process.Start(new ProcessStartInfo(authorizationUri.AbsoluteUri)
+        {
+            UseShellExecute = true,
+        });
 
     private static IReadOnlyDictionary<string, string> ParseQuery(string? query)
     {

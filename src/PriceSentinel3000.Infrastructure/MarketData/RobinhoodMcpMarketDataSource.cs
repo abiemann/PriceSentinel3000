@@ -12,6 +12,8 @@ public sealed class RobinhoodMcpMarketDataSource : IMarketDataSource
 {
     private static readonly Uri Endpoint =
         new("https://agent.robinhood.com/mcp/trading");
+    internal static TimeSpan InteractiveAuthorizationTimeout { get; } =
+        TimeSpan.FromMinutes(5);
     private readonly SemaphoreSlim _connectionGate = new(1, 1);
     private readonly ProtectedRobinhoodAuthStore _authStore;
     private McpClient? _client;
@@ -76,8 +78,13 @@ public sealed class RobinhoodMcpMarketDataSource : IMarketDataSource
 
             try
             {
+                var clientOptions = new McpClientOptions
+                {
+                    InitializationTimeout = InteractiveAuthorizationTimeout,
+                };
                 _client = await McpClient.CreateAsync(
                         transport,
+                        clientOptions,
                         cancellationToken: cancellationToken)
                     .ConfigureAwait(false);
             }

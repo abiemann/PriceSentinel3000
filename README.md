@@ -40,7 +40,9 @@ explicitly disarmed and no order-submission tool is called anywhere in the app.
 ## Paper Trader workflow
 
 1. At startup, click **LOGIN** and complete Robinhood's hosted browser
-   authorization. PriceSentinel never asks for or stores a Robinhood password.
+   authorization. Being signed in is only the first step: finish the on-screen
+   connection approval and wait for the PriceSentinel completion page.
+   PriceSentinel never asks for or stores a Robinhood password.
 2. Select **Paper Trader**, enter a stock or ETF symbol and paper starting balance,
    configure the risk and timing settings, then click **Start Paper Trader**.
 3. The app loads up to four minutes of real 15-second history, obtains the current
@@ -71,8 +73,13 @@ uses the former synthetic data.
 ## Authentication and local data
 
 Robinhood is connected through the official Streamable HTTP MCP endpoint and OAuth
-authorization flow. Access/refresh tokens and dynamic client registration are
-encrypted with Windows Data Protection API for the current Windows user at:
+authorization flow. The app allows up to five minutes for interactive browser
+authorization. While the browser is open, the disabled LOGIN button reads
+**WAITING FOR APPROVAL**; EXIT cancels the attempt. If authorization times out,
+LOGIN becomes available for a clean retry.
+
+Access/refresh tokens and dynamic client registration are encrypted with Windows
+Data Protection API for the current Windows user at:
 
 ~~~text
 %LOCALAPPDATA%\PriceSentinel3000\robinhood-tokens.dat

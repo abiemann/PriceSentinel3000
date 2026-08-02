@@ -22,10 +22,11 @@ public partial class WelcomeDialog : Window
             return;
         }
 
-        ErrorText.Visibility = Visibility.Collapsed;
-        StatusText.Text = "Connecting to Robinhood. Complete the secure browser authorization if it opens...";
+        ErrorPanel.Visibility = Visibility.Collapsed;
+        StatusText.Text = "Waiting for Robinhood approval. In the browser, finish any authorization shown and wait for the PriceSentinel completion page...";
         StatusPanel.Visibility = Visibility.Visible;
         LoginButton.IsEnabled = false;
+        LoginButton.Content = "WAITING FOR APPROVAL...";
         _loginCancellation = new CancellationTokenSource();
 
         try
@@ -37,14 +38,16 @@ public partial class WelcomeDialog : Window
         {
             if (!_isClosing)
             {
-                ShowError("Robinhood login was cancelled. Check your internet connection and try LOGIN again, or EXIT.");
+                ShowError(_loginCancellation.IsCancellationRequested
+                    ? "Robinhood login was cancelled. Click LOGIN to try again, or EXIT."
+                    : CreateConnectionErrorMessage(new TimeoutException()));
             }
         }
         catch (Exception exception)
         {
             if (!_isClosing)
             {
-                ShowError($"Could not connect to Robinhood: {exception.Message} Check your internet connection and try again.");
+                ShowError(CreateConnectionErrorMessage(exception));
             }
         }
         finally
@@ -55,6 +58,7 @@ public partial class WelcomeDialog : Window
             if (!_isClosing)
             {
                 LoginButton.IsEnabled = true;
+                LoginButton.Content = "LOGIN";
             }
         }
     }
@@ -80,6 +84,34 @@ public partial class WelcomeDialog : Window
     {
         StatusPanel.Visibility = Visibility.Collapsed;
         ErrorText.Text = message;
-        ErrorText.Visibility = Visibility.Visible;
+        ErrorPanel.Visibility = Visibility.Visible;
+    }
+
+    private static string CreateConnectionErrorMessage(Exception exception)
+    {
+        if (IsTimeout(exception))
+        {
+            return "Robinhood did not finish authorization in time. Click LOGIN again, approve PriceSentinel in the browser, and wait for the completion page before returning to the app.";
+        }
+
+        return $"Could not connect to Robinhood: {exception.Message} Check the connection and try LOGIN again.";
+    }
+
+    private static bool IsTimeout(Exception exception)
+    {
+        for (Exception? current = exception;
+             current is not null;
+             current = current.InnerException)
+        {
+            if (current is TimeoutException ||
+                current.Message.Contains(
+                    "Initialization timed out",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

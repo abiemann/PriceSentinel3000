@@ -4,7 +4,7 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Welcome to PriceSentinel 3000"
         Width="590"
-        Height="460"
+        Height="500"
         ResizeMode="NoResize"
         WindowStyle="None"
         WindowStartupLocation="CenterScreen"
@@ -92,11 +92,12 @@
                        FontSize="13"
                        LineHeight="20"
                        TextWrapping="Wrap"
-                       Text="LOGIN uses Robinhood's secure browser authorization. PriceSentinel never asks for your Robinhood password, does not submit an order at startup, and opens in OFF mode after connecting." />
+                       Text="LOGIN opens Robinhood's secure authorization page. Finish any approval shown there and wait for the PriceSentinel completion message. The app opens safely in OFF mode." />
+        </StackPanel>
 
+        <Grid Grid.Row="2" Margin="0,16,0,0">
             <Border x:Name="StatusPanel"
-                    Margin="0,18,0,0"
-                    Padding="12,10"
+                    Padding="12,11"
                     Background="#101A26"
                     BorderBrush="#2A3A4E"
                     BorderThickness="1"
@@ -122,17 +123,22 @@
                                TextWrapping="Wrap" />
                 </Grid>
             </Border>
-        </StackPanel>
+            <Border x:Name="ErrorPanel"
+                    Padding="12,10"
+                    Background="#301C1B"
+                    BorderBrush="#7F3C34"
+                    BorderThickness="1"
+                    CornerRadius="7"
+                    Visibility="Collapsed">
+                <TextBlock x:Name="ErrorText"
+                           Foreground="#FB8B7B"
+                           FontSize="12"
+                           LineHeight="18"
+                           TextWrapping="Wrap" />
+            </Border>
+        </Grid>
 
-        <TextBlock x:Name="ErrorText"
-                   Grid.Row="2"
-                   Margin="0,12,0,0"
-                   Foreground="#FB8B7B"
-                   FontSize="12"
-                   TextWrapping="Wrap"
-                   Visibility="Collapsed" />
-
-        <Grid Grid.Row="3" Margin="0,22,0,0">
+        <Grid Grid.Row="3" Margin="0,18,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="12" />
