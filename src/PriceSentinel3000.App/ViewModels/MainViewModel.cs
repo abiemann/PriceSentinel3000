@@ -856,6 +856,21 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                     : order.BrokerOrderId)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Count();
+            BrokerOrderSnapshot? latestSell = ordersToday
+                .Where(order =>
+                    order.Side is BrokerOrderSide.Sell &&
+                    order.FilledQuantity > 0m &&
+                    string.Equals(
+                        order.Symbol,
+                        instrument.Symbol,
+                        StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(order => order.UpdatedAtUtc)
+                .FirstOrDefault();
+            if (latestSell is not null && latestSell.EffectiveAveragePrice is not > 0m)
+            {
+                throw new InvalidOperationException(
+                    "The most recent LIVE sell has no usable fill price, so the re-entry price gate cannot be restored; execution remains disarmed.");
+            }
             decimal dailyStartingEquity =
                 _journal.GetLiveStartingBalanceSince(tradingDayStartUtc) ??
                 initialBroker.Portfolio.TotalValue;
@@ -867,7 +882,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             _liveExecutionEngine = new(
                 sessionSettings,
                 dailyStartingEquity,
-                initialEntriesToday: initialEntriesToday);
+                initialEntriesToday: initialEntriesToday,
+                initialLastExitUtc: latestSell?.UpdatedAtUtc,
+                initialLastExitPrice: latestSell?.EffectiveAveragePrice);
         }
 
         PrepareDataSession(instrument, sessionSettings, mode);

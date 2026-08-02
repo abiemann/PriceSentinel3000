@@ -102,6 +102,22 @@ public sealed record BrokerOrderSnapshot(
     DateTimeOffset UpdatedAtUtc,
     IReadOnlyList<BrokerExecution> Executions)
 {
+    public decimal? EffectiveAveragePrice
+    {
+        get
+        {
+            if (AveragePrice is > 0m)
+            {
+                return AveragePrice;
+            }
+
+            decimal executedQuantity = Executions.Sum(execution => execution.Quantity);
+            return executedQuantity > 0m
+                ? Executions.Sum(execution => execution.Quantity * execution.Price) / executedQuantity
+                : null;
+        }
+    }
+
     public bool IsOpen => !IsTerminal;
 
     public bool IsTerminal => State is

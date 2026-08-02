@@ -97,6 +97,46 @@ public sealed class LiveExecutionEngineTests
         Assert.Equal("DAILY LOSS LOCK", result.Decision.State);
     }
 
+    [Theory]
+    [InlineData(10.01)]
+    [InlineData(9.97)]
+    public void Evaluate_RequiresPriceMovementFromPreviousSellBeforeReentry(
+        double movedLast)
+    {
+        DateTimeOffset sellAt = new(2026, 8, 3, 15, 58, 0, TimeSpan.Zero);
+        var engine = new LiveExecutionEngine(
+            Settings(),
+            10_000m,
+            new ScriptedStrategy(
+                StrategySignalKind.Buy,
+                StrategySignalKind.Buy));
+        BrokerOrderSnapshot sell = Order(
+            BrokerOrderSide.Sell,
+            BrokerOrderState.Filled,
+            1m) with
+        {
+            AveragePrice = 10m,
+            UpdatedAtUtc = sellAt,
+        };
+        engine.ObserveTerminalOrder(sell);
+
+        LiveTradeEvaluation unchanged = engine.Evaluate(
+            [Quote(9.99m)],
+            Snapshot());
+
+        Assert.Null(unchanged.Intent);
+        Assert.Equal("RISK BLOCKED", unchanged.Decision.State);
+        Assert.Contains("0.10%", unchanged.Decision.Reasons[0]);
+        Assert.Contains("last sell", unchanged.Decision.Reasons[0]);
+
+        LiveTradeEvaluation moved = engine.Evaluate(
+            [Quote((decimal)movedLast, secondsOffset: 5)],
+            Snapshot());
+
+        Assert.NotNull(moved.Intent);
+        Assert.Equal(BrokerOrderSide.Buy, moved.Intent.Side);
+    }
+
     [Fact]
     public void ObserveTerminalOrder_IsIdempotentForEntryLimits()
     {
@@ -202,9 +242,10 @@ public sealed class LiveExecutionEngineTests
         StopLossValue = 100m,
     };
 
-    private static MarketQuote Quote(decimal last)
+    private static MarketQuote Quote(decimal last, int secondsOffset = 0)
     {
-        DateTimeOffset now = new(2026, 8, 3, 16, 0, 0, TimeSpan.Zero);
+        DateTimeOffset now = new DateTimeOffset(2026, 8, 3, 16, 0, 0, TimeSpan.Zero)
+            .AddSeconds(secondsOffset);
         return new(Instrument, now, now, last - 0.01m, last + 0.01m, last, 1_000m);
     }
 

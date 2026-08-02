@@ -40,7 +40,8 @@ execution path to the authenticated Robinhood data foundation:
 - Paper position sizing supports a fixed dollar amount or account percentage,
   plus "As many as possible" or a user-entered "No more than" share limit
 - Maximum entries, maximum daily loss, purchase-price percentage/total-position
-  dollar stop loss, and a 30-second re-entry cooldown are enforced before simulated execution
+  dollar stop loss, a 30-second re-entry cooldown, and a post-sell price deadband
+  are enforced before simulated execution
 - The WPF chart always renders 15-second candlesticks. Replay preserves
   Robinhood's true OHLC bars, while Paper Trader aggregates incoming quotes into
   live candles; the chart also shows current price, bid/ask, and minute blocks
@@ -132,6 +133,7 @@ starting hypothesis:
 - bottom RSI confirmation: at or below 48 and no longer falling
 - minimum profitable peak exit: 0.04% before bid-side spread impact
 - profitable-stall fallback: five minutes with non-positive momentum
+- minimum movement from the previous sell before re-entry: 0.10% in either direction
 
 These constants deliberately live in the strategy core and every decision stores
 its confidence and human-readable evidence. Replay results should be used to tune

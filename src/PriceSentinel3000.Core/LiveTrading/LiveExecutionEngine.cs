@@ -22,6 +22,7 @@ public sealed class LiveExecutionEngine
     private readonly decimal _sessionStartingEquity;
     private DateTimeOffset? _lastEvaluatedUtc;
     private DateTimeOffset? _lastExitUtc;
+    private decimal? _lastExitPrice;
     private DateTimeOffset? _positionOpenedAtUtc;
     private int _entriesToday;
     private bool _riskLocked;
@@ -30,7 +31,9 @@ public sealed class LiveExecutionEngine
         PaperTraderSettings settings,
         decimal sessionStartingEquity,
         IPriceActionSignalEngine? strategy = null,
-        int initialEntriesToday = 0)
+        int initialEntriesToday = 0,
+        DateTimeOffset? initialLastExitUtc = null,
+        decimal? initialLastExitPrice = null)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
@@ -44,9 +47,18 @@ public sealed class LiveExecutionEngine
             throw new ArgumentOutOfRangeException(nameof(initialEntriesToday));
         }
 
+        if ((initialLastExitUtc is null) != (initialLastExitPrice is null) ||
+            initialLastExitPrice is <= 0m)
+        {
+            throw new ArgumentException(
+                "The restored last exit requires both a timestamp and a positive fill price.");
+        }
+
         _settings = settings;
         _sessionStartingEquity = sessionStartingEquity;
         _entriesToday = initialEntriesToday;
+        _lastExitUtc = initialLastExitUtc;
+        _lastExitPrice = initialLastExitPrice;
         _strategy = strategy ?? new PriceActionSignalEngine(settings.BufferMinutes);
     }
 
@@ -97,13 +109,13 @@ public sealed class LiveExecutionEngine
 
         if (decision.Signal is StrategySignalKind.Buy)
         {
-            string? buyBlock = BuyBlockReason(latest.SourceTimestampUtc, broker);
+            decimal entryPrice = latest.HasTwoSidedMarket ? latest.Ask : latest.Last;
+            string? buyBlock = BuyBlockReason(latest.SourceTimestampUtc, entryPrice, broker);
             if (buyBlock is not null)
             {
                 return Block(decision, buyBlock);
             }
 
-            decimal entryPrice = latest.HasTwoSidedMarket ? latest.Ask : latest.Last;
             decimal allocation = _settings.PositionSizeBasis switch
             {
                 AmountBasis.FixedAmount => _settings.PositionSizeValue,
@@ -181,6 +193,7 @@ public sealed class LiveExecutionEngine
         else
         {
             _lastExitUtc = order.UpdatedAtUtc;
+            _lastExitPrice = order.EffectiveAveragePrice;
             _positionOpenedAtUtc = null;
         }
     }
@@ -276,7 +289,10 @@ public sealed class LiveExecutionEngine
         return null;
     }
 
-    private string? BuyBlockReason(DateTimeOffset now, LiveBrokerSnapshot broker)
+    private string? BuyBlockReason(
+        DateTimeOffset now,
+        decimal entryPrice,
+        LiveBrokerSnapshot broker)
     {
         if (_riskLocked)
         {
@@ -296,6 +312,20 @@ public sealed class LiveExecutionEngine
         if (_lastExitUtc is not null && now - _lastExitUtc < ReentryCooldown)
         {
             return "Waiting for the 30-second re-entry cooldown.";
+        }
+
+        if (_lastExitUtc is not null && _lastExitPrice is not > 0m)
+        {
+            return "The previous LIVE sell price is unavailable; re-entry remains blocked.";
+        }
+
+        if (_lastExitPrice is > 0m &&
+            !ReentryPriceGate.IsSatisfied(entryPrice, _lastExitPrice.Value))
+        {
+            decimal movement = ReentryPriceGate.MovementPercentage(
+                entryPrice,
+                _lastExitPrice.Value);
+            return $"Waiting for price to move at least {ReentryPriceGate.MinimumMovementPercentage:0.00}% from the last sell at {_lastExitPrice.Value:C2}; current movement is {movement:0.00}%.";
         }
 
         return null;

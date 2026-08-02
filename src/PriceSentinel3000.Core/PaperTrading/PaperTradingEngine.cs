@@ -58,6 +58,7 @@ public sealed class PaperTradingEngine
     private decimal _averagePrice;
     private DateTimeOffset? _openedAtUtc;
     private DateTimeOffset? _lastExitUtc;
+    private decimal? _lastExitPrice;
     private DateTimeOffset? _lastEvaluatedUtc;
     private decimal _realizedProfitLoss;
     private int _entriesToday;
@@ -109,7 +110,10 @@ public sealed class PaperTradingEngine
 
         if (decision.Signal is StrategySignalKind.Buy)
         {
-            string? blocked = BuyBlockReason(latest.SourceTimestampUtc, mark);
+            string? blocked = BuyBlockReason(
+                latest.SourceTimestampUtc,
+                mark,
+                EntryPrice(latest));
 
             if (blocked is not null)
             {
@@ -194,7 +198,10 @@ public sealed class PaperTradingEngine
         return null;
     }
 
-    private string? BuyBlockReason(DateTimeOffset now, decimal mark)
+    private string? BuyBlockReason(
+        DateTimeOffset now,
+        decimal mark,
+        decimal entryPrice)
     {
         if (_riskLocked || Math.Max(0m, _settings.StartingBalance - Snapshot(mark).Equity) >= DailyLossLimit())
         {
@@ -210,6 +217,15 @@ public sealed class PaperTradingEngine
         if (_lastExitUtc is not null && now - _lastExitUtc < ReentryCooldown)
         {
             return "Waiting for the 30-second re-entry cooldown.";
+        }
+
+        if (_lastExitPrice is > 0m &&
+            !ReentryPriceGate.IsSatisfied(entryPrice, _lastExitPrice.Value))
+        {
+            decimal movement = ReentryPriceGate.MovementPercentage(
+                entryPrice,
+                _lastExitPrice.Value);
+            return $"Waiting for price to move at least {ReentryPriceGate.MinimumMovementPercentage:0.00}% from the last sell at {_lastExitPrice.Value:C2}; current movement is {movement:0.00}%.";
         }
 
         return null;
@@ -278,6 +294,7 @@ public sealed class PaperTradingEngine
         _averagePrice = 0m;
         _openedAtUtc = null;
         _lastExitUtc = quote.SourceTimestampUtc;
+        _lastExitPrice = fillPrice;
 
         if (decision.Signal is StrategySignalKind.DailyLoss ||
             Math.Max(0m, _settings.StartingBalance - _cash) >= DailyLossLimit())

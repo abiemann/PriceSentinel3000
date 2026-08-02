@@ -152,6 +152,48 @@ public sealed class PaperTradingEngineTests
         Assert.Contains("Maximum entries", blocked.Decision.Reasons[0]);
     }
 
+    [Theory]
+    [InlineData(10.01)]
+    [InlineData(9.97)]
+    public void Engine_RequiresPriceMovementFromPreviousSellBeforeReentry(
+        double movedLast)
+    {
+        var instrument = new Instrument("SOFI");
+        var strategy = new ScriptedStrategy(
+            StrategySignalKind.Buy,
+            StrategySignalKind.Sell,
+            StrategySignalKind.Buy,
+            StrategySignalKind.Buy);
+        var engine = new PaperTradingEngine(
+            instrument,
+            PaperTraderSettings.Default,
+            strategy);
+        DateTimeOffset start = new(2026, 8, 1, 16, 0, 0, TimeSpan.Zero);
+        var quotes = new List<MarketQuote>
+        {
+            Quote(instrument, start, 10m),
+        };
+        Assert.Equal(PaperOrderSide.Buy, engine.Process(quotes).Fill?.Side);
+        quotes.Add(Quote(instrument, start.AddSeconds(5), 10.01m));
+        Assert.Equal(PaperOrderSide.Sell, engine.Process(quotes).Fill?.Side);
+        quotes.Add(Quote(instrument, start.AddSeconds(40), 9.99m));
+
+        PaperTradeResult unchanged = engine.Process(quotes);
+
+        Assert.Null(unchanged.Fill);
+        Assert.Equal("RISK BLOCKED", unchanged.Decision.State);
+        Assert.Contains("0.10%", unchanged.Decision.Reasons[0]);
+        Assert.Contains("last sell", unchanged.Decision.Reasons[0]);
+
+        quotes.Add(Quote(
+            instrument,
+            start.AddSeconds(45),
+            (decimal)movedLast));
+        PaperTradeResult moved = engine.Process(quotes);
+
+        Assert.Equal(PaperOrderSide.Buy, moved.Fill?.Side);
+    }
+
     [Fact]
     public void Engine_TotalPositionLossUsesCombinedDollarLoss()
     {
