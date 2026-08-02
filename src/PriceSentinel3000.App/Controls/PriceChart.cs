@@ -15,6 +15,15 @@ public sealed class PriceChart : FrameworkElement
     private static readonly Color DownCandleColor = Color.FromRgb(255, 90, 31);
     private static readonly Color FlatCandleColor = Color.FromRgb(142, 160, 183);
     private Point? _pointerPosition;
+    private MouseButton? _scaleDragButton;
+    private Point _scaleDragStart;
+    private decimal _scaleDragMinimum;
+    private decimal _scaleDragMaximum;
+    private decimal? _manualMinimum;
+    private decimal? _manualMaximum;
+    private decimal _lastRenderedMinimum;
+    private decimal _lastRenderedMaximum;
+    private bool _hasRenderedScale;
 
     public static readonly DependencyProperty PointsProperty = DependencyProperty.Register(
         nameof(Points),
@@ -33,6 +42,15 @@ public sealed class PriceChart : FrameworkElement
             7d,
             FrameworkPropertyMetadataOptions.AffectsRender));
 
+    public static readonly DependencyProperty IsManualScaleProperty = DependencyProperty.Register(
+        nameof(IsManualScale),
+        typeof(bool),
+        typeof(PriceChart),
+        new FrameworkPropertyMetadata(
+            false,
+            FrameworkPropertyMetadataOptions.AffectsRender,
+            OnIsManualScaleChanged));
+
     private INotifyCollectionChanged? _observedCollection;
 
     public IEnumerable? Points
@@ -45,6 +63,12 @@ public sealed class PriceChart : FrameworkElement
     {
         get => (double)GetValue(WindowMinutesProperty);
         set => SetValue(WindowMinutesProperty, value);
+    }
+
+    public bool IsManualScale
+    {
+        get => (bool)GetValue(IsManualScaleProperty);
+        set => SetValue(IsManualScaleProperty, value);
     }
 
     public PriceChart()
@@ -84,11 +108,25 @@ public sealed class PriceChart : FrameworkElement
             openingPrice + halfMinimumRange,
             observedMaximum + expansionPadding);
         (minimum, maximum, decimal priceStep) = CreatePriceScale(minimum, maximum);
+
+        if (IsManualScale)
+        {
+            _manualMinimum ??= minimum;
+            _manualMaximum ??= maximum;
+            minimum = _manualMinimum.Value;
+            maximum = _manualMaximum.Value;
+            priceStep = (maximum - minimum) / 4m;
+        }
+
+        _lastRenderedMinimum = minimum;
+        _lastRenderedMaximum = maximum;
+        _hasRenderedScale = true;
         decimal range = maximum - minimum;
-        const double plotLeft = 4d;
-        const double plotTop = 4d;
-        double plotRight = Math.Max(plotLeft + 1d, RenderSize.Width - 52d);
-        double plotBottom = Math.Max(plotTop + 1d, RenderSize.Height - 22d);
+        Rect plotBounds = GetPlotBounds();
+        double plotLeft = plotBounds.Left;
+        double plotTop = plotBounds.Top;
+        double plotRight = plotBounds.Right;
+        double plotBottom = plotBounds.Bottom;
         double plotWidth = plotRight - plotLeft;
         double plotHeight = plotBottom - plotTop;
         DateTimeOffset lastTimestamp = points[^1].TimestampUtc + CandleInterval;
@@ -109,15 +147,26 @@ public sealed class PriceChart : FrameworkElement
             plotRight,
             plotBottom);
 
-        DrawLastPriceGuide(
-            drawingContext,
-            points[^1],
-            minimum,
-            range,
+        if (points[^1].Close >= minimum && points[^1].Close <= maximum)
+        {
+            DrawLastPriceGuide(
+                drawingContext,
+                points[^1],
+                minimum,
+                range,
+                plotTop,
+                plotRight,
+                plotWidth,
+                plotHeight);
+        }
+
+        var plotClip = new RectangleGeometry(new(
+            plotLeft,
             plotTop,
-            plotRight,
             plotWidth,
-            plotHeight);
+            plotHeight));
+        plotClip.Freeze();
+        drawingContext.PushClip(plotClip);
 
         DrawCandles(
             drawingContext,
@@ -143,6 +192,8 @@ public sealed class PriceChart : FrameworkElement
             plotWidth,
             plotHeight);
 
+        drawingContext.Pop();
+
         DrawPointerReadout(
             drawingContext,
             minimum,
@@ -159,13 +210,156 @@ public sealed class PriceChart : FrameworkElement
     {
         base.OnMouseMove(eventArgs);
         _pointerPosition = eventArgs.GetPosition(this);
+
+        if (_scaleDragButton.HasValue)
+        {
+            ApplyScaleDrag(_pointerPosition.Value);
+            eventArgs.Handled = true;
+        }
+
         InvalidateVisual();
+    }
+
+    protected override void OnMouseDown(MouseButtonEventArgs eventArgs)
+    {
+        base.OnMouseDown(eventArgs);
+
+        if (!IsManualScale ||
+            eventArgs.ChangedButton is not (MouseButton.Left or MouseButton.Right) ||
+            !_hasRenderedScale)
+        {
+            return;
+        }
+
+        Point pointer = eventArgs.GetPosition(this);
+        Rect plotBounds = GetPlotBounds();
+
+        if (!plotBounds.Contains(pointer))
+        {
+            return;
+        }
+
+        _manualMinimum ??= _lastRenderedMinimum;
+        _manualMaximum ??= _lastRenderedMaximum;
+        _scaleDragButton = eventArgs.ChangedButton;
+        _scaleDragStart = pointer;
+        _scaleDragMinimum = _manualMinimum.Value;
+        _scaleDragMaximum = _manualMaximum.Value;
+        Cursor = Cursors.SizeNS;
+        CaptureMouse();
+        eventArgs.Handled = true;
+    }
+
+    protected override void OnMouseUp(MouseButtonEventArgs eventArgs)
+    {
+        base.OnMouseUp(eventArgs);
+
+        if (_scaleDragButton != eventArgs.ChangedButton)
+        {
+            return;
+        }
+
+        EndScaleDrag();
+        eventArgs.Handled = true;
     }
 
     protected override void OnMouseLeave(MouseEventArgs eventArgs)
     {
         base.OnMouseLeave(eventArgs);
-        _pointerPosition = null;
+
+        if (!_scaleDragButton.HasValue)
+        {
+            _pointerPosition = null;
+        }
+
+        InvalidateVisual();
+    }
+
+    protected override void OnLostMouseCapture(MouseEventArgs eventArgs)
+    {
+        base.OnLostMouseCapture(eventArgs);
+        EndScaleDrag(releaseCapture: false);
+    }
+
+    private Rect GetPlotBounds()
+    {
+        const double plotLeft = 4d;
+        const double plotTop = 4d;
+        double plotRight = Math.Max(plotLeft + 1d, RenderSize.Width - 52d);
+        double plotBottom = Math.Max(plotTop + 1d, RenderSize.Height - 22d);
+        return new(
+            plotLeft,
+            plotTop,
+            plotRight - plotLeft,
+            plotBottom - plotTop);
+    }
+
+    private void ApplyScaleDrag(Point pointer)
+    {
+        if (_scaleDragButton is not MouseButton button)
+        {
+            return;
+        }
+
+        Rect plotBounds = GetPlotBounds();
+        decimal startingRange = _scaleDragMaximum - _scaleDragMinimum;
+
+        if (plotBounds.Height <= 0d || startingRange <= 0m)
+        {
+            return;
+        }
+
+        decimal dragFraction = (decimal)(
+            (pointer.Y - _scaleDragStart.Y) / plotBounds.Height);
+        decimal priceDelta = startingRange * dragFraction;
+        decimal minimumSpan = Math.Max(0.0001m, startingRange * 0.02m);
+        decimal minimum = _scaleDragMinimum;
+        decimal maximum = _scaleDragMaximum;
+
+        if (button is MouseButton.Left)
+        {
+            if (priceDelta < 0m)
+            {
+                minimum = Math.Max(0m, _scaleDragMinimum + priceDelta);
+            }
+            else
+            {
+                maximum = _scaleDragMaximum + priceDelta;
+            }
+        }
+        else if (priceDelta > 0m)
+        {
+            minimum = Math.Min(
+                _scaleDragMinimum + priceDelta,
+                _scaleDragMaximum - minimumSpan);
+        }
+        else
+        {
+            maximum = Math.Max(
+                _scaleDragMaximum + priceDelta,
+                _scaleDragMinimum + minimumSpan);
+        }
+
+        _manualMinimum = minimum;
+        _manualMaximum = maximum;
+        InvalidateVisual();
+    }
+
+    private void EndScaleDrag(bool releaseCapture = true)
+    {
+        if (!_scaleDragButton.HasValue)
+        {
+            return;
+        }
+
+        _scaleDragButton = null;
+        Cursor = Cursors.Cross;
+
+        if (releaseCapture && IsMouseCaptured)
+        {
+            ReleaseMouseCapture();
+        }
+
         InvalidateVisual();
     }
 
@@ -702,9 +896,47 @@ public sealed class PriceChart : FrameworkElement
             chart._observedCollection.CollectionChanged += chart.OnCollectionChanged;
         }
 
+        chart.ResetManualScale();
+
         chart.InvalidateVisual();
     }
 
-    private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+    private static void OnIsManualScaleChanged(
+        DependencyObject dependencyObject,
+        DependencyPropertyChangedEventArgs eventArgs)
+    {
+        var chart = (PriceChart)dependencyObject;
+        chart.EndScaleDrag();
+
+        if ((bool)eventArgs.NewValue && chart._hasRenderedScale)
+        {
+            chart._manualMinimum = chart._lastRenderedMinimum;
+            chart._manualMaximum = chart._lastRenderedMaximum;
+        }
+        else
+        {
+            chart._manualMinimum = null;
+            chart._manualMaximum = null;
+        }
+
+        chart.InvalidateVisual();
+    }
+
+    private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs eventArgs)
+    {
+        if (eventArgs.Action is NotifyCollectionChangedAction.Reset)
+        {
+            ResetManualScale();
+        }
+
         InvalidateVisual();
+    }
+
+    private void ResetManualScale()
+    {
+        EndScaleDrag();
+        _manualMinimum = null;
+        _manualMaximum = null;
+        _hasRenderedScale = false;
+    }
 }

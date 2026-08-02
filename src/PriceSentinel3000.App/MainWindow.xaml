@@ -465,6 +465,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <TextBlock VerticalAlignment="Center"
                                        Foreground="{StaticResource PrimaryTextBrush}"
@@ -474,10 +475,16 @@
                                        VerticalAlignment="Center"
                                        Style="{StaticResource SectionLabelStyle}"
                                        Text="{Binding PriceActionCaption}" />
-                            <TextBlock Grid.Column="3" VerticalAlignment="Center"
+                            <ToggleButton Grid.Column="3" Margin="0,0,14,0"
+                                          VerticalAlignment="Center"
+                                          Style="{StaticResource ChartScaleToggleStyle}"
+                                          IsChecked="{Binding IsChartManualScale, Mode=TwoWay}"
+                                          Content="{Binding ChartScaleLabel}"
+                                          ToolTip="Auto fits incoming prices. In Manual, drag vertically with the left or right mouse button to adjust one Y-axis boundary." />
+                            <TextBlock Grid.Column="4" VerticalAlignment="Center"
                                        Style="{StaticResource SectionLabelStyle}"
                                        Text="BID / ASK" />
-                            <TextBlock Grid.Column="4" Margin="10,0,0,0"
+                            <TextBlock Grid.Column="5" Margin="10,0,0,0"
                                        VerticalAlignment="Center"
                                        Foreground="#CBD5E1" FontSize="16"
                                        Text="{Binding BidAskDisplay}" />
@@ -487,6 +494,7 @@
                                 BorderThickness="1" CornerRadius="8">
                             <Grid>
                                 <controls:PriceChart Margin="1"
+                                                     IsManualScale="{Binding IsChartManualScale}"
                                                      Points="{Binding ChartPoints}"
                                                      WindowMinutes="{Binding BufferMinutes}" />
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">

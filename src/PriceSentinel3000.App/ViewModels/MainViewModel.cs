@@ -48,6 +48,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private bool _journalReady;
     private bool _hasMarketData;
     private bool _isMarketDataConnected;
+    private bool _isChartManualScale;
     private string _statusMessage;
     private string _currentPrice = "--";
     private string _bidAskDisplay = "-- / --";
@@ -204,6 +205,20 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public string MarketDataStateLabel => _marketDataStateLabel;
     public string CurrentPrice => _currentPrice;
     public string BidAskDisplay => _bidAskDisplay;
+    public bool IsChartManualScale
+    {
+        get => _isChartManualScale;
+        set
+        {
+            if (SetField(ref _isChartManualScale, value))
+            {
+                OnPropertyChanged(nameof(ChartScaleLabel));
+            }
+        }
+    }
+    public string ChartScaleLabel => IsChartManualScale
+        ? "SCALE: MANUAL"
+        : "SCALE: AUTO";
     public bool HasMarketData => _hasMarketData;
     public string StrategyMessage => _strategyMessage;
     public string StrategyStateLabel => _strategyStateLabel;
