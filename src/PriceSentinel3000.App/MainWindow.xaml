@@ -304,29 +304,23 @@
                                          Text="{Binding MaximumQuantity, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
                             </Grid>
 
-                            <Grid Margin="0,14,0,0">
+                            <TextBlock Margin="0,14,0,0"
+                                       Style="{StaticResource FieldLabelStyle}"
+                                       Text="Maximum entries per day" />
+                            <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="86" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock VerticalAlignment="Center"
-                                           Style="{StaticResource FieldLabelStyle}"
-                                           Text="Maximum entries per day" />
-                                <CheckBox Grid.Column="1" VerticalAlignment="Center"
-                                          Foreground="#CBD5E1" IsChecked="{Binding UnlimitedEntries}"
-                                          Content="Unlimited" />
+                                <ComboBox Style="{StaticResource InputComboBoxStyle}"
+                                          ItemsSource="{Binding EntryLimitOptions}"
+                                          DisplayMemberPath="Label" SelectedValuePath="Value"
+                                          SelectedValue="{Binding UnlimitedEntries}" />
+                                <TextBox Grid.Column="2" Style="{StaticResource InputTextBoxStyle}"
+                                         IsEnabled="{Binding IsEntryLimited}"
+                                         Text="{Binding MaximumEntriesPerDay, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
                             </Grid>
-                            <TextBox Text="{Binding MaximumEntriesPerDay, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}">
-                                <TextBox.Style>
-                                    <Style BasedOn="{StaticResource InputTextBoxStyle}" TargetType="TextBox">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding UnlimitedEntries}" Value="True">
-                                                <Setter Property="IsEnabled" Value="False" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBox.Style>
-                            </TextBox>
 
                             <TextBlock Margin="0,14,0,0"
                                        Style="{StaticResource FieldLabelStyle}" Text="Maximum daily loss" />

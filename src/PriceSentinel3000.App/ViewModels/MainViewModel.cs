@@ -129,6 +129,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             new("As many as possible", QuantityLimitMode.AsManyAsPossible),
             new("No more than", QuantityLimitMode.NoMoreThan),
         ];
+        EntryLimitOptions =
+        [
+            new("As many as possible", true),
+            new("No more than", false),
+        ];
         StopLossOptions =
         [
             new(
@@ -161,6 +166,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public IReadOnlyList<SelectionOption<AmountBasis>> PositionSizeOptions { get; }
     public IReadOnlyList<SelectionOption<QuantityLimitMode>> QuantityLimitOptions { get; }
+    public IReadOnlyList<SelectionOption<bool>> EntryLimitOptions { get; }
     public IReadOnlyList<SelectionOption<AmountBasis>> DailyLossOptions { get; }
     public IReadOnlyList<SelectionOption<StopLossBasis>> StopLossOptions { get; }
 
@@ -241,6 +247,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         $"{_paperRealizedProfitLoss:+$0.00;-$0.00;$0.00} / {_paperUnrealizedProfitLoss:+$0.00;-$0.00;$0.00}";
     public string EntriesDisplay => _paperEntries.ToString(CultureInfo.InvariantCulture);
     public bool IsQuantityLimited => QuantityLimitMode is QuantityLimitMode.NoMoreThan;
+    public bool IsEntryLimited => !UnlimitedEntries;
     public string BufferCaption => $"{BufferSegments.Count} × 1 MINUTE BLOCKS";
 
     public string Symbol
@@ -309,7 +316,13 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public bool UnlimitedEntries
     {
         get => _unlimitedEntries;
-        set => SetPreferenceField(ref _unlimitedEntries, value);
+        set
+        {
+            if (SetPreferenceField(ref _unlimitedEntries, value))
+            {
+                OnPropertyChanged(nameof(IsEntryLimited));
+            }
+        }
     }
 
     public int MaximumEntriesPerDay
