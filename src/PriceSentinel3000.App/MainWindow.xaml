@@ -515,6 +515,8 @@
                         <TextBlock Style="{StaticResource SectionLabelStyle}" Text="ACTIVITY JOURNAL" />
                         <ListBox Grid.Row="1" Margin="0,14,0,0" Padding="0"
                                  Background="Transparent" BorderThickness="0"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
                                  ItemsSource="{Binding ActivityLog}">
                             <ListBox.ItemContainerStyle>
                                 <Style TargetType="ListBoxItem">
