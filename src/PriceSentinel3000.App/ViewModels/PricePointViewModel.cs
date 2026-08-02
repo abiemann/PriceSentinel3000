@@ -14,4 +14,5 @@ public sealed record PricePointViewModel(
     decimal Low,
     decimal Close,
     ChartTradeMarker Marker = ChartTradeMarker.None,
-    decimal? MarkerPrice = null);
+    decimal? MarkerPrice = null,
+    bool IsSynthetic = false);

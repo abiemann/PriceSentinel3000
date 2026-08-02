@@ -14,8 +14,10 @@ public sealed class PriceChart : FrameworkElement
     private static readonly Color UpCandleColor = Color.FromRgb(90, 203, 60);
     private static readonly Color DownCandleColor = Color.FromRgb(255, 90, 31);
     private static readonly Color FlatCandleColor = Color.FromRgb(142, 160, 183);
+    private static readonly Color SyntheticCandleColor = Colors.White;
     private Point? _pointerPosition;
     private MouseButton? _scaleDragButton;
+    private bool _scaleDragAdjustsMaximum;
     private Point _scaleDragStart;
     private decimal _scaleDragMinimum;
     private decimal _scaleDragMaximum;
@@ -109,15 +111,7 @@ public sealed class PriceChart : FrameworkElement
             new MouseButtonEventHandler(HandlePreviewMouseDown),
             handledEventsToo: true);
         AddHandler(
-            PreviewMouseRightButtonDownEvent,
-            new MouseButtonEventHandler(HandlePreviewMouseDown),
-            handledEventsToo: true);
-        AddHandler(
             PreviewMouseLeftButtonUpEvent,
-            new MouseButtonEventHandler(HandlePreviewMouseUp),
-            handledEventsToo: true);
-        AddHandler(
-            PreviewMouseRightButtonUpEvent,
             new MouseButtonEventHandler(HandlePreviewMouseUp),
             handledEventsToo: true);
         AddHandler(
@@ -144,9 +138,30 @@ public sealed class PriceChart : FrameworkElement
             return;
         }
 
-        decimal observedMinimum = points.Min(point => point.Low);
-        decimal observedMaximum = points.Max(point => point.High);
-        decimal openingPrice = points[0].Open;
+        DateTimeOffset lastTimestamp = points[^1].TimestampUtc + CandleInterval;
+        double windowMinutes = double.IsFinite(WindowMinutes)
+            ? Math.Clamp(WindowMinutes, 1d, 60d)
+            : 7d;
+        DateTimeOffset firstTimestamp = lastTimestamp.AddMinutes(-windowMinutes);
+        PricePointViewModel[] visiblePoints =
+        [
+            .. points.Where(point =>
+            {
+                DateTimeOffset centerTimestamp =
+                    point.TimestampUtc + CandleInterval / 2d;
+                return centerTimestamp >= firstTimestamp &&
+                       centerTimestamp <= lastTimestamp;
+            }),
+        ];
+
+        if (visiblePoints.Length == 0)
+        {
+            return;
+        }
+
+        decimal observedMinimum = visiblePoints.Min(point => point.Low);
+        decimal observedMaximum = visiblePoints.Max(point => point.High);
+        decimal openingPrice = visiblePoints[0].Open;
         decimal minimumRange = Math.Max(0.01m, Math.Abs(openingPrice) * 0.02m);
         decimal halfMinimumRange = minimumRange / 2m;
         decimal observedRange = observedMaximum - observedMinimum;
@@ -180,12 +195,6 @@ public sealed class PriceChart : FrameworkElement
         double plotBottom = plotBounds.Bottom;
         double plotWidth = plotRight - plotLeft;
         double plotHeight = plotBottom - plotTop;
-        DateTimeOffset lastTimestamp = points[^1].TimestampUtc + CandleInterval;
-        double windowMinutes = double.IsFinite(WindowMinutes)
-            ? Math.Clamp(WindowMinutes, 1d, 60d)
-            : 7d;
-        DateTimeOffset firstTimestamp = lastTimestamp.AddMinutes(-windowMinutes);
-
         DrawAxes(
             drawingContext,
             minimum,
@@ -209,11 +218,11 @@ public sealed class PriceChart : FrameworkElement
                 GetRsiBounds());
         }
 
-        if (points[^1].Close >= minimum && points[^1].Close <= maximum)
+        if (visiblePoints[^1].Close >= minimum && visiblePoints[^1].Close <= maximum)
         {
             DrawLastPriceGuide(
                 drawingContext,
-                points[^1],
+                visiblePoints[^1],
                 minimum,
                 range,
                 plotTop,
@@ -232,7 +241,7 @@ public sealed class PriceChart : FrameworkElement
 
         DrawCandles(
             drawingContext,
-            points,
+            visiblePoints,
             minimum,
             range,
             firstTimestamp,
@@ -244,7 +253,7 @@ public sealed class PriceChart : FrameworkElement
 
         DrawTradeMarkers(
             drawingContext,
-            points,
+            visiblePoints,
             minimum,
             range,
             firstTimestamp,
@@ -275,12 +284,8 @@ public sealed class PriceChart : FrameworkElement
 
         if (_scaleDragButton.HasValue)
         {
-            bool dragButtonIsPressed = _scaleDragButton switch
-            {
-                MouseButton.Left => eventArgs.LeftButton is MouseButtonState.Pressed,
-                MouseButton.Right => eventArgs.RightButton is MouseButtonState.Pressed,
-                _ => false,
-            };
+            bool dragButtonIsPressed =
+                eventArgs.LeftButton is MouseButtonState.Pressed;
 
             if (dragButtonIsPressed)
             {
@@ -307,7 +312,7 @@ public sealed class PriceChart : FrameworkElement
         MouseButtonEventArgs eventArgs)
     {
         if (!IsManualScale ||
-            eventArgs.ChangedButton is not (MouseButton.Left or MouseButton.Right) ||
+            eventArgs.ChangedButton is not MouseButton.Left ||
             !_hasRenderedScale)
         {
             return;
@@ -324,6 +329,8 @@ public sealed class PriceChart : FrameworkElement
         _manualMinimum ??= _lastRenderedMinimum;
         _manualMaximum ??= _lastRenderedMaximum;
         _scaleDragButton = eventArgs.ChangedButton;
+        _scaleDragAdjustsMaximum =
+            pointer.Y < plotBounds.Top + plotBounds.Height / 2d;
         _scaleDragStart = pointer;
         _scaleDragMinimum = _manualMinimum.Value;
         _scaleDragMaximum = _manualMaximum.Value;
@@ -410,7 +417,7 @@ public sealed class PriceChart : FrameworkElement
 
     private void ApplyScaleDrag(Point pointer)
     {
-        if (_scaleDragButton is not MouseButton button)
+        if (!_scaleDragButton.HasValue)
         {
             return;
         }
@@ -427,35 +434,21 @@ public sealed class PriceChart : FrameworkElement
             (pointer.Y - _scaleDragStart.Y) / plotBounds.Height);
         decimal priceDelta = startingRange * dragFraction;
         decimal minimumSpan = Math.Max(0.0001m, startingRange * 0.02m);
-        decimal minimum = _scaleDragMinimum;
-        decimal maximum = _scaleDragMaximum;
-
-        if (button is MouseButton.Left)
+        if (_scaleDragAdjustsMaximum)
         {
-            if (priceDelta < 0m)
-            {
-                minimum = Math.Max(0m, _scaleDragMinimum + priceDelta);
-            }
-            else
-            {
-                maximum = _scaleDragMaximum + priceDelta;
-            }
-        }
-        else if (priceDelta > 0m)
-        {
-            minimum = Math.Min(
-                _scaleDragMinimum + priceDelta,
-                _scaleDragMaximum - minimumSpan);
-        }
-        else
-        {
-            maximum = Math.Max(
+            _manualMinimum = _scaleDragMinimum;
+            _manualMaximum = Math.Max(
                 _scaleDragMaximum + priceDelta,
                 _scaleDragMinimum + minimumSpan);
         }
-
-        _manualMinimum = minimum;
-        _manualMaximum = maximum;
+        else
+        {
+            _manualMinimum = Math.Clamp(
+                _scaleDragMinimum + priceDelta,
+                0m,
+                _scaleDragMaximum - minimumSpan);
+            _manualMaximum = _scaleDragMaximum;
+        }
         InvalidateVisual();
     }
 
@@ -517,12 +510,14 @@ public sealed class PriceChart : FrameworkElement
                 candle.Open, minimum, range, plotTop, plotHeight);
             double closeY = MapPrice(
                 candle.Close, minimum, range, plotTop, plotHeight);
-            Color color = candle.Close.CompareTo(candle.Open) switch
-            {
-                > 0 => UpCandleColor,
-                < 0 => DownCandleColor,
-                _ => FlatCandleColor,
-            };
+            Color color = candle.IsSynthetic
+                ? SyntheticCandleColor
+                : candle.Close.CompareTo(candle.Open) switch
+                {
+                    > 0 => UpCandleColor,
+                    < 0 => DownCandleColor,
+                    _ => FlatCandleColor,
+                };
             var wickBrush = new SolidColorBrush(color);
             var bodyBrush = new SolidColorBrush(color);
             var candlePen = new Pen(wickBrush, 1.15d);

@@ -71,6 +71,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private CancellationTokenSource? _sessionCancellation;
     private JournalSession? _activeSession;
     private PriceRingBuffer? _ringBuffer;
+    private PriceRingBuffer? _chartRingBuffer;
     private MarketDataRequest? _marketDataRequest;
     private PaperTradingEngine? _paperTradingEngine;
     private readonly Dictionary<DateTimeOffset, ChartTradeMarker> _tradeMarkers = [];
@@ -760,12 +761,14 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             token);
         _journal.AppendQuotes(_activeSession!.Id, history, QuoteIngestionKind.WarmStart);
         QuoteMergeResult warmMerge = _ringBuffer!.Merge(history);
+        _chartRingBuffer!.Merge(history);
         MarketQuote current = await _marketDataSource.GetQuoteAsync(
             _marketDataRequest,
             DateTimeOffset.UtcNow,
             token);
         _journal.AppendQuotes(_activeSession.Id, [current], QuoteIngestionKind.Live);
         _ringBuffer.Merge([current]);
+        _chartRingBuffer.Merge([current]);
         SetQuoteMarketState(current);
         ProcessPaperObservation(current);
         RefreshMarketView();
@@ -786,6 +789,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 token);
             _journal.AppendQuotes(_activeSession!.Id, [quote], QuoteIngestionKind.Live);
             _ringBuffer.Merge([quote]);
+            _chartRingBuffer!.Merge([quote]);
             SetQuoteMarketState(quote);
 
             if (observedAt >= nextReconciliation)
@@ -805,6 +809,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                     verification,
                     QuoteIngestionKind.Reconciliation);
                 QuoteMergeResult merge = _ringBuffer.Merge(verification);
+                _chartRingBuffer.Merge(verification);
                 AddActivity(
                     $"Robinhood history reconciled {verification.Count} bars: {merge.Duplicates} verified, {merge.Corrected} corrected, {merge.Added} gaps filled.");
                 nextReconciliation =
@@ -882,6 +887,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             };
             _journal.AppendQuotes(_activeSession!.Id, [replayed], QuoteIngestionKind.Replay);
             QuoteMergeResult merge = _ringBuffer!.Merge([replayed]);
+            _chartRingBuffer!.Merge([replayed]);
 
             if (merge.Added + merge.Corrected == 0 && _ringBuffer.Count == 0)
             {
@@ -943,6 +949,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         ReleaseReplayPause();
         _ringBuffer = new(instrument, TimeSpan.FromMinutes(settings.BufferMinutes));
+        _chartRingBuffer = new(
+            instrument,
+            TimeSpan.FromMinutes(settings.BufferMinutes) + MaximumWarmStart);
         _paperTradingEngine = new(instrument, settings);
         _marketDataRequest = null;
         _tradeMarkers.Clear();
@@ -1079,14 +1088,16 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             return;
         }
 
+        IReadOnlyList<MarketQuote> chartSnapshot =
+            _chartRingBuffer?.Snapshot() ?? snapshot;
         IReadOnlyList<PriceCandle> candles = PriceCandleAggregator.Aggregate(
-            snapshot,
+            chartSnapshot,
             TimeSpan.FromSeconds(15));
         var refreshedPoints = new List<PricePointViewModel>(candles.Count);
 
         foreach (PriceCandle candle in candles)
         {
-            MarketQuote? markedQuote = snapshot.LastOrDefault(quote =>
+            MarketQuote? markedQuote = chartSnapshot.LastOrDefault(quote =>
                 quote.SourceTimestampUtc >= candle.StartsAtUtc &&
                 quote.SourceTimestampUtc < candle.EndsAtUtc &&
                 _tradeMarkers.ContainsKey(quote.SourceTimestampUtc));
@@ -1100,7 +1111,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 candle.Low,
                 candle.Close,
                 marker,
-                markedQuote?.Last));
+                markedQuote?.Last,
+                candle.IsSynthetic));
         }
 
         SynchronizeChartPoints(refreshedPoints);

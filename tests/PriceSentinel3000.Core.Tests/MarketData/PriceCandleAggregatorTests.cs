@@ -55,6 +55,39 @@ public sealed class PriceCandleAggregatorTests
         Assert.Equal(130.2m, candles[1].Open);
     }
 
+    [Fact]
+    public void Aggregate_FillsMissingIntervalsUsingPreviousClose()
+    {
+        MarketQuote[] quotes =
+        [
+            Quote(Start.AddSeconds(1), 130.0m, 10m),
+            Quote(Start.AddSeconds(61), 131.0m, 20m),
+        ];
+
+        IReadOnlyList<PriceCandle> candles = PriceCandleAggregator.Aggregate(
+            quotes,
+            TimeSpan.FromSeconds(15));
+
+        Assert.Equal(5, candles.Count);
+        Assert.False(candles[0].IsSynthetic);
+        Assert.False(candles[4].IsSynthetic);
+
+        foreach (PriceCandle synthetic in candles.Skip(1).Take(3))
+        {
+            Assert.True(synthetic.IsSynthetic);
+            Assert.Equal(0, synthetic.QuoteCount);
+            Assert.Equal(130.0m, synthetic.Open);
+            Assert.Equal(130.0m, synthetic.High);
+            Assert.Equal(130.0m, synthetic.Low);
+            Assert.Equal(130.0m, synthetic.Close);
+            Assert.Equal(0m, synthetic.Volume);
+        }
+
+        Assert.Equal(Start.AddSeconds(15), candles[1].StartsAtUtc);
+        Assert.Equal(Start.AddSeconds(30), candles[2].StartsAtUtc);
+        Assert.Equal(Start.AddSeconds(45), candles[3].StartsAtUtc);
+    }
+
     private static MarketQuote Quote(
         DateTimeOffset timestamp,
         decimal last,

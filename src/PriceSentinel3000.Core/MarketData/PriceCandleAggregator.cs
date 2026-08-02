@@ -8,7 +8,8 @@ public sealed record PriceCandle(
     decimal High,
     decimal Low,
     decimal Close,
-    decimal Volume);
+    decimal Volume,
+    bool IsSynthetic = false);
 
 public static class PriceCandleAggregator
 {
@@ -25,13 +26,49 @@ public static class PriceCandleAggregator
                 "Candle interval must be positive.");
         }
 
-        return
+        PriceCandle[] observedCandles =
         [
             .. quotes
                 .OrderBy(quote => quote.SourceTimestampUtc)
                 .GroupBy(quote => AlignToInterval(quote.SourceTimestampUtc, interval))
                 .Select(group => CreateCandle(group.Key, interval, group.ToArray())),
         ];
+
+        if (observedCandles.Length < 2)
+        {
+            return observedCandles;
+        }
+
+        var candles = new List<PriceCandle>(observedCandles.Length);
+        candles.Add(observedCandles[0]);
+
+        for (int index = 1; index < observedCandles.Length; index++)
+        {
+            PriceCandle nextObserved = observedCandles[index];
+            PriceCandle previous = candles[^1];
+            DateTimeOffset missingStart = previous.EndsAtUtc;
+
+            while (missingStart < nextObserved.StartsAtUtc)
+            {
+                decimal carriedClose = previous.Close;
+                previous = new(
+                    missingStart,
+                    missingStart + interval,
+                    0,
+                    carriedClose,
+                    carriedClose,
+                    carriedClose,
+                    carriedClose,
+                    0m,
+                    IsSynthetic: true);
+                candles.Add(previous);
+                missingStart = previous.EndsAtUtc;
+            }
+
+            candles.Add(nextObserved);
+        }
+
+        return candles;
     }
 
     public static DateTimeOffset AlignToInterval(

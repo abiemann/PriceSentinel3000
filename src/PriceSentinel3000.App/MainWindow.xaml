@@ -480,17 +480,17 @@
                             <ToggleButton x:Name="RsiToggle"
                                            Grid.Column="3" Margin="0,0,14,0"
                                            VerticalAlignment="Center"
-                                           Style="{StaticResource ChartScaleToggleStyle}"
+                                          Style="{StaticResource ChartScaleToggleStyle}"
                                            IsChecked="{Binding ShowRsi, Mode=TwoWay}"
                                            Content="{Binding RsiToggleLabel}"
                                            ToolTip="Show or hide the 14-period simple-average RSI panel." />
                             <ToggleButton x:Name="ChartScaleToggle"
                                           Grid.Column="4" Margin="0,0,14,0"
                                           VerticalAlignment="Center"
-                                          Style="{StaticResource ChartScaleToggleStyle}"
+                                           Style="{StaticResource ChartScaleToggleStyle}"
                                            IsChecked="{Binding IsChartManualScale, Mode=TwoWay}"
                                            Content="{Binding ChartScaleLabel}"
-                                           ToolTip="Auto fits incoming prices. In Manual, drag vertically with the left or right mouse button to adjust one Y-axis boundary." />
+                                           ToolTip="Auto fits incoming prices. In Manual, left-drag the upper half of the price chart to adjust its top Y value, or the lower half to adjust its bottom Y value." />
                             <TextBlock Grid.Column="5" VerticalAlignment="Center"
                                        Style="{StaticResource SectionLabelStyle}"
                                        Text="BID / ASK" />
