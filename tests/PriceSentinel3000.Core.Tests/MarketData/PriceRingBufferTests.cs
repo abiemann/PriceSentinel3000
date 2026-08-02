@@ -46,6 +46,45 @@ public sealed class PriceRingBufferTests
     }
 
     [Fact]
+    public void Merge_AcceptsHistoricalBarWithoutBidAskBook()
+    {
+        var buffer = new PriceRingBuffer(Instrument, TimeSpan.FromMinutes(7));
+        var historicalBar = new MarketQuote(
+            Instrument,
+            Start.AddHours(1),
+            Start,
+            0m,
+            0m,
+            10m,
+            1_000m);
+
+        QuoteMergeResult result = buffer.Merge([historicalBar]);
+
+        Assert.Equal(1, result.Added);
+        Assert.Equal(0, result.Rejected);
+        Assert.Single(buffer.Snapshot());
+    }
+
+    [Fact]
+    public void Merge_RejectsMalformedOneSidedMarket()
+    {
+        var buffer = new PriceRingBuffer(Instrument, TimeSpan.FromMinutes(7));
+        var malformed = new MarketQuote(
+            Instrument,
+            Start,
+            Start,
+            10m,
+            0m,
+            10m,
+            100m);
+
+        QuoteMergeResult result = buffer.Merge([malformed]);
+
+        Assert.Equal(1, result.Rejected);
+        Assert.Empty(buffer.Snapshot());
+    }
+
+    [Fact]
     public void MinuteAnalyzer_ReportsEachSerialBlockIndependently()
     {
         MarketQuote[] quotes =

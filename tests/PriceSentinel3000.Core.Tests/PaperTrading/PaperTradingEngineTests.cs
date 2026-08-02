@@ -79,6 +79,31 @@ public sealed class PaperTradingEngineTests
     }
 
     [Fact]
+    public void Engine_ReplayBarWithoutBookFillsAtClose()
+    {
+        var instrument = new Instrument("USO");
+        var engine = new PaperTradingEngine(
+            instrument,
+            PaperTraderSettings.Default,
+            new ScriptedStrategy(StrategySignalKind.Buy));
+        DateTimeOffset timestamp = new(2026, 7, 31, 20, 52, 0, TimeSpan.Zero);
+        var replayBar = new MarketQuote(
+            instrument,
+            DateTimeOffset.UtcNow,
+            timestamp,
+            0m,
+            0m,
+            73.25m,
+            1_000m);
+
+        PaperTradeResult result = engine.Process([replayBar]);
+
+        Assert.NotNull(result.Fill);
+        Assert.Equal(PaperOrderSide.Buy, result.Fill.Side);
+        Assert.Equal(73.25m, result.Fill.Price);
+    }
+
+    [Fact]
     public void Engine_LocksFurtherBuysAtMaximumEntryCount()
     {
         var instrument = new Instrument("SOFI");

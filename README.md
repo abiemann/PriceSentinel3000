@@ -27,8 +27,9 @@ authenticated Robinhood data foundation:
   low-zone touches, a confirmed positive turn, and simple-average RSI(14)
 - Peak detection combines open-position profit, repeated peak or pullback
   evidence, negative momentum, RSI context, and a five-minute profitable-stall exit
-- Paper buys fill at the observed ask and paper sells fill at the observed bid;
-  no fill is generated from a stale closed-market quote
+- Live-price paper buys fill at the observed ask and sells at the observed bid.
+  Historical Replay has no bid/ask series, so its simulated fills use the bar
+  close; no fill is generated from a stale closed-market quote
 - Paper position sizing supports a fixed dollar amount or account percentage,
   plus unlimited quantity or a user-entered maximum-share limit
 - Maximum entries, maximum daily loss, fixed/percentage stop loss, and a

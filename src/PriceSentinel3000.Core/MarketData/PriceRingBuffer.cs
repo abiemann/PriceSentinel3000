@@ -32,7 +32,9 @@ public sealed class PriceRingBuffer
 
         foreach (MarketQuote quote in quotes.OrderBy(item => item.SourceTimestampUtc))
         {
-            if (quote.Instrument != Instrument || quote.Last <= 0m || !quote.HasTwoSidedMarket)
+            if (quote.Instrument != Instrument ||
+                quote.Last <= 0m ||
+                !HasValidMarketPrices(quote))
             {
                 rejected++;
                 continue;
@@ -73,6 +75,9 @@ public sealed class PriceRingBuffer
         left.Ask == right.Ask &&
         left.Last == right.Last &&
         left.Volume == right.Volume;
+
+    private static bool HasValidMarketPrices(MarketQuote quote) =>
+        quote.HasTwoSidedMarket || quote.Bid == 0m && quote.Ask == 0m;
 
     private void TrimExpired()
     {

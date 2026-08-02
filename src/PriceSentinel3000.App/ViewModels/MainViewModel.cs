@@ -194,7 +194,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public string StrategyStateLabel => _strategyStateLabel;
     public string StrategyMetrics => _strategyMetrics;
     public string JournalStatus => _journalReady ? "SQLITE WAL" : "OFFLINE";
-    public string PriceActionCaption => $"{QuotePollingSeconds} SECOND PRICE ACTION";
+    public string PriceActionCaption => EffectiveMode is TradingMode.Replay
+        ? "15 SECOND REPLAY PRICE ACTION"
+        : $"{QuotePollingSeconds} SECOND PRICE ACTION";
     public string PrimaryActionLabel =>
         SelectedMode is TradingMode.Replay ? "START REPLAY" : "START PAPER TRADER";
     public string SessionStateLabel => EffectiveMode is TradingMode.Off
@@ -756,9 +758,18 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 ObservedAtUtc = DateTimeOffset.UtcNow,
             };
             _journal.AppendQuotes(_activeSession!.Id, [replayed], QuoteIngestionKind.Replay);
-            _ringBuffer!.Merge([replayed]);
+            QuoteMergeResult merge = _ringBuffer!.Merge([replayed]);
+
+            if (merge.Added + merge.Corrected == 0 && _ringBuffer.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    "Robinhood returned historical bars, but the replay buffer could not accept them.");
+            }
+
             ProcessPaperObservation(replayed, allowHistoricalSource: true);
             RefreshMarketView();
+            StatusMessage =
+                $"Replaying {index + 1}/{historicalQuotes.Count} real {instrument.Symbol} observations from {firstSource.ToLocalTime():g} at {settings.ReplaySpeed:0.#}x speed.";
         }
 
         JournalSummary summary = _journal.GetSummary(_activeSession!.Id);
@@ -1027,6 +1038,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(LiveArmed));
         OnPropertyChanged(nameof(BrokerExecutionLabel));
         OnPropertyChanged(nameof(BrokerExecutionForeground));
+        OnPropertyChanged(nameof(PriceActionCaption));
         OnPropertyChanged(nameof(PrimaryActionLabel));
         OnPropertyChanged(nameof(SessionStateLabel));
         OnPropertyChanged(nameof(SessionStateBackground));
