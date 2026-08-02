@@ -18,12 +18,26 @@ public sealed class PriceChart : FrameworkElement
             FrameworkPropertyMetadataOptions.AffectsRender,
             OnPointsChanged));
 
+    public static readonly DependencyProperty WindowMinutesProperty = DependencyProperty.Register(
+        nameof(WindowMinutes),
+        typeof(double),
+        typeof(PriceChart),
+        new FrameworkPropertyMetadata(
+            7d,
+            FrameworkPropertyMetadataOptions.AffectsRender));
+
     private INotifyCollectionChanged? _observedCollection;
 
     public IEnumerable? Points
     {
         get => (IEnumerable?)GetValue(PointsProperty);
         set => SetValue(PointsProperty, value);
+    }
+
+    public double WindowMinutes
+    {
+        get => (double)GetValue(WindowMinutesProperty);
+        set => SetValue(WindowMinutesProperty, value);
     }
 
     protected override void OnRender(DrawingContext drawingContext)
@@ -40,34 +54,31 @@ public sealed class PriceChart : FrameworkElement
             return;
         }
 
-        decimal minimum = points.Min(point => point.Price);
-        decimal maximum = points.Max(point => point.Price);
+        decimal observedMinimum = points.Min(point => point.Price);
+        decimal observedMaximum = points.Max(point => point.Price);
+        decimal openingPrice = points[0].Price;
+        decimal minimumRange = Math.Max(0.01m, Math.Abs(openingPrice) * 0.02m);
+        decimal halfMinimumRange = minimumRange / 2m;
+        decimal observedRange = observedMaximum - observedMinimum;
+        decimal expansionPadding = Math.Max(minimumRange * 0.08m, observedRange * 0.12m);
+        decimal minimum = Math.Min(
+            openingPrice - halfMinimumRange,
+            observedMinimum - expansionPadding);
+        decimal maximum = Math.Max(
+            openingPrice + halfMinimumRange,
+            observedMaximum + expansionPadding);
         decimal range = maximum - minimum;
-
-        if (range <= 0m)
-        {
-            range = Math.Max(0.01m, maximum * 0.001m);
-            minimum -= range / 2m;
-            maximum += range / 2m;
-        }
-
-        decimal padding = range * 0.12m;
-        minimum -= padding;
-        maximum += padding;
-        range = maximum - minimum;
         const double plotLeft = 12d;
         const double plotTop = 12d;
         double plotRight = Math.Max(plotLeft + 1d, RenderSize.Width - 70d);
         double plotBottom = Math.Max(plotTop + 1d, RenderSize.Height - 30d);
         double plotWidth = plotRight - plotLeft;
         double plotHeight = plotBottom - plotTop;
-        DateTimeOffset firstTimestamp = points[0].TimestampUtc;
         DateTimeOffset lastTimestamp = points[^1].TimestampUtc;
-
-        if (lastTimestamp <= firstTimestamp)
-        {
-            lastTimestamp = firstTimestamp.AddSeconds(15);
-        }
+        double windowMinutes = double.IsFinite(WindowMinutes)
+            ? Math.Clamp(WindowMinutes, 1d, 60d)
+            : 7d;
+        DateTimeOffset firstTimestamp = lastTimestamp.AddMinutes(-windowMinutes);
 
         DrawAxes(
             drawingContext,

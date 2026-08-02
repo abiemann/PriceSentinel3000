@@ -489,7 +489,8 @@
                                 BorderThickness="1" CornerRadius="8">
                             <Grid>
                                 <controls:PriceChart Margin="4"
-                                                     Points="{Binding ChartPoints}" />
+                                                     Points="{Binding ChartPoints}"
+                                                     WindowMinutes="{Binding BufferMinutes}" />
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <StackPanel.Style>
                                         <Style TargetType="StackPanel">
