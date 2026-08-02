@@ -54,6 +54,26 @@ public sealed class ModeStateTests
     }
 
     [Fact]
+    public void AcknowledgedLive_BecomesEffectiveButRemainsDisarmed()
+    {
+        ModeState state = ModeState.SafeDefault
+            .Select(TradingMode.Live)
+            .ActivateLiveDisarmed();
+
+        Assert.Equal(TradingMode.Live, state.SelectedMode);
+        Assert.Equal(TradingMode.Live, state.EffectiveMode);
+        Assert.False(state.LiveArmed);
+    }
+
+    [Fact]
+    public void ActivatingLiveDisarmed_RequiresLiveSelection()
+    {
+        ModeState state = ModeState.SafeDefault;
+
+        Assert.Throws<InvalidOperationException>(() => state.ActivateLiveDisarmed());
+    }
+
+    [Fact]
     public void CancellingLiveFromReplay_RestoresReplay()
     {
         ModeState state = ModeState.SafeDefault

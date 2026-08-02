@@ -54,7 +54,7 @@ dotnet test PriceSentinel3000.sln
 ```
 
 The application starts in OFF mode and asks the user to explicitly select Replay,
-Simulation, or LIVE. Its current LIVE workflow records the risk acknowledgment but
-does not arm execution. A later integration stage must complete Robinhood
-authorization, account checks, risk checks, and data initialization before Core
-will permit LIVE to be armed.
+Simulation, or LIVE. After the risk acknowledgment, LIVE becomes the effective
+operating mode while broker execution remains explicitly disarmed. A later
+integration stage must complete Robinhood authorization, account checks, risk
+checks, and data initialization before Core will permit LIVE to be armed.

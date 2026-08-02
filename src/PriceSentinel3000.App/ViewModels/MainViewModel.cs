@@ -102,10 +102,17 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public string CurrentPrice => "--";
     public string SessionStateLabel => EffectiveMode is TradingMode.Off
         ? "OFF"
+        : EffectiveMode is TradingMode.Live && !LiveArmed ? "DISARMED"
         : IsSimulationRunning ? "RUNNING" : "READY";
-    public string SessionStateBackground => EffectiveMode is TradingMode.Off ? "#202B39" : "#123528";
-    public string SessionStateBorder => EffectiveMode is TradingMode.Off ? "#3A4B61" : "#24684C";
-    public string SessionStateForeground => EffectiveMode is TradingMode.Off ? "#A8B6C7" : "#5EE6B1";
+    public string SessionStateBackground => EffectiveMode is TradingMode.Live && !LiveArmed
+        ? "#3B211E"
+        : EffectiveMode is TradingMode.Off ? "#202B39" : "#123528";
+    public string SessionStateBorder => EffectiveMode is TradingMode.Live && !LiveArmed
+        ? "#7F3C34"
+        : EffectiveMode is TradingMode.Off ? "#3A4B61" : "#24684C";
+    public string SessionStateForeground => EffectiveMode is TradingMode.Live && !LiveArmed
+        ? "#FF9B8C"
+        : EffectiveMode is TradingMode.Off ? "#A8B6C7" : "#5EE6B1";
     public string SymbolDisplay => string.IsNullOrWhiteSpace(Symbol) ? "—" : Symbol.Trim().ToUpperInvariant();
     public string BuyingPowerDisplay => StartingBalance.ToString("C", CultureInfo.CurrentCulture);
     public string BufferCaption => $"{BufferSegments.Count} × 1 MINUTE BLOCKS";
@@ -265,9 +272,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public void AcknowledgeLiveRisk()
     {
         _liveRiskAcknowledged = true;
+        _modeState = _modeState.ActivateLiveDisarmed();
         IsSimulationRunning = false;
-        StatusMessage = "LIVE risk acknowledged. Robinhood authorization is not connected in Stage 2; LIVE remains disarmed.";
-        AddActivity("LIVE risk acknowledged; waiting for the future Robinhood authorization adapter.");
+        StatusMessage = "LIVE mode is effective, but broker execution remains disarmed until Robinhood authorization is connected.";
+        AddActivity("LIVE mode entered disarmed; waiting for the future Robinhood authorization adapter.");
         OnPropertyChanged(nameof(LiveRiskAcknowledged));
         NotifyModeProperties();
     }

@@ -447,7 +447,7 @@
             </Grid>
             <Grid Grid.Column="4">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="250" />
+                    <RowDefinition Height="220" />
                     <RowDefinition Height="12" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
@@ -476,15 +476,6 @@
                             <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Effective mode" />
                             <TextBlock Grid.Column="1" Foreground="{StaticResource AccentBrush}"
                                        FontWeight="Bold" Text="{Binding EffectiveModeLabel}" />
-                        </Grid>
-                        <Grid Margin="0,11,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Selected mode" />
-                            <TextBlock Grid.Column="1" Foreground="#CBD5E1"
-                                       FontWeight="SemiBold" Text="{Binding SelectedModeLabel}" />
                         </Grid>
                         <Grid Margin="0,11,0,0">
                             <Grid.ColumnDefinitions>

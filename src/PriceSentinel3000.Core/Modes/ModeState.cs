@@ -49,6 +49,17 @@ public readonly record struct ModeState
         return new(TradingMode.Live, TradingMode.Live, true);
     }
 
+    public ModeState ActivateLiveDisarmed()
+    {
+        if (SelectedMode is not TradingMode.Live)
+        {
+            throw new InvalidOperationException(
+                "Live mode must be selected before it can become effective.");
+        }
+
+        return new(TradingMode.Live, TradingMode.Live, false);
+    }
+
     public ModeState DisarmTo(TradingMode safeMode = TradingMode.Off) =>
         safeMode is TradingMode.Live
             ? throw new ArgumentOutOfRangeException(
