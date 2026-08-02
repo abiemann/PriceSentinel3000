@@ -321,9 +321,26 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
-                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Replay lookback (days)" />
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Replay date (yyyy-MM-dd)" />
                                     <TextBox Style="{StaticResource InputTextBoxStyle}"
-                                             Text="{Binding ReplayLookbackDays, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                                             Text="{Binding ReplayDate, UpdateSourceTrigger=LostFocus}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Local start (HH:mm)" />
+                                    <TextBox Style="{StaticResource InputTextBoxStyle}"
+                                             Text="{Binding ReplayTime, UpdateSourceTrigger=LostFocus}" />
+                                </StackPanel>
+                            </Grid>
+                            <Grid Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Replay duration (min)" />
+                                    <TextBox Style="{StaticResource InputTextBoxStyle}"
+                                             Text="{Binding ReplayDurationMinutes, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
                                     <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Replay speed (x)" />

@@ -49,7 +49,7 @@
                        FontSize="13"
                        LineHeight="20"
                        TextWrapping="Wrap"
-                       Text="Stage 3 does not connect to Robinhood or arm LIVE execution. Agreeing records the warning acknowledgment only." />
+                       Text="Robinhood is already connected for market data. Agreeing enters LIVE mode, but this version keeps broker execution disarmed and cannot submit an order." />
         </StackPanel>
 
         <Grid Grid.Row="2"

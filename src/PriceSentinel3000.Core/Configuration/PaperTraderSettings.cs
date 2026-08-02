@@ -16,8 +16,22 @@ public sealed record PaperTraderSettings
     public int QuotePollingSeconds { get; init; } = 5;
     public int ReconciliationSeconds { get; init; } = 45;
     public int ReconciliationOverlapSeconds { get; init; } = 15;
-    public int ReplayLookbackDays { get; init; } = 7;
+    public string ReplayDate { get; init; } = GetDefaultReplayDate();
+    public string ReplayTime { get; init; } = "09:30";
+    public int ReplayDurationMinutes { get; init; } = 90;
     public decimal ReplaySpeed { get; init; } = 10m;
 
     public static PaperTraderSettings Default { get; } = new();
+
+    private static string GetDefaultReplayDate()
+    {
+        DateOnly date = DateOnly.FromDateTime(DateTime.Today);
+
+        while (date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+        {
+            date = date.AddDays(-1);
+        }
+
+        return date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+    }
 }

@@ -69,9 +69,27 @@ public static class PaperTraderSettingsValidator
             errors.Add("Reconciliation overlap must be at least 5 seconds and no longer than the reconciliation interval.");
         }
 
-        if (settings.ReplayLookbackDays is < 1 or > 30)
+        if (!DateOnly.TryParseExact(
+                settings.ReplayDate.Trim(),
+                "yyyy-MM-dd",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None,
+                out _))
         {
-            errors.Add("Replay lookback must be between 1 and 30 days.");
+            errors.Add("Replay date must use yyyy-MM-dd format.");
+        }
+
+        if (!ReplaySchedule.TryParseLocal(
+                settings.ReplayDate,
+                settings.ReplayTime,
+                out _))
+        {
+            errors.Add("Replay time must use 24-hour HH:mm format and identify a valid local time.");
+        }
+
+        if (settings.ReplayDurationMinutes is < 1 or > 480)
+        {
+            errors.Add("Replay duration must be between 1 and 480 minutes.");
         }
 
         if (settings.ReplaySpeed is < 1 or > 100)

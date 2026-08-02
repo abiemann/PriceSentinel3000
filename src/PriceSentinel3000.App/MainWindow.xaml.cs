@@ -8,10 +8,16 @@ namespace PriceSentinel3000.App;
 
 public partial class MainWindow : Window
 {
-    private readonly MainViewModel _viewModel = new();
+    private readonly MainViewModel _viewModel;
 
     public MainWindow()
+        : this(new MainViewModel())
     {
+    }
+
+    internal MainWindow(MainViewModel viewModel)
+    {
+        _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         InitializeComponent();
         DataContext = _viewModel;
     }

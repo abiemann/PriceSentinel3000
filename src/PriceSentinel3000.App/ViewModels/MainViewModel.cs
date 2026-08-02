@@ -33,7 +33,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private int _quotePollingSeconds;
     private int _reconciliationSeconds;
     private int _reconciliationOverlapSeconds;
-    private int _replayLookbackDays;
+    private string _replayDate;
+    private string _replayTime;
+    private int _replayDurationMinutes;
     private decimal _replaySpeed;
     private bool _isSessionRunning;
     private bool _isStartingSession;
@@ -83,7 +85,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _quotePollingSeconds = defaults.QuotePollingSeconds;
         _reconciliationSeconds = defaults.ReconciliationSeconds;
         _reconciliationOverlapSeconds = defaults.ReconciliationOverlapSeconds;
-        _replayLookbackDays = defaults.ReplayLookbackDays;
+        _replayDate = defaults.ReplayDate;
+        _replayTime = defaults.ReplayTime;
+        _replayDurationMinutes = defaults.ReplayDurationMinutes;
         _replaySpeed = defaults.ReplaySpeed;
         _statusMessage = "Choose Replay, Paper Trader, or LIVE on the rotary selector to begin.";
 
@@ -116,8 +120,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         AddActivity("Application started with operating mode OFF.");
         AddActivity(
             _journalReady
-                ? "Stage 3 data engine loaded; SQLite journal is ready."
-                : "Stage 3 data engine loaded; SQLite journal could not be initialized.",
+                ? "Stage 4 data engine loaded; SQLite journal is ready."
+                : "Stage 4 data engine loaded; SQLite journal could not be initialized.",
             _journalReady ? "INFO" : "ERROR");
     }
 
@@ -302,10 +306,22 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         set => SetField(ref _reconciliationOverlapSeconds, value);
     }
 
-    public int ReplayLookbackDays
+    public string ReplayDate
     {
-        get => _replayLookbackDays;
-        set => SetField(ref _replayLookbackDays, value);
+        get => _replayDate;
+        set => SetField(ref _replayDate, value);
+    }
+
+    public string ReplayTime
+    {
+        get => _replayTime;
+        set => SetField(ref _replayTime, value);
+    }
+
+    public int ReplayDurationMinutes
+    {
+        get => _replayDurationMinutes;
+        set => SetField(ref _replayDurationMinutes, value);
     }
 
     public decimal ReplaySpeed
@@ -350,7 +366,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             StatusMessage = mode switch
             {
                 TradingMode.Off => "System is OFF. Choose Replay, Paper Trader, or LIVE to begin.",
-                TradingMode.Replay => "Replay selected. Start to stream recent Robinhood history as new observations.",
+                TradingMode.Replay => "Replay selected. Choose a ticker and local date/time, then stream that history as new observations.",
                 TradingMode.PaperTrader => "Paper Trader selected. Configure the paper account, then start the real Robinhood price feed.",
                 _ => StatusMessage,
             };
@@ -376,18 +392,18 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _sessionCancellation?.Dispose();
         _sessionCancellation = new();
         _isStartingSession = true;
-        StatusMessage = "LIVE mode is effective and disarmed. Connecting to Robinhood for authorization...";
-        AddActivity("LIVE mode entered disarmed; Robinhood authorization started.");
+        StatusMessage = "LIVE mode is effective and disarmed. Verifying the Robinhood connection...";
+        AddActivity("LIVE risk acknowledged; verifying the startup Robinhood connection.");
         OnPropertyChanged(nameof(LiveRiskAcknowledged));
         NotifyModeProperties();
 
         try
         {
-            SetMarketDataState("ROBINHOOD LOGIN", "AUTHORIZING", isConnected: false);
+            SetMarketDataState("ROBINHOOD READY", "VERIFYING", isConnected: false);
             await _marketDataSource.ConnectAsync(_sessionCancellation.Token);
             SetMarketDataState("ROBINHOOD READY", "CONNECTED");
-            StatusMessage = "Robinhood authorization is connected. LIVE order execution remains disarmed in this stage.";
-            AddActivity("Robinhood authorization connected; LIVE execution remains disarmed.");
+            StatusMessage = "Robinhood remains connected. LIVE order execution is disarmed in this stage.";
+            AddActivity("Robinhood connection verified; LIVE execution remains disarmed.");
         }
         catch (OperationCanceledException)
         {
@@ -407,6 +423,28 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         {
             _isStartingSession = false;
             StartSessionCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    public async Task ConnectRobinhoodAtStartupAsync(
+        CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        StatusMessage = "Connecting to Robinhood before PriceSentinel starts...";
+        SetMarketDataState("ROBINHOOD LOGIN", "AUTHORIZING", isConnected: false);
+
+        try
+        {
+            await _marketDataSource.ConnectAsync(cancellationToken);
+            SetMarketDataState("ROBINHOOD READY", "CONNECTED");
+            StatusMessage = "Robinhood is connected. Choose Replay, Paper Trader, or LIVE to begin.";
+            AddActivity("Robinhood connected at startup; operating mode remains OFF.");
+        }
+        catch
+        {
+            SetMarketDataState("ADAPTER OFFLINE", "OFFLINE", isConnected: false);
+            StatusMessage = "Robinhood is required. Retry LOGIN or exit PriceSentinel.";
+            throw;
         }
     }
 
@@ -576,23 +614,33 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         PaperTraderSettings settings)
     {
         CancellationToken token = _sessionCancellation!.Token;
-        StatusMessage = "Connecting to Robinhood and loading recent 15-second history for Replay...";
+        if (!ReplaySchedule.TryParseLocal(
+                settings.ReplayDate,
+                settings.ReplayTime,
+                out DateTimeOffset replayStart))
+        {
+            throw new InvalidOperationException("The Replay date or time is invalid.");
+        }
+
+        DateTimeOffset replayEnd =
+            replayStart.AddMinutes(settings.ReplayDurationMinutes);
+        StatusMessage = $"Loading real 15-second {instrument.Symbol} history from {replayStart:g}...";
         SetMarketDataState("ROBINHOOD LOGIN", "AUTHORIZING", isConnected: false);
         await _marketDataSource.ConnectAsync(token);
         DateTimeOffset observedAt = DateTimeOffset.UtcNow;
         IReadOnlyList<MarketQuote> historicalQuotes =
             await _marketDataSource.GetReplayHistoryAsync(
                 instrument,
-                observedAt,
-                settings.ReplayLookbackDays,
+                replayStart,
+                replayEnd,
                 observedAt,
                 token);
 
         if (historicalQuotes.Count == 0)
         {
             SetMarketDataState("ROBINHOOD READY", "NO HISTORY");
-            StatusMessage = $"Robinhood returned no replayable {instrument.Symbol} trades in the last {settings.ReplayLookbackDays} days.";
-            AddActivity($"Replay found no historical {instrument.Symbol} observations.", "WARNING");
+            StatusMessage = $"Robinhood returned no {instrument.Symbol} trades from {replayStart:g} through {replayEnd:t}.";
+            AddActivity($"Replay found no historical {instrument.Symbol} observations in the requested window.", "WARNING");
             return;
         }
 
@@ -605,7 +653,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         DateTimeOffset lastSource = historicalQuotes[^1].SourceTimestampUtc;
         StatusMessage = $"Replaying {historicalQuotes.Count} real {instrument.Symbol} observations from {firstSource.ToLocalTime():g} at {settings.ReplaySpeed:0.#}x speed.";
         AddActivity(
-            $"Historical Replay loaded {historicalQuotes.Count} Robinhood observations through {lastSource.ToLocalTime():g}.");
+            $"Historical Replay loaded {historicalQuotes.Count} Robinhood observations for the requested {replayStart:g} start through {lastSource.ToLocalTime():g}.");
 
         for (int index = 0; index < historicalQuotes.Count; index++)
         {
@@ -806,7 +854,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         QuotePollingSeconds = QuotePollingSeconds,
         ReconciliationSeconds = ReconciliationSeconds,
         ReconciliationOverlapSeconds = ReconciliationOverlapSeconds,
-        ReplayLookbackDays = ReplayLookbackDays,
+        ReplayDate = ReplayDate,
+        ReplayTime = ReplayTime,
+        ReplayDurationMinutes = ReplayDurationMinutes,
         ReplaySpeed = ReplaySpeed,
     };
 

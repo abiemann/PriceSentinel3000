@@ -75,17 +75,49 @@ public sealed class PaperTraderSettingsValidatorTests
 
     [Theory]
     [InlineData(0)]
-    [InlineData(31)]
-    public void ReplayLookbackOutsideRange_IsRejected(int days)
+    [InlineData(481)]
+    public void ReplayDurationOutsideRange_IsRejected(int minutes)
     {
         PaperTraderSettings settings = PaperTraderSettings.Default with
         {
-            ReplayLookbackDays = days,
+            ReplayDurationMinutes = minutes,
         };
 
         IReadOnlyList<string> errors = PaperTraderSettingsValidator.Validate(settings);
 
-        Assert.Contains(errors, error => error.Contains("Replay lookback"));
+        Assert.Contains(errors, error => error.Contains("Replay duration"));
+    }
+
+    [Theory]
+    [InlineData("08/01/2026", "09:30")]
+    [InlineData("2026-08-01", "25:00")]
+    public void InvalidReplayDateOrTime_IsRejected(string date, string time)
+    {
+        PaperTraderSettings settings = PaperTraderSettings.Default with
+        {
+            ReplayDate = date,
+            ReplayTime = time,
+        };
+
+        IReadOnlyList<string> errors = PaperTraderSettingsValidator.Validate(settings);
+
+        Assert.Contains(errors, error => error.Contains("Replay", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ReplaySchedule_ParsesEnteredLocalDateAndTime()
+    {
+        bool parsed = ReplaySchedule.TryParseLocal(
+            "2026-07-31",
+            "09:30",
+            out DateTimeOffset replayStart);
+
+        Assert.True(parsed);
+        Assert.Equal(2026, replayStart.Year);
+        Assert.Equal(7, replayStart.Month);
+        Assert.Equal(31, replayStart.Day);
+        Assert.Equal(9, replayStart.Hour);
+        Assert.Equal(30, replayStart.Minute);
     }
 
     [Theory]

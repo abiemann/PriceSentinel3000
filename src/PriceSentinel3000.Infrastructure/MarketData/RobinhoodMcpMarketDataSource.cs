@@ -12,7 +12,6 @@ public sealed class RobinhoodMcpMarketDataSource : IMarketDataSource
 {
     private static readonly Uri Endpoint =
         new("https://agent.robinhood.com/mcp/trading");
-    private const int MaximumReplayObservations = 360;
     private readonly SemaphoreSlim _connectionGate = new(1, 1);
     private readonly ProtectedRobinhoodAuthStore _authStore;
     private McpClient? _client;
@@ -149,61 +148,41 @@ public sealed class RobinhoodMcpMarketDataSource : IMarketDataSource
 
     public async Task<IReadOnlyList<MarketQuote>> GetReplayHistoryAsync(
         Instrument instrument,
+        DateTimeOffset fromUtc,
         DateTimeOffset throughUtc,
-        int lookbackDays,
         DateTimeOffset observedAtUtc,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(instrument);
+        if (fromUtc > throughUtc)
+        {
+            throw new ArgumentException(
+                "Replay start must not be after its end.",
+                nameof(fromUtc));
+        }
+
+        DateTimeOffset start = fromUtc.ToUniversalTime();
         DateTimeOffset end = throughUtc.ToUniversalTime();
-        JsonElement locatorRoot = await CallStructuredToolAsync(
+        JsonElement root = await CallStructuredToolAsync(
             "get_equity_historicals",
             new Dictionary<string, object?>
             {
                 ["symbols"] = new[] { instrument.Symbol },
-                ["start_time"] = end.AddDays(-lookbackDays).ToString("O"),
+                ["start_time"] = start.ToString("O"),
                 ["end_time"] = end.ToString("O"),
-                ["bounds"] = "extended",
-                ["adjustment_type"] = "split",
-            },
-            cancellationToken).ConfigureAwait(false);
-        IReadOnlyList<MarketQuote> locatorHistory =
-            RobinhoodMarketDataParser.ParseHistory(
-                locatorRoot,
-                instrument,
-                observedAtUtc);
-
-        if (locatorHistory.Count == 0)
-        {
-            return [];
-        }
-
-        DateTimeOffset detailedEnd = locatorHistory[^1].SourceTimestampUtc
-            .AddHours(1);
-
-        if (detailedEnd > end)
-        {
-            detailedEnd = end;
-        }
-
-        JsonElement detailedRoot = await CallStructuredToolAsync(
-            "get_equity_historicals",
-            new Dictionary<string, object?>
-            {
-                ["symbols"] = new[] { instrument.Symbol },
-                ["start_time"] = detailedEnd.AddHours(-8).ToString("O"),
-                ["end_time"] = detailedEnd.ToString("O"),
                 ["interval"] = "15second",
                 ["bounds"] = "extended",
                 ["adjustment_type"] = "split",
             },
             cancellationToken).ConfigureAwait(false);
-        IReadOnlyList<MarketQuote> detailedHistory =
-            RobinhoodMarketDataParser.ParseHistory(
-                detailedRoot,
+        return RobinhoodMarketDataParser.ParseHistory(
+                root,
                 instrument,
-                observedAtUtc);
-        return SelectLatestContinuousSession(detailedHistory);
+                observedAtUtc)
+            .Where(quote =>
+                quote.SourceTimestampUtc >= start &&
+                quote.SourceTimestampUtc <= end)
+            .ToArray();
     }
 
     public async ValueTask DisposeAsync()
@@ -249,26 +228,4 @@ public sealed class RobinhoodMcpMarketDataSource : IMarketDataSource
             $"Robinhood MCP returned no structured data for {toolName}.");
     }
 
-    private static IReadOnlyList<MarketQuote> SelectLatestContinuousSession(
-        IReadOnlyList<MarketQuote> history)
-    {
-        if (history.Count == 0)
-        {
-            return [];
-        }
-
-        int first = history.Count - 1;
-
-        while (first > 0 &&
-               history[first].SourceTimestampUtc -
-               history[first - 1].SourceTimestampUtc <= TimeSpan.FromHours(2))
-        {
-            first--;
-        }
-
-        return history
-            .Skip(first)
-            .TakeLast(MaximumReplayObservations)
-            .ToArray();
-    }
 }

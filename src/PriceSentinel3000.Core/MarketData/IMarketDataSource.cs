@@ -20,8 +20,8 @@ public interface IMarketDataSource : IAsyncDisposable
 
     Task<IReadOnlyList<MarketQuote>> GetReplayHistoryAsync(
         Instrument instrument,
+        DateTimeOffset fromUtc,
         DateTimeOffset throughUtc,
-        int lookbackDays,
         DateTimeOffset observedAtUtc,
         CancellationToken cancellationToken);
 }

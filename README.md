@@ -17,16 +17,18 @@ Stage 4 replaces the synthetic feed with authenticated Robinhood MCP market data
   never submit a real order
 - Four-minute startup history and 45-second overlap reconciliation use real
   15-second Robinhood equity bars
-- Replay loads the latest available historical 15-second session and emits each
-  observation as though it has just arrived
-- Replay lookback (1-30 days) and playback speed (1x-100x) are tunable
+- Replay accepts a ticker plus an exact local date/time and emits that historical
+  15-second window as though each observation has just arrived
+- Replay duration (1-480 minutes) and playback speed (1x-100x) are tunable
 - A tunable 5-15 minute rolling buffer is analyzed as serial one-minute blocks
 - A WPF price chart shows the real or replayed stream, current price, bid/ask,
   minute-block direction, close, and quote counts
 - SQLite WAL journaling records sessions, observations, and activities, with
   reserved tables for decisions, paper orders, fills, positions, and risk events
 - Separate selected and effective modes keep LIVE execution safely disarmed
-- The first LIVE selection shows the loss warning before Robinhood authorization
+- Startup is gated by a welcome dialog: EXIT closes the app, while LOGIN must
+  establish Robinhood authorization before the workspace opens safely in OFF mode
+- The first LIVE selection still shows the loss warning before entering disarmed LIVE
 - Friendly status guidance distinguishes REAL TIME, MARKET CLOSED, REPLAY,
   AUTHORIZING, and OFFLINE states
 
@@ -37,10 +39,10 @@ explicitly disarmed and no order-submission tool is called anywhere in the app.
 
 ## Paper Trader workflow
 
-1. Select **Paper Trader**, enter a stock or ETF symbol and paper starting balance,
+1. At startup, click **LOGIN** and complete Robinhood's hosted browser
+   authorization. PriceSentinel never asks for or stores a Robinhood password.
+2. Select **Paper Trader**, enter a stock or ETF symbol and paper starting balance,
    configure the risk and timing settings, then click **Start Paper Trader**.
-2. On first use, the system browser opens Robinhood's hosted authorization page.
-   PriceSentinel 3000 never asks for or stores a Robinhood password.
 3. The app loads up to four minutes of real 15-second history, obtains the current
    quote, and then polls the current quote at the configured interval.
 4. At each reconciliation interval, the app requests the full interval plus the
@@ -54,14 +56,14 @@ is unavailable, the session stops and reports the failure.
 
 ## Replay workflow
 
-1. Select **Replay**, choose the symbol, lookback days, and playback speed, then
-   click **Start Replay**.
-2. A bounded locator request finds the latest available trading period inside the
-   lookback, then one eight-hour request loads actual 15-second bars. This keeps
-   traffic low and the detailed request below the upstream bar cap.
-3. Up to 360 observations from the latest continuous trading session are replayed
-   in source-time order. Each historical price enters the normal ring buffer as a
-   newly observed event, with delays compressed by the selected speed.
+1. After the required startup login, select **Replay** and enter the ticker,
+   local date (`yyyy-MM-dd`), local start time (`HH:mm`), duration, and playback
+   speed, then click **Start Replay**.
+2. One bounded request loads actual 15-second Robinhood bars for precisely that
+   start/end window, using extended-hours bounds.
+3. The returned observations are replayed in source-time order. Each historical
+   price enters the normal ring buffer as a newly observed event, with delays
+   compressed by the selected speed.
 
 Replay does not depend on a previously recorded Paper Trader session and never
 uses the former synthetic data.
@@ -119,7 +121,7 @@ dotnet build PriceSentinel3000.sln
 dotnet test PriceSentinel3000.sln
 ~~~
 
-The application always starts OFF. Accepting the LIVE warning makes LIVE the
-effective mode and performs Robinhood authorization, but broker execution remains
-disarmed until a later, separately reviewed implementation stage adds account,
-risk, order-preview, and order-submission safeguards.
+The workspace always starts OFF after the required Robinhood connection succeeds.
+Accepting the LIVE warning makes LIVE the effective mode, but broker execution
+remains disarmed until a later, separately reviewed implementation stage adds
+account, risk, order-preview, and order-submission safeguards.

@@ -1,8 +1,7 @@
 <Application x:Class="PriceSentinel3000.App.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:converters="clr-namespace:PriceSentinel3000.App.Converters"
-             StartupUri="MainWindow.xaml">
+             xmlns:converters="clr-namespace:PriceSentinel3000.App.Converters">
     <Application.Resources>
         <converters:TradingModeToAngleConverter x:Key="TradingModeToAngleConverter" />
 
