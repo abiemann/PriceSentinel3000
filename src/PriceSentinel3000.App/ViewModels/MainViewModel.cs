@@ -20,6 +20,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     private readonly IMarketDataSource _marketDataSource;
     private readonly ITradingJournal _journal;
+    private readonly JsonUserPreferencesStore _preferencesStore;
     private ModeState _modeState = ModeState.SafeDefault;
     private string _symbol;
     private decimal _startingBalance;
@@ -73,18 +74,22 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public MainViewModel()
         : this(
             RobinhoodMcpMarketDataSource.CreateDefault(),
-            new SqliteTradingJournal(AppDataPaths.JournalDatabase))
+            new SqliteTradingJournal(AppDataPaths.JournalDatabase),
+            new JsonUserPreferencesStore(AppDataPaths.UserPreferences))
     {
     }
 
     internal MainViewModel(
         IMarketDataSource marketDataSource,
-        ITradingJournal journal)
+        ITradingJournal journal,
+        JsonUserPreferencesStore preferencesStore)
     {
         _marketDataSource = marketDataSource;
         _journal = journal;
+        _preferencesStore = preferencesStore;
 
-        PaperTraderSettings defaults = PaperTraderSettings.Default;
+        PaperTraderSettings defaults =
+            _preferencesStore.Load() ?? PaperTraderSettings.Default;
         _symbol = defaults.Symbol;
         _startingBalance = defaults.StartingBalance;
         _positionSizeBasis = defaults.PositionSizeBasis;
@@ -241,7 +246,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         {
             string normalized = value?.ToUpperInvariant() ?? string.Empty;
 
-            if (SetField(ref _symbol, normalized))
+            if (SetPreferenceField(ref _symbol, normalized))
             {
                 OnPropertyChanged(nameof(SymbolDisplay));
             }
@@ -253,7 +258,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         get => _startingBalance;
         set
         {
-            if (SetField(ref _startingBalance, value))
+            if (SetPreferenceField(ref _startingBalance, value))
             {
                 if (!IsSessionRunning)
                 {
@@ -270,13 +275,13 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public AmountBasis PositionSizeBasis
     {
         get => _positionSizeBasis;
-        set => SetField(ref _positionSizeBasis, value);
+        set => SetPreferenceField(ref _positionSizeBasis, value);
     }
 
     public decimal PositionSizeValue
     {
         get => _positionSizeValue;
-        set => SetField(ref _positionSizeValue, value);
+        set => SetPreferenceField(ref _positionSizeValue, value);
     }
 
     public QuantityLimitMode QuantityLimitMode
@@ -284,7 +289,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         get => _quantityLimitMode;
         set
         {
-            if (SetField(ref _quantityLimitMode, value))
+            if (SetPreferenceField(ref _quantityLimitMode, value))
             {
                 OnPropertyChanged(nameof(IsQuantityLimited));
             }
@@ -294,43 +299,43 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public decimal MaximumQuantity
     {
         get => _maximumQuantity;
-        set => SetField(ref _maximumQuantity, value);
+        set => SetPreferenceField(ref _maximumQuantity, value);
     }
 
     public bool UnlimitedEntries
     {
         get => _unlimitedEntries;
-        set => SetField(ref _unlimitedEntries, value);
+        set => SetPreferenceField(ref _unlimitedEntries, value);
     }
 
     public int MaximumEntriesPerDay
     {
         get => _maximumEntriesPerDay;
-        set => SetField(ref _maximumEntriesPerDay, value);
+        set => SetPreferenceField(ref _maximumEntriesPerDay, value);
     }
 
     public AmountBasis MaximumDailyLossBasis
     {
         get => _maximumDailyLossBasis;
-        set => SetField(ref _maximumDailyLossBasis, value);
+        set => SetPreferenceField(ref _maximumDailyLossBasis, value);
     }
 
     public decimal MaximumDailyLossValue
     {
         get => _maximumDailyLossValue;
-        set => SetField(ref _maximumDailyLossValue, value);
+        set => SetPreferenceField(ref _maximumDailyLossValue, value);
     }
 
     public StopLossBasis StopLossBasis
     {
         get => _stopLossBasis;
-        set => SetField(ref _stopLossBasis, value);
+        set => SetPreferenceField(ref _stopLossBasis, value);
     }
 
     public decimal StopLossValue
     {
         get => _stopLossValue;
-        set => SetField(ref _stopLossValue, value);
+        set => SetPreferenceField(ref _stopLossValue, value);
     }
 
     public int BufferMinutes
@@ -338,7 +343,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         get => _bufferMinutes;
         set
         {
-            if (SetField(ref _bufferMinutes, value))
+            if (SetPreferenceField(ref _bufferMinutes, value))
             {
                 RebuildBufferSegments();
             }
@@ -350,7 +355,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         get => _quotePollingSeconds;
         set
         {
-            if (SetField(ref _quotePollingSeconds, value))
+            if (SetPreferenceField(ref _quotePollingSeconds, value))
             {
                 OnPropertyChanged(nameof(PriceActionCaption));
             }
@@ -360,37 +365,37 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public int ReconciliationSeconds
     {
         get => _reconciliationSeconds;
-        set => SetField(ref _reconciliationSeconds, value);
+        set => SetPreferenceField(ref _reconciliationSeconds, value);
     }
 
     public int ReconciliationOverlapSeconds
     {
         get => _reconciliationOverlapSeconds;
-        set => SetField(ref _reconciliationOverlapSeconds, value);
+        set => SetPreferenceField(ref _reconciliationOverlapSeconds, value);
     }
 
     public string ReplayDate
     {
         get => _replayDate;
-        set => SetField(ref _replayDate, value);
+        set => SetPreferenceField(ref _replayDate, value);
     }
 
     public string ReplayTime
     {
         get => _replayTime;
-        set => SetField(ref _replayTime, value);
+        set => SetPreferenceField(ref _replayTime, value);
     }
 
     public int ReplayDurationMinutes
     {
         get => _replayDurationMinutes;
-        set => SetField(ref _replayDurationMinutes, value);
+        set => SetPreferenceField(ref _replayDurationMinutes, value);
     }
 
     public decimal ReplaySpeed
     {
         get => _replaySpeed;
-        set => SetField(ref _replaySpeed, value);
+        set => SetPreferenceField(ref _replaySpeed, value);
     }
 
     public bool IsSessionRunning
@@ -547,6 +552,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
 
         _disposed = true;
+        SavePreferences();
         _sessionCancellation?.Cancel();
 
         if (_activeSession is not null)
@@ -558,6 +564,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _marketDataSource.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _journal.Dispose();
     }
+
+    public void SavePreferences() =>
+        _preferencesStore.Save(CreateSettings());
 
     private async void StartSelectedSession()
     {
@@ -1141,6 +1150,20 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
         field = value;
         OnPropertyChanged(propertyName);
+        return true;
+    }
+
+    private bool SetPreferenceField<T>(
+        ref T field,
+        T value,
+        [CallerMemberName] string? propertyName = null)
+    {
+        if (!SetField(ref field, value, propertyName))
+        {
+            return false;
+        }
+
+        SavePreferences();
         return true;
     }
 

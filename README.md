@@ -143,6 +143,15 @@ The SQLite journal is stored at:
 %LOCALAPPDATA%\PriceSentinel3000\journal.db
 ~~~
 
+Editable Paper Account, risk, timing, and Replay inputs are restored from:
+
+~~~text
+%LOCALAPPDATA%\PriceSentinel3000\preferences.json
+~~~
+
+The preferences file contains ordinary UI values only. Robinhood credentials and
+tokens are never written to it.
+
 The journal uses normalized tables, indexed symbol/timestamp lookups, prepared
 inserts, short transactions, and write-ahead logging. Broker passwords are never
 stored in the database.

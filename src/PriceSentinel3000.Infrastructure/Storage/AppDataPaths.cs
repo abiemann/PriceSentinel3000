@@ -20,4 +20,7 @@ public static class AppDataPaths
 
     public static string RobinhoodClientRegistration =>
         Path.Combine(ApplicationDirectory, "robinhood-client.dat");
+
+    public static string UserPreferences =>
+        Path.Combine(ApplicationDirectory, "preferences.json");
 }

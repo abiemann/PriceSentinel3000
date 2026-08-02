@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using PriceSentinel3000.App.Dialogs;
 using PriceSentinel3000.App.ViewModels;
 using PriceSentinel3000.Core.Modes;
@@ -80,5 +81,16 @@ public partial class MainWindow : Window
     {
         _viewModel.Dispose();
         base.OnClosed(e);
+    }
+
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        if (Keyboard.FocusedElement is TextBox textBox)
+        {
+            textBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
+        }
+
+        _viewModel.SavePreferences();
+        base.OnClosing(e);
     }
 }
