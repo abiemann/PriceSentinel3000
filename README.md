@@ -1,7 +1,12 @@
 # PriceSentinel 3000
 
-Real-price monitoring, historical playback, and paper-first trade research
-for a user-selected stock or ETF.
+A Windows desktop application for real-price monitoring, historical playback,
+paper-first strategy research, and guarded live execution for a user-selected
+stock or ETF.
+
+![PriceSentinel 3000 showing a paused historical Replay with candlesticks, RSI, trade markers, ring buffer, and activity journal](docs/images/pricesentinel3000-replay.png)
+
+*Historical Replay mode using Robinhood price history and simulated paper fills.*
 
 > [!WARNING]
 > This project is experimental software, not financial advice. Trading involves
@@ -19,8 +24,10 @@ execution path to the authenticated Robinhood data foundation:
 - Four-minute startup history and 45-second overlap reconciliation use real
   15-second Robinhood equity bars
 - Replay accepts a ticker plus an exact local date/time and emits that historical
-  15-second window as though each observation has just arrived
-- Replay local start/end range (up to 480 minutes) and playback speed (1x-100x) are tunable
+  15-second window as though each observation has just arrived; it can be paused,
+  resumed, or stopped without losing the captured chart and paper-account state
+- Replay local start/end range (up to 480 minutes) and playback speed (1x-100x)
+  are tunable
 - A tunable 5-15 minute rolling buffer is analyzed as individual one-minute
   blocks and as a whole
 - Bottom detection combines a meaningful decline, lingering or separated
@@ -39,6 +46,11 @@ execution path to the authenticated Robinhood data foundation:
   live candles; the chart also shows current price, bid/ask, and minute blocks
 - The chart labels simulated BUY and SELL fills, while Session Status shows paper
   buying power, equity, position, realized/unrealized P&L, and entry count
+- Optional RSI(14), minute-by-minute time labels, cursor crosshairs, and Auto or
+  drag-adjusted Manual Y-axis scaling support visual inspection
+- OFF collapses the configuration tiles under the rotary selector. Selecting
+  Replay, Paper Trader, or an acknowledged LIVE mode reveals the relevant controls;
+  LIVE retains polling/buffer controls while hiding Replay-only date and speed fields
 - SQLite WAL journaling records sessions, observations, every strategy decision,
   paper orders, fills, position snapshots, activities, and idempotent LIVE order events
 - LIVE enters disarmed, then **Start Live Trader** reconciles the agentic account,
@@ -135,7 +147,9 @@ them later; they are not a promise that the labeled regions can be captured live
 3. The returned observations are replayed in source-time order. Each historical
    price enters the normal ring buffer as a newly observed event, with delays
    compressed by the selected speed.
-4. Replay uses the same paper account, strategy, risk controls, fill model, chart
+4. **Pause** freezes playback while preserving the chart, buffer, strategy, and
+   paper account. **Resume** continues with the next historical observation.
+5. Replay uses the same paper account, strategy, risk controls, fill model, chart
    markers, and journal as Paper Trader, making a historical run reproducible.
 
 Replay does not depend on a previously recorded Paper Trader session and never
