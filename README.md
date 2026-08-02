@@ -76,6 +76,8 @@ uses the former synthetic data.
 Robinhood is connected through the official Streamable HTTP MCP endpoint and OAuth
 authorization flow. PriceSentinel dynamically registers as a native desktop client
 and uses a loopback callback; there is no separate developer-app registration page.
+The client pins Robinhood's currently supported MCP `2025-11-25` handshake instead
+of probing the newer `server/discover` method.
 The app allows up to five minutes for interactive browser authorization. While the
 browser is open, the disabled LOGIN button reads
 **WAITING FOR APPROVAL**; EXIT cancels the attempt. If authorization times out,

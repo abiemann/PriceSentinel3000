@@ -47,6 +47,9 @@ public sealed class RobinhoodBrowserAuthorizationTests
         Assert.Equal(
             TimeSpan.FromMinutes(5),
             RobinhoodMcpMarketDataSource.InteractiveAuthorizationTimeout);
+        Assert.Equal(
+            "2025-11-25",
+            RobinhoodMcpMarketDataSource.RobinhoodProtocolVersion);
     }
 
     private static int GetAvailableLoopbackPort()

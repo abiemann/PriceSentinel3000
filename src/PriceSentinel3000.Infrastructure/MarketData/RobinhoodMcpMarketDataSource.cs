@@ -14,6 +14,7 @@ public sealed class RobinhoodMcpMarketDataSource :
 {
     private static readonly Uri Endpoint =
         new("https://agent.robinhood.com/mcp/trading");
+    internal const string RobinhoodProtocolVersion = "2025-11-25";
     internal static TimeSpan InteractiveAuthorizationTimeout { get; } =
         TimeSpan.FromMinutes(5);
     internal static TimeSpan CachedAuthorizationTimeout { get; } =
@@ -116,6 +117,7 @@ public sealed class RobinhoodMcpMarketDataSource :
             {
                 var clientOptions = new McpClientOptions
                 {
+                    ProtocolVersion = RobinhoodProtocolVersion,
                     InitializationTimeout = allowInteractiveAuthorization
                         ? InteractiveAuthorizationTimeout
                         : CachedAuthorizationTimeout,
