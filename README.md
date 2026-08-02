@@ -73,10 +73,16 @@ uses the former synthetic data.
 ## Authentication and local data
 
 Robinhood is connected through the official Streamable HTTP MCP endpoint and OAuth
-authorization flow. The app allows up to five minutes for interactive browser
-authorization. While the browser is open, the disabled LOGIN button reads
+authorization flow. PriceSentinel dynamically registers as a native desktop client
+and uses a loopback callback; there is no separate developer-app registration page.
+The app allows up to five minutes for interactive browser authorization. While the
+browser is open, the disabled LOGIN button reads
 **WAITING FOR APPROVAL**; EXIT cancels the attempt. If authorization times out,
 LOGIN becomes available for a clean retry.
+
+The OAuth client cache format was updated with the MCP C# SDK 2.0 migration. The
+first run after upgrading re-registers PriceSentinel once; this does not modify
+authorization for Codex, Claude, or another MCP client.
 
 Access/refresh tokens and dynamic client registration are encrypted with Windows
 Data Protection API for the current Windows user at:

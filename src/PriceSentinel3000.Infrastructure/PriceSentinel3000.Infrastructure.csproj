@@ -3,7 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\PriceSentinel3000.Core\PriceSentinel3000.Core.csproj" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.10" />
-    <PackageReference Include="ModelContextProtocol.Core" Version="1.4.1" />
+    <PackageReference Include="ModelContextProtocol.Core" Version="2.0.0" />
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.12" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.1" />
   </ItemGroup>

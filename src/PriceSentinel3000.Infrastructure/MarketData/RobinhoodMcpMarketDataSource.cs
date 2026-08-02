@@ -52,7 +52,7 @@ public sealed class RobinhoodMcpMarketDataSource : IMarketDataSource
             var oauth = new ClientOAuthOptions
             {
                 RedirectUri = RobinhoodBrowserAuthorization.RedirectUri,
-                AuthorizationRedirectDelegate =
+                AuthorizationCallbackHandler =
                     RobinhoodBrowserAuthorization.AuthorizeAsync,
                 TokenCache = _authStore,
                 ClientId = registration?.ClientId,
@@ -63,6 +63,7 @@ public sealed class RobinhoodMcpMarketDataSource : IMarketDataSource
                         ClientName = "PriceSentinel 3000",
                         ClientUri = new Uri(
                             "https://github.com/abiemann/PriceSentinel3000"),
+                        ApplicationType = "native",
                         ResponseDelegate = _authStore.StoreRegistrationAsync,
                     }
                     : null,

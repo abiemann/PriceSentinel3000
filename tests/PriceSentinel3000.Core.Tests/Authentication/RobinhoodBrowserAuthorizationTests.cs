@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using ModelContextProtocol.Authentication;
 using PriceSentinel3000.Infrastructure.Authentication;
 using PriceSentinel3000.Infrastructure.MarketData;
 
@@ -18,15 +19,21 @@ public sealed class RobinhoodBrowserAuthorizationTests
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         Task<string>? callbackResponse = null;
 
-        string? code = await RobinhoodBrowserAuthorization.AuthorizeAsync(
-            authorizationUri,
-            redirectUri,
+        AuthorizationResult? result = await RobinhoodBrowserAuthorization.AuthorizeAsync(
+            new AuthorizationCallbackContext
+            {
+                AuthorizationUri = authorizationUri,
+                RedirectUri = redirectUri,
+            },
             cancellation.Token,
             _ => callbackResponse = httpClient.GetStringAsync(
-                new Uri(redirectUri, "?code=authorization-code&state=expected-state"),
+                new Uri(redirectUri, "?code=authorization-code&state=expected-state&iss=https%3A%2F%2Fissuer.test"),
                 cancellation.Token));
 
-        Assert.Equal("authorization-code", code);
+        Assert.NotNull(result);
+        Assert.Equal("authorization-code", result.Code);
+        Assert.Equal("expected-state", result.State);
+        Assert.Equal("https://issuer.test", result.Iss);
         Assert.NotNull(callbackResponse);
         Assert.Contains(
             "authorization is complete",

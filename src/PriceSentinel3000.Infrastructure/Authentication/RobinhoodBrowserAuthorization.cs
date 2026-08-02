@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 using System.Text;
+using ModelContextProtocol.Authentication;
 
 namespace PriceSentinel3000.Infrastructure.Authentication;
 
@@ -11,42 +12,38 @@ public static class RobinhoodBrowserAuthorization
     public static Uri RedirectUri { get; } =
         new("http://127.0.0.1:17843/callback/");
 
-    public static Task<string?> AuthorizeAsync(
-        Uri authorizationUri,
-        Uri redirectUri,
+    public static Task<AuthorizationResult?> AuthorizeAsync(
+        AuthorizationCallbackContext callbackContext,
         CancellationToken cancellationToken) =>
         AuthorizeAsync(
-            authorizationUri,
-            redirectUri,
+            callbackContext,
             cancellationToken,
             OpenBrowser);
 
-    internal static async Task<string?> AuthorizeAsync(
-        Uri authorizationUri,
-        Uri redirectUri,
+    internal static async Task<AuthorizationResult?> AuthorizeAsync(
+        AuthorizationCallbackContext callbackContext,
         CancellationToken cancellationToken,
         Action<Uri> openAuthorization)
     {
-        ArgumentNullException.ThrowIfNull(authorizationUri);
-        ArgumentNullException.ThrowIfNull(redirectUri);
+        ArgumentNullException.ThrowIfNull(callbackContext);
         ArgumentNullException.ThrowIfNull(openAuthorization);
         await AuthorizationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
 
         try
         {
             using var listener = new HttpListener();
-            listener.Prefixes.Add(redirectUri.AbsoluteUri);
+            listener.Prefixes.Add(callbackContext.RedirectUri.AbsoluteUri);
             listener.Start();
 
-            openAuthorization(authorizationUri);
+            openAuthorization(callbackContext.AuthorizationUri);
 
             CancellationTokenRegistration registration =
                 cancellationToken.Register(listener.Stop);
-            HttpListenerContext context;
+            HttpListenerContext listenerContext;
 
             try
             {
-                context = await listener.GetContextAsync().ConfigureAwait(false);
+                listenerContext = await listener.GetContextAsync().ConfigureAwait(false);
             }
             catch (HttpListenerException) when (cancellationToken.IsCancellationRequested)
             {
@@ -58,15 +55,15 @@ public static class RobinhoodBrowserAuthorization
             }
 
             IReadOnlyDictionary<string, string> expected =
-                ParseQuery(authorizationUri.Query);
+                ParseQuery(callbackContext.AuthorizationUri.Query);
             IReadOnlyDictionary<string, string> actual =
-                ParseQuery(context.Request.Url?.Query);
+                ParseQuery(listenerContext.Request.Url?.Query);
             string? error = actual.GetValueOrDefault("error");
 
             if (!string.IsNullOrWhiteSpace(error))
             {
                 await RespondAsync(
-                    context.Response,
+                    listenerContext.Response,
                     "Robinhood authorization was cancelled. You can return to PriceSentinel 3000.")
                     .ConfigureAwait(false);
                 throw new InvalidOperationException(
@@ -80,7 +77,7 @@ public static class RobinhoodBrowserAuthorization
                 !string.Equals(expectedState, actualState, StringComparison.Ordinal))
             {
                 await RespondAsync(
-                    context.Response,
+                    listenerContext.Response,
                     "Authorization validation failed. Return to PriceSentinel 3000 and try again.")
                     .ConfigureAwait(false);
                 throw new InvalidOperationException(
@@ -89,12 +86,19 @@ public static class RobinhoodBrowserAuthorization
 
             string? code = actual.GetValueOrDefault("code");
             await RespondAsync(
-                context.Response,
+                listenerContext.Response,
                 string.IsNullOrWhiteSpace(code)
                     ? "No authorization code was received. Return to PriceSentinel 3000 and try again."
                     : "Robinhood authorization is complete. You can close this tab and return to PriceSentinel 3000.")
                 .ConfigureAwait(false);
-            return code;
+            return string.IsNullOrWhiteSpace(code)
+                ? null
+                : new AuthorizationResult
+                {
+                    Code = code,
+                    State = actualState,
+                    Iss = actual.GetValueOrDefault("iss"),
+                };
         }
         finally
         {

@@ -8,7 +8,7 @@ namespace PriceSentinel3000.Infrastructure.Authentication;
 public sealed class ProtectedRobinhoodAuthStore : ITokenCache
 {
     private static readonly byte[] Entropy =
-        Encoding.UTF8.GetBytes("PriceSentinel3000.Robinhood.MCP.v1");
+        Encoding.UTF8.GetBytes("PriceSentinel3000.Robinhood.MCP.v2.native");
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
     private readonly object _gate = new();
