@@ -86,9 +86,9 @@ public sealed class PriceChart : FrameworkElement
         (minimum, maximum, decimal priceStep) = CreatePriceScale(minimum, maximum);
         decimal range = maximum - minimum;
         const double plotLeft = 4d;
-        const double plotTop = 12d;
+        const double plotTop = 4d;
         double plotRight = Math.Max(plotLeft + 1d, RenderSize.Width - 52d);
-        double plotBottom = Math.Max(plotTop + 1d, RenderSize.Height - 30d);
+        double plotBottom = Math.Max(plotTop + 1d, RenderSize.Height - 22d);
         double plotWidth = plotRight - plotLeft;
         double plotHeight = plotBottom - plotTop;
         DateTimeOffset lastTimestamp = points[^1].TimestampUtc + CandleInterval;
@@ -288,7 +288,12 @@ public sealed class PriceChart : FrameworkElement
                 pixelsPerDip);
             drawingContext.DrawText(
                 priceLabel,
-                new(plotRight + 7d, y - priceLabel.Height / 2d));
+                new(
+                    plotRight + 7d,
+                    Math.Clamp(
+                        y - priceLabel.Height / 2d,
+                        0d,
+                        RenderSize.Height - priceLabel.Height)));
         }
 
         for (int index = 0; index < timeTickCount; index++)
@@ -376,7 +381,10 @@ public sealed class PriceChart : FrameworkElement
         const double verticalPadding = 2d;
         var labelBounds = new Rect(
             plotRight + 4d,
-            y - priceLabel.Height / 2d - verticalPadding,
+            Math.Clamp(
+                y - priceLabel.Height / 2d - verticalPadding,
+                0d,
+                RenderSize.Height - priceLabel.Height - verticalPadding * 2d),
             priceLabel.Width + horizontalPadding * 2d,
             priceLabel.Height + verticalPadding * 2d);
         drawingContext.DrawRoundedRectangle(
@@ -481,7 +489,10 @@ public sealed class PriceChart : FrameworkElement
             RenderSize.Width - priceWidth - 2d);
         var priceBounds = new Rect(
             priceLeft,
-            pointer.Y - priceLabel.Height / 2d - verticalPadding,
+            Math.Clamp(
+                pointer.Y - priceLabel.Height / 2d - verticalPadding,
+                0d,
+                RenderSize.Height - priceLabel.Height - verticalPadding * 2d),
             priceWidth,
             priceLabel.Height + verticalPadding * 2d);
 

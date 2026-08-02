@@ -144,12 +144,12 @@
             </Grid>
         </Border>
 
-        <Grid Grid.Row="2" Margin="18">
+        <Grid Grid.Row="2" Margin="12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="340" />
-                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="10" />
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="10" />
                 <ColumnDefinition Width="330" />
             </Grid.ColumnDefinitions>
             <ScrollViewer Grid.Column="0"
@@ -452,13 +452,13 @@
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" />
-                    <RowDefinition Height="12" />
+                    <RowDefinition Height="8" />
                     <RowDefinition Height="160" />
-                    <RowDefinition Height="12" />
+                    <RowDefinition Height="8" />
                     <RowDefinition Height="120" />
                 </Grid.RowDefinitions>
 
-                <Border Style="{StaticResource CardStyle}">
+                <Border Padding="12" Style="{StaticResource CardStyle}">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -466,29 +466,33 @@
                         </Grid.RowDefinitions>
                         <Grid>
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource SectionLabelStyle}"
-                                           Text="{Binding PriceActionCaption}" />
-                                <TextBlock Margin="0,5,0,0"
-                                           Foreground="{StaticResource PrimaryTextBrush}"
-                                           FontSize="20" FontWeight="Bold" Text="{Binding SymbolDisplay}" />
-                            </StackPanel>
-                            <StackPanel Grid.Column="1">
-                                <TextBlock HorizontalAlignment="Right"
-                                           Style="{StaticResource SectionLabelStyle}" Text="BID / ASK" />
-                                <TextBlock Margin="0,5,0,0" HorizontalAlignment="Right"
-                                           Foreground="#CBD5E1" FontSize="16"
-                                           Text="{Binding BidAskDisplay}" />
-                            </StackPanel>
+                            <TextBlock VerticalAlignment="Center"
+                                       Foreground="{StaticResource PrimaryTextBrush}"
+                                       FontSize="20" FontWeight="Bold"
+                                       Text="{Binding SymbolDisplay}" />
+                            <TextBlock Grid.Column="1" Margin="12,2,0,0"
+                                       VerticalAlignment="Center"
+                                       Style="{StaticResource SectionLabelStyle}"
+                                       Text="{Binding PriceActionCaption}" />
+                            <TextBlock Grid.Column="3" VerticalAlignment="Center"
+                                       Style="{StaticResource SectionLabelStyle}"
+                                       Text="BID / ASK" />
+                            <TextBlock Grid.Column="4" Margin="10,0,0,0"
+                                       VerticalAlignment="Center"
+                                       Foreground="#CBD5E1" FontSize="16"
+                                       Text="{Binding BidAskDisplay}" />
                         </Grid>
-                        <Border Grid.Row="1" Margin="0,18,0,0"
+                        <Border Grid.Row="1" Margin="0,8,0,0"
                                 Background="#0C131C" BorderBrush="#253447"
                                 BorderThickness="1" CornerRadius="8">
                             <Grid>
-                                <controls:PriceChart Margin="4"
+                                <controls:PriceChart Margin="1"
                                                      Points="{Binding ChartPoints}"
                                                      WindowMinutes="{Binding BufferMinutes}" />
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
