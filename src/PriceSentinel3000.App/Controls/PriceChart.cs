@@ -89,6 +89,27 @@ public sealed class PriceChart : FrameworkElement
     public PriceChart()
     {
         Cursor = Cursors.Cross;
+        Focusable = true;
+        AddHandler(
+            PreviewMouseLeftButtonDownEvent,
+            new MouseButtonEventHandler(HandlePreviewMouseDown),
+            handledEventsToo: true);
+        AddHandler(
+            PreviewMouseRightButtonDownEvent,
+            new MouseButtonEventHandler(HandlePreviewMouseDown),
+            handledEventsToo: true);
+        AddHandler(
+            PreviewMouseLeftButtonUpEvent,
+            new MouseButtonEventHandler(HandlePreviewMouseUp),
+            handledEventsToo: true);
+        AddHandler(
+            PreviewMouseRightButtonUpEvent,
+            new MouseButtonEventHandler(HandlePreviewMouseUp),
+            handledEventsToo: true);
+        AddHandler(
+            PreviewMouseMoveEvent,
+            new MouseEventHandler(HandlePreviewMouseMove),
+            handledEventsToo: true);
     }
 
     protected override void OnRender(DrawingContext drawingContext)
@@ -221,24 +242,43 @@ public sealed class PriceChart : FrameworkElement
             plotBottom);
     }
 
-    protected override void OnMouseMove(MouseEventArgs eventArgs)
+    private void HandlePreviewMouseMove(object sender, MouseEventArgs eventArgs)
     {
-        base.OnMouseMove(eventArgs);
         _pointerPosition = eventArgs.GetPosition(this);
 
         if (_scaleDragButton.HasValue)
         {
-            ApplyScaleDrag(_pointerPosition.Value);
-            eventArgs.Handled = true;
+            bool dragButtonIsPressed = _scaleDragButton switch
+            {
+                MouseButton.Left => eventArgs.LeftButton is MouseButtonState.Pressed,
+                MouseButton.Right => eventArgs.RightButton is MouseButtonState.Pressed,
+                _ => false,
+            };
+
+            if (dragButtonIsPressed)
+            {
+                ApplyScaleDrag(_pointerPosition.Value);
+                eventArgs.Handled = true;
+            }
+            else
+            {
+                EndScaleDrag(releaseCapture: false);
+            }
+        }
+        else
+        {
+            Cursor = IsManualScale && GetPlotBounds().Contains(_pointerPosition.Value)
+                ? Cursors.SizeNS
+                : Cursors.Cross;
         }
 
         InvalidateVisual();
     }
 
-    protected override void OnMouseDown(MouseButtonEventArgs eventArgs)
+    private void HandlePreviewMouseDown(
+        object sender,
+        MouseButtonEventArgs eventArgs)
     {
-        base.OnMouseDown(eventArgs);
-
         if (!IsManualScale ||
             eventArgs.ChangedButton is not (MouseButton.Left or MouseButton.Right) ||
             !_hasRenderedScale)
@@ -261,14 +301,14 @@ public sealed class PriceChart : FrameworkElement
         _scaleDragMinimum = _manualMinimum.Value;
         _scaleDragMaximum = _manualMaximum.Value;
         Cursor = Cursors.SizeNS;
-        CaptureMouse();
+        Focus();
         eventArgs.Handled = true;
     }
 
-    protected override void OnMouseUp(MouseButtonEventArgs eventArgs)
+    private void HandlePreviewMouseUp(
+        object sender,
+        MouseButtonEventArgs eventArgs)
     {
-        base.OnMouseUp(eventArgs);
-
         if (_scaleDragButton != eventArgs.ChangedButton)
         {
             return;
@@ -285,15 +325,10 @@ public sealed class PriceChart : FrameworkElement
         if (!_scaleDragButton.HasValue)
         {
             _pointerPosition = null;
+            Cursor = Cursors.Cross;
         }
 
         InvalidateVisual();
-    }
-
-    protected override void OnLostMouseCapture(MouseEventArgs eventArgs)
-    {
-        base.OnLostMouseCapture(eventArgs);
-        EndScaleDrag(releaseCapture: false);
     }
 
     private Rect GetPlotBounds()

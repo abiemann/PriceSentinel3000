@@ -475,7 +475,8 @@
                                        VerticalAlignment="Center"
                                        Style="{StaticResource SectionLabelStyle}"
                                        Text="{Binding PriceActionCaption}" />
-                            <ToggleButton Grid.Column="3" Margin="0,0,14,0"
+                            <ToggleButton x:Name="ChartScaleToggle"
+                                          Grid.Column="3" Margin="0,0,14,0"
                                           VerticalAlignment="Center"
                                           Style="{StaticResource ChartScaleToggleStyle}"
                                           IsChecked="{Binding IsChartManualScale, Mode=TwoWay}"
@@ -494,7 +495,7 @@
                                 BorderThickness="1" CornerRadius="8">
                             <Grid>
                                 <controls:PriceChart Margin="1"
-                                                     IsManualScale="{Binding IsChartManualScale}"
+                                                     IsManualScale="{Binding IsChecked, ElementName=ChartScaleToggle}"
                                                      Points="{Binding ChartPoints}"
                                                      ScaleResetVersion="{Binding ChartScaleResetVersion}"
                                                      WindowMinutes="{Binding BufferMinutes}" />
@@ -763,7 +764,7 @@
                            Foreground="#53657B"
                            FontSize="10"
                            FontWeight="SemiBold"
-                           Text="STAGE 5 · PAPER STRATEGY" />
+                           Text="{Binding VersionDisplay}" />
             </Grid>
         </Border>
     </Grid>

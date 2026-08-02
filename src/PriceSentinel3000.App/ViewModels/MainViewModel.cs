@@ -221,6 +221,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         ? "SCALE: MANUAL"
         : "SCALE: AUTO";
     public int ChartScaleResetVersion => _chartScaleResetVersion;
+    public string VersionDisplay { get; } =
+        $"VERSION {typeof(MainViewModel).Assembly.GetName().Version?.ToString(3) ?? "1.0.0"}";
     public bool HasMarketData => _hasMarketData;
     public string StrategyMessage => _strategyMessage;
     public string StrategyStateLabel => _strategyStateLabel;
