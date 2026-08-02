@@ -10,6 +10,9 @@ namespace PriceSentinel3000.App.Controls;
 public sealed class PriceChart : FrameworkElement
 {
     private static readonly TimeSpan CandleInterval = TimeSpan.FromSeconds(15);
+    private static readonly Color UpCandleColor = Color.FromRgb(90, 203, 60);
+    private static readonly Color DownCandleColor = Color.FromRgb(255, 90, 31);
+    private static readonly Color FlatCandleColor = Color.FromRgb(142, 160, 183);
 
     public static readonly DependencyProperty PointsProperty = DependencyProperty.Register(
         nameof(Points),
@@ -69,6 +72,7 @@ public sealed class PriceChart : FrameworkElement
         decimal maximum = Math.Max(
             openingPrice + halfMinimumRange,
             observedMaximum + expansionPadding);
+        (minimum, maximum, decimal priceStep) = CreatePriceScale(minimum, maximum);
         decimal range = maximum - minimum;
         const double plotLeft = 12d;
         const double plotTop = 12d;
@@ -86,12 +90,23 @@ public sealed class PriceChart : FrameworkElement
             drawingContext,
             minimum,
             maximum,
+            priceStep,
             firstTimestamp,
             lastTimestamp,
             plotLeft,
             plotTop,
             plotRight,
             plotBottom);
+
+        DrawLastPriceGuide(
+            drawingContext,
+            points[^1],
+            minimum,
+            range,
+            plotTop,
+            plotRight,
+            plotWidth,
+            plotHeight);
 
         DrawCandles(
             drawingContext,
@@ -133,7 +148,7 @@ public sealed class PriceChart : FrameworkElement
         double candleSlotWidth = plotWidth *
             CandleInterval.Ticks /
             Math.Max(1d, (lastTimestamp - firstTimestamp).Ticks);
-        double bodyWidth = Math.Clamp(candleSlotWidth * 0.68d, 3d, 22d);
+        double bodyWidth = Math.Clamp(candleSlotWidth * 0.80d, 4d, 28d);
 
         foreach (PricePointViewModel candle in points)
         {
@@ -160,27 +175,26 @@ public sealed class PriceChart : FrameworkElement
                 candle.Close, minimum, range, plotTop, plotHeight);
             Color color = candle.Close.CompareTo(candle.Open) switch
             {
-                > 0 => Color.FromRgb(94, 230, 177),
-                < 0 => Color.FromRgb(255, 138, 120),
-                _ => Color.FromRgb(142, 160, 183),
+                > 0 => UpCandleColor,
+                < 0 => DownCandleColor,
+                _ => FlatCandleColor,
             };
             var wickBrush = new SolidColorBrush(color);
-            var bodyBrush = new SolidColorBrush(Color.FromArgb(
-                218,
-                color.R,
-                color.G,
-                color.B));
-            var candlePen = new Pen(wickBrush, 1d);
+            var bodyBrush = new SolidColorBrush(color);
+            var candlePen = new Pen(wickBrush, 1.15d);
+            wickBrush.Freeze();
+            bodyBrush.Freeze();
+            candlePen.Freeze();
             drawingContext.DrawLine(candlePen, new(x, highY), new(x, lowY));
 
             double bodyTop = Math.Min(openY, closeY);
-            double bodyHeight = Math.Max(2d, Math.Abs(closeY - openY));
+            double bodyHeight = Math.Max(2.4d, Math.Abs(closeY - openY));
             drawingContext.DrawRectangle(
                 bodyBrush,
-                candlePen,
+                null,
                 new(
                     x - bodyWidth / 2d,
-                    bodyTop - (bodyHeight == 2d ? 1d : 0d),
+                    bodyTop - (bodyHeight == 2.4d ? 1.2d : 0d),
                     bodyWidth,
                     bodyHeight));
         }
@@ -190,6 +204,7 @@ public sealed class PriceChart : FrameworkElement
         DrawingContext drawingContext,
         decimal minimum,
         decimal maximum,
+        decimal priceStep,
         DateTimeOffset firstTimestamp,
         DateTimeOffset lastTimestamp,
         double plotLeft,
@@ -197,25 +212,39 @@ public sealed class PriceChart : FrameworkElement
         double plotRight,
         double plotBottom)
     {
-        const int tickCount = 5;
+        const int timeTickCount = 5;
         double plotWidth = plotRight - plotLeft;
         double plotHeight = plotBottom - plotTop;
-        var gridPen = new Pen(new SolidColorBrush(Color.FromRgb(25, 38, 54)), 1);
-        var axisPen = new Pen(new SolidColorBrush(Color.FromRgb(48, 65, 88)), 1);
-        var labelBrush = new SolidColorBrush(Color.FromRgb(113, 133, 156));
+        var horizontalGridPen = new Pen(
+            new SolidColorBrush(Color.FromRgb(29, 42, 56)),
+            1d);
+        var verticalGridPen = new Pen(
+            new SolidColorBrush(Color.FromArgb(115, 29, 42, 56)),
+            1d);
+        var axisPen = new Pen(new SolidColorBrush(Color.FromRgb(42, 57, 75)), 1d);
+        var labelBrush = new SolidColorBrush(Color.FromRgb(126, 140, 155));
+        horizontalGridPen.Freeze();
+        verticalGridPen.Freeze();
+        axisPen.Freeze();
+        labelBrush.Freeze();
         var typeface = new Typeface("Segoe UI");
         double pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
         TimeSpan visibleTime = lastTimestamp - firstTimestamp;
 
-        for (int index = 0; index < tickCount; index++)
-        {
-            double fraction = index / (double)(tickCount - 1);
-            double y = plotTop + plotHeight * fraction;
-            double x = plotLeft + plotWidth * fraction;
-            drawingContext.DrawLine(gridPen, new(plotLeft, y), new(plotRight, y));
-            drawingContext.DrawLine(gridPen, new(x, plotTop), new(x, plotBottom));
+        int priceTickCount = Math.Max(
+            2,
+            (int)Math.Round((maximum - minimum) / priceStep) + 1);
 
-            decimal price = maximum - (maximum - minimum) * (decimal)fraction;
+        for (int index = 0; index < priceTickCount; index++)
+        {
+            decimal price = maximum - priceStep * index;
+            double fraction = (double)((maximum - price) / (maximum - minimum));
+            double y = plotTop + plotHeight * fraction;
+            drawingContext.DrawLine(
+                horizontalGridPen,
+                new(plotLeft, y),
+                new(plotRight, y));
+
             FormattedText priceLabel = CreateLabel(
                 FormatPrice(price),
                 typeface,
@@ -224,10 +253,20 @@ public sealed class PriceChart : FrameworkElement
             drawingContext.DrawText(
                 priceLabel,
                 new(plotRight + 7d, y - priceLabel.Height / 2d));
+        }
+
+        for (int index = 0; index < timeTickCount; index++)
+        {
+            double fraction = index / (double)(timeTickCount - 1);
+            double x = plotLeft + plotWidth * fraction;
+            drawingContext.DrawLine(
+                verticalGridPen,
+                new(x, plotTop),
+                new(x, plotBottom));
 
             DateTimeOffset timestamp = firstTimestamp.AddTicks(
                 (long)(visibleTime.Ticks * fraction));
-            string timeFormat = visibleTime >= TimeSpan.FromHours(1)
+            string timeFormat = visibleTime >= TimeSpan.FromMinutes(5)
                 ? "HH:mm"
                 : "HH:mm:ss";
             FormattedText timeLabel = CreateLabel(
@@ -238,7 +277,7 @@ public sealed class PriceChart : FrameworkElement
             double labelX = index switch
             {
                 0 => x,
-                tickCount - 1 => x - timeLabel.Width,
+                timeTickCount - 1 => x - timeLabel.Width,
                 _ => x - timeLabel.Width / 2d,
             };
             drawingContext.DrawText(timeLabel, new(labelX, plotBottom + 7d));
@@ -246,6 +285,75 @@ public sealed class PriceChart : FrameworkElement
 
         drawingContext.DrawLine(axisPen, new(plotRight, plotTop), new(plotRight, plotBottom));
         drawingContext.DrawLine(axisPen, new(plotLeft, plotBottom), new(plotRight, plotBottom));
+    }
+
+    private void DrawLastPriceGuide(
+        DrawingContext drawingContext,
+        PricePointViewModel candle,
+        decimal minimum,
+        decimal range,
+        double plotTop,
+        double plotRight,
+        double plotWidth,
+        double plotHeight)
+    {
+        Color color = candle.Close.CompareTo(candle.Open) switch
+        {
+            > 0 => UpCandleColor,
+            < 0 => DownCandleColor,
+            _ => FlatCandleColor,
+        };
+        var guideBrush = new SolidColorBrush(Color.FromArgb(
+            170,
+            color.R,
+            color.G,
+            color.B));
+        var guidePen = new Pen(guideBrush, 1d)
+        {
+            DashStyle = new DashStyle([2d, 3d], 0d),
+        };
+        var labelBrush = new SolidColorBrush(color);
+        guideBrush.Freeze();
+        guidePen.Freeze();
+        labelBrush.Freeze();
+
+        double y = MapPrice(
+            candle.Close,
+            minimum,
+            range,
+            plotTop,
+            plotHeight);
+        drawingContext.DrawLine(
+            guidePen,
+            new(plotRight - plotWidth, y),
+            new(plotRight, y));
+
+        FormattedText priceLabel = new(
+            FormatPrice(candle.Close),
+            CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight,
+            new Typeface("Segoe UI Semibold"),
+            9d,
+            Brushes.White,
+            VisualTreeHelper.GetDpi(this).PixelsPerDip);
+        const double horizontalPadding = 5d;
+        const double verticalPadding = 2d;
+        var labelBounds = new Rect(
+            plotRight + 4d,
+            y - priceLabel.Height / 2d - verticalPadding,
+            priceLabel.Width + horizontalPadding * 2d,
+            priceLabel.Height + verticalPadding * 2d);
+        drawingContext.DrawRoundedRectangle(
+            labelBrush,
+            null,
+            labelBounds,
+            3d,
+            3d);
+        drawingContext.DrawText(
+            priceLabel,
+            new(
+                labelBounds.Left + horizontalPadding,
+                labelBounds.Top + verticalPadding));
     }
 
     private void DrawTradeMarkers(
@@ -346,10 +454,43 @@ public sealed class PriceChart : FrameworkElement
         return plotTop + plotHeight * (1d - normalized);
     }
 
+    private static (decimal Minimum, decimal Maximum, decimal Step) CreatePriceScale(
+        decimal rawMinimum,
+        decimal rawMaximum)
+    {
+        decimal rawRange = Math.Max(0.0001m, rawMaximum - rawMinimum);
+        decimal step = NiceStep(rawRange / 4m);
+        decimal minimum = Math.Floor(rawMinimum / step) * step;
+        decimal maximum = Math.Ceiling(rawMaximum / step) * step;
+
+        if (maximum <= minimum)
+        {
+            maximum = minimum + step;
+        }
+
+        return (minimum, maximum, step);
+    }
+
+    private static decimal NiceStep(decimal rawStep)
+    {
+        double exponent = Math.Floor(Math.Log10((double)rawStep));
+        decimal magnitude = (decimal)Math.Pow(10d, exponent);
+        decimal fraction = rawStep / magnitude;
+        decimal niceFraction = fraction switch
+        {
+            <= 1m => 1m,
+            <= 2m => 2m,
+            <= 2.5m => 2.5m,
+            <= 5m => 5m,
+            _ => 10m,
+        };
+        return niceFraction * magnitude;
+    }
+
     private static string FormatPrice(decimal price) => price switch
     {
-        < 1m => price.ToString("$0.0000", CultureInfo.InvariantCulture),
-        _ => price.ToString("$0.00", CultureInfo.InvariantCulture),
+        < 1m => price.ToString("0.0000", CultureInfo.InvariantCulture),
+        _ => price.ToString("0.00", CultureInfo.InvariantCulture),
     };
 
     private static FormattedText CreateLabel(
