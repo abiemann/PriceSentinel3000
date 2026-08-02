@@ -10,6 +10,82 @@
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
         Background="#10151D">
+    <Window.Resources>
+        <Style x:Key="LiveDialogButtonBaseStyle"
+               TargetType="Button">
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Padding" Value="14,7" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder"
+                                        Property="Opacity"
+                                        Value="0.72" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ButtonBorder"
+                                        Property="Opacity"
+                                        Value="0.35" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="LiveDialogCancelButtonStyle"
+               BasedOn="{StaticResource LiveDialogButtonBaseStyle}"
+               TargetType="Button">
+            <Setter Property="Background" Value="#202A37" />
+            <Setter Property="BorderBrush" Value="#3B4A5E" />
+            <Setter Property="Foreground" Value="#E2E8F0" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="BorderBrush" Value="#8AA2BC" />
+                    <Setter Property="BorderThickness" Value="2" />
+                </Trigger>
+                <Trigger Property="IsKeyboardFocused" Value="True">
+                    <Setter Property="BorderBrush" Value="#8AA2BC" />
+                    <Setter Property="BorderThickness" Value="2" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="LiveDialogAgreeButtonStyle"
+               BasedOn="{StaticResource LiveDialogButtonBaseStyle}"
+               TargetType="Button">
+            <Setter Property="Background" Value="#3A201D" />
+            <Setter Property="BorderBrush" Value="#B95145" />
+            <Setter Property="Foreground" Value="#FFE9E5" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="BorderBrush" Value="#FB8B7B" />
+                    <Setter Property="BorderThickness" Value="2" />
+                </Trigger>
+                <Trigger Property="IsKeyboardFocused" Value="True">
+                    <Setter Property="BorderBrush" Value="#FB8B7B" />
+                    <Setter Property="BorderThickness" Value="2" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="36"
                             CornerRadius="8"
@@ -53,77 +129,74 @@
         </Border>
 
         <Grid Grid.Row="1" Margin="32">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
-        <StackPanel>
-            <Border Width="54"
-                    Height="54"
-                    HorizontalAlignment="Left"
-                    Background="#3A201D"
-                    BorderBrush="#F97360"
-                    BorderThickness="1"
-                    CornerRadius="27">
-                <TextBlock HorizontalAlignment="Center"
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Width="54"
+                        Height="54"
+                        Background="#3A201D"
+                        BorderBrush="#F97360"
+                        BorderThickness="1"
+                        CornerRadius="27">
+                    <TextBlock HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Foreground="#FB8B7B"
+                               FontSize="26"
+                               FontWeight="Bold"
+                               Text="!" />
+                </Border>
+                <TextBlock Grid.Column="1"
+                           Margin="18,0,0,0"
                            VerticalAlignment="Center"
-                           Foreground="#FB8B7B"
-                           FontSize="26"
+                           Foreground="#F8FAFC"
+                           FontSize="25"
                            FontWeight="Bold"
-                           Text="!" />
-            </Border>
-            <TextBlock Margin="0,20,0,0"
-                       Foreground="#F8FAFC"
-                       FontSize="25"
-                       FontWeight="Bold"
-                       Text="LIVE trading can lose money" />
-        </StackPanel>
+                           Text="LIVE trading can lose money"
+                           TextWrapping="Wrap" />
+            </Grid>
 
-        <StackPanel Grid.Row="1"
-                    Margin="0,20,0,0">
-            <TextBlock Foreground="#CBD5E1"
-                       FontSize="14"
-                       LineHeight="21"
-                       TextWrapping="Wrap"
-                       Text="LIVE mode can submit real orders using funds in your Robinhood Agentic account. Prices can move before an order fills, automated decisions can be wrong, and losses may exceed expectations." />
-            <TextBlock Margin="0,16,0,0"
-                       Foreground="#94A3B8"
-                       FontSize="13"
-                       LineHeight="20"
-                       TextWrapping="Wrap"
-                       Text="Robinhood is already connected for market data. Agreeing enters LIVE mode, but this version keeps broker execution disarmed and cannot submit an order." />
-        </StackPanel>
+            <StackPanel Grid.Row="1"
+                        Margin="0,16,0,0">
+                <TextBlock Foreground="#CBD5E1"
+                           FontSize="14"
+                           LineHeight="21"
+                           TextWrapping="Wrap"
+                           Text="LIVE mode can submit real orders using funds in your Robinhood Agentic account. Prices can move before an order fills, automated decisions can be wrong, and losses may exceed expectations." />
+                <TextBlock Margin="0,16,0,0"
+                           Foreground="#94A3B8"
+                           FontSize="13"
+                           LineHeight="20"
+                           TextWrapping="Wrap"
+                           Text="Robinhood is already connected for market data. Agreeing enters LIVE mode, but this version keeps broker execution disarmed and cannot submit an order." />
+            </StackPanel>
 
-        <Grid Grid.Row="2"
-              Margin="0,24,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="12" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+            <Grid Grid.Row="2"
+                  Margin="0,18,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
 
-            <Button Height="44"
-                    Background="#202A37"
-                    BorderBrush="#3B4A5E"
-                    BorderThickness="1"
-                    Click="Cancel_Click"
-                    Foreground="#E2E8F0"
-                    FontWeight="SemiBold"
-                    IsCancel="True"
-                    Content="CANCEL" />
-            <Button Grid.Column="2"
-                    Height="44"
-                    Background="#D85545"
-                    BorderBrush="#F97360"
-                    BorderThickness="1"
-                    Click="Agree_Click"
-                    Foreground="White"
-                    FontWeight="Bold"
-                    IsDefault="True"
-                    Content="I AGREE" />
-        </Grid>
+                <Button Style="{StaticResource LiveDialogCancelButtonStyle}"
+                        Click="Cancel_Click"
+                        IsCancel="True"
+                        Content="CANCEL" />
+                <Button Grid.Column="2"
+                        Style="{StaticResource LiveDialogAgreeButtonStyle}"
+                        Click="Agree_Click"
+                        IsDefault="True"
+                        Content="I AGREE" />
+            </Grid>
         </Grid>
     </Grid>
 </Window>

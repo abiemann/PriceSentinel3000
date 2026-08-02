@@ -153,7 +153,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         StartSessionCommand = new RelayCommand(
             ExecutePrimarySessionAction,
             () => IsReplayPaused ||
-                  (SelectedMode is TradingMode.PaperTrader or TradingMode.Replay &&
+                  (SelectedMode is TradingMode.PaperTrader or TradingMode.Replay or TradingMode.Live &&
                    EffectiveMode == SelectedMode &&
                    !IsSessionRunning &&
                    !_isStartingSession));
@@ -194,6 +194,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public bool IsReplaySelected => SelectedMode is TradingMode.Replay;
     public bool IsPaperTraderSelected => SelectedMode is TradingMode.PaperTrader;
     public bool IsLiveSelected => SelectedMode is TradingMode.Live;
+    public bool IsConfigurationPanelExpanded =>
+        EffectiveMode is not TradingMode.Off;
     public bool LiveArmed => _modeState.LiveArmed;
     public bool LiveRiskAcknowledged => _liveRiskAcknowledged;
     public string BrokerExecutionLabel => EffectiveMode switch
@@ -252,7 +254,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         : $"15 SECOND CANDLES · {QuotePollingSeconds} SECOND UPDATES";
     public string PrimaryActionLabel => IsReplayPaused
         ? "RESUME"
-        : SelectedMode is TradingMode.Replay ? "START REPLAY" : "START PAPER TRADER";
+        : SelectedMode switch
+        {
+            TradingMode.Replay => "START REPLAY",
+            TradingMode.Live => "START LIVE TRADER",
+            _ => "START PAPER TRADER",
+        };
     public string SecondaryActionLabel =>
         EffectiveMode is TradingMode.Replay && IsSessionRunning && !IsReplayPaused
             ? "PAUSE"
@@ -703,7 +710,21 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
         Symbol = settings.Symbol.Trim().ToUpperInvariant();
         var instrument = new Instrument(Symbol, AssetClass.Equity);
-        _modeState = _modeState.ActivateSafeMode(SelectedMode);
+
+        if (SelectedMode is TradingMode.Live)
+        {
+            if (EffectiveMode is not TradingMode.Live || !LiveRiskAcknowledged)
+            {
+                StatusMessage = "Cannot start LIVE Trader until the LIVE warning is acknowledged.";
+                AddActivity("LIVE Trader start rejected because LIVE mode is not authorized.", "WARNING");
+                return;
+            }
+        }
+        else
+        {
+            _modeState = _modeState.ActivateSafeMode(SelectedMode);
+        }
+
         NotifyModeProperties();
         _sessionCancellation?.Cancel();
         _sessionCancellation?.Dispose();
@@ -719,7 +740,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             }
             else
             {
-                await StartPaperTraderAsync(instrument, settings);
+                await StartRealtimeTraderAsync(instrument, settings, EffectiveMode);
             }
         }
         catch (OperationCanceledException)
@@ -737,15 +758,17 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
-    private async Task StartPaperTraderAsync(
+    private async Task StartRealtimeTraderAsync(
         Instrument instrument,
-        PaperTraderSettings settings)
+        PaperTraderSettings settings,
+        TradingMode mode)
     {
         CancellationToken token = _sessionCancellation!.Token;
+        bool isLive = mode is TradingMode.Live;
         StatusMessage = "Connecting to Robinhood. Complete the secure browser login if it opens.";
         SetMarketDataState("ROBINHOOD LOGIN", "AUTHORIZING", isConnected: false);
         await _marketDataSource.ConnectAsync(token);
-        PrepareDataSession(instrument, settings, TradingMode.PaperTrader);
+        PrepareDataSession(instrument, settings, mode);
         DateTimeOffset now = DateTimeOffset.UtcNow;
         TimeSpan warmStart = TimeSpan.FromMinutes(
             Math.Min(settings.BufferMinutes, (int)MaximumWarmStart.TotalMinutes));
@@ -772,9 +795,13 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         SetQuoteMarketState(current);
         ProcessPaperObservation(current);
         RefreshMarketView();
-        StatusMessage = $"Paper Trader is watching real {instrument.Symbol} prices every {settings.QuotePollingSeconds} seconds; order execution is paper-only.";
+        StatusMessage = isLive
+            ? $"LIVE Trader is watching real {instrument.Symbol} prices every {settings.QuotePollingSeconds} seconds; broker execution remains disarmed."
+            : $"Paper Trader is watching real {instrument.Symbol} prices every {settings.QuotePollingSeconds} seconds; order execution is paper-only.";
         AddActivity(
-            $"Paper Trader started with {warmMerge.Added} real warm-start bars plus the current Robinhood quote; no real orders can be sent.");
+            isLive
+                ? $"LIVE Trader started with {warmMerge.Added} real warm-start bars plus the current Robinhood quote; strategy actions are tracked in the paper shadow account and no real orders can be sent."
+                : $"Paper Trader started with {warmMerge.Added} real warm-start bars plus the current Robinhood quote; no real orders can be sent.");
 
         DateTimeOffset nextReconciliation =
             DateTimeOffset.UtcNow.AddSeconds(settings.ReconciliationSeconds);
@@ -1298,6 +1325,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(IsReplaySelected));
         OnPropertyChanged(nameof(IsPaperTraderSelected));
         OnPropertyChanged(nameof(IsLiveSelected));
+        OnPropertyChanged(nameof(IsConfigurationPanelExpanded));
         OnPropertyChanged(nameof(LiveArmed));
         OnPropertyChanged(nameof(BrokerExecutionLabel));
         OnPropertyChanged(nameof(BrokerExecutionForeground));

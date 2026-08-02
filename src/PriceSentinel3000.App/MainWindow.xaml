@@ -156,7 +156,7 @@
                           VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled">
                 <StackPanel>
-                    <Border Style="{StaticResource CardStyle}">
+                    <Border Panel.ZIndex="2" Style="{StaticResource CardStyle}">
                         <StackPanel>
                             <TextBlock Style="{StaticResource SectionLabelStyle}"
                                        Text="OPERATING MODE" />
@@ -244,6 +244,74 @@
                         </StackPanel>
                     </Border>
 
+                    <Grid Panel.ZIndex="1"
+                          ClipToBounds="True"
+                          RenderTransformOrigin="0.5,0">
+                        <Grid.RenderTransform>
+                            <TranslateTransform Y="-28" />
+                        </Grid.RenderTransform>
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="MaxHeight" Value="0" />
+                                <Setter Property="Opacity" Value="0" />
+                                <Setter Property="IsEnabled" Value="False" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsConfigurationPanelExpanded}"
+                                                 Value="True">
+                                        <Setter Property="MaxHeight" Value="1600" />
+                                        <Setter Property="Opacity" Value="1" />
+                                        <Setter Property="IsEnabled" Value="True" />
+                                        <DataTrigger.EnterActions>
+                                            <BeginStoryboard HandoffBehavior="SnapshotAndReplace">
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetProperty="MaxHeight"
+                                                                     From="0" To="1600"
+                                                                     Duration="0:0:0.38">
+                                                        <DoubleAnimation.EasingFunction>
+                                                            <CubicEase EasingMode="EaseOut" />
+                                                        </DoubleAnimation.EasingFunction>
+                                                    </DoubleAnimation>
+                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                     From="0" To="1"
+                                                                     Duration="0:0:0.22" />
+                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
+                                                                     From="-28" To="0"
+                                                                     Duration="0:0:0.32">
+                                                        <DoubleAnimation.EasingFunction>
+                                                            <CubicEase EasingMode="EaseOut" />
+                                                        </DoubleAnimation.EasingFunction>
+                                                    </DoubleAnimation>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </DataTrigger.EnterActions>
+                                        <DataTrigger.ExitActions>
+                                            <BeginStoryboard HandoffBehavior="SnapshotAndReplace">
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetProperty="MaxHeight"
+                                                                     From="1600" To="0"
+                                                                     Duration="0:0:0.32">
+                                                        <DoubleAnimation.EasingFunction>
+                                                            <CubicEase EasingMode="EaseIn" />
+                                                        </DoubleAnimation.EasingFunction>
+                                                    </DoubleAnimation>
+                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                     From="1" To="0"
+                                                                     Duration="0:0:0.18" />
+                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
+                                                                     From="0" To="-28"
+                                                                     Duration="0:0:0.28">
+                                                        <DoubleAnimation.EasingFunction>
+                                                            <CubicEase EasingMode="EaseIn" />
+                                                        </DoubleAnimation.EasingFunction>
+                                                    </DoubleAnimation>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </DataTrigger.ExitActions>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+                        <StackPanel>
                     <Border Margin="0,12,0,0" Style="{StaticResource CardStyle}">
                         <StackPanel>
                             <TextBlock Style="{StaticResource SectionLabelStyle}" Text="PAPER ACCOUNT" />
@@ -441,6 +509,8 @@
                         <Button Grid.Column="2" Style="{StaticResource SecondaryButtonStyle}"
                                 Command="{Binding StopSessionCommand}"
                                 Content="{Binding SecondaryActionLabel}" />
+                    </Grid>
+                        </StackPanel>
                     </Grid>
                 </StackPanel>
             </ScrollViewer>
