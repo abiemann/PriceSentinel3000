@@ -164,33 +164,15 @@
                                             <Style BasedOn="{StaticResource ModeButtonStyle}" TargetType="Button">
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IsOffSelected}" Value="True">
-                                                        <Setter Property="Background" Value="#20374B" />
-                                                        <Setter Property="BorderBrush" Value="#5F89A8" />
-                                                        <Setter Property="Foreground" Value="#CBE7F8" />
+                                                        <Setter Property="Background" Value="#153D32" />
+                                                        <Setter Property="BorderBrush" Value="#2BC48A" />
+                                                        <Setter Property="Foreground" Value="#77F0C1" />
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
                                         </Button.Style>
                                     </Button>
                                 </Canvas>
-                            </Grid>
-                            <Grid Margin="0,4,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource SectionLabelStyle}" Text="SELECTED" />
-                                    <TextBlock Margin="0,3,0,0" Foreground="#CBD5E1" FontWeight="SemiBold"
-                                               Text="{Binding SelectedModeLabel}" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="1">
-                                    <TextBlock HorizontalAlignment="Right"
-                                               Style="{StaticResource SectionLabelStyle}" Text="EFFECTIVE" />
-                                    <TextBlock Margin="0,3,0,0" HorizontalAlignment="Right"
-                                               Foreground="{StaticResource AccentBrush}" FontWeight="Bold"
-                                               Text="{Binding EffectiveModeLabel}" />
-                                </StackPanel>
                             </Grid>
                         </StackPanel>
                     </Border>
