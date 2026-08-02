@@ -30,20 +30,12 @@ public sealed class PriceChart : FrameworkElement
     {
         base.OnRender(drawingContext);
 
-        var gridPen = new Pen(new SolidColorBrush(Color.FromRgb(25, 38, 54)), 1);
-
-        for (int line = 1; line < 5; line++)
-        {
-            double y = RenderSize.Height * line / 5d;
-            drawingContext.DrawLine(gridPen, new(0, y), new(RenderSize.Width, y));
-        }
-
         PricePointViewModel[] points =
         [
             .. (Points?.Cast<PricePointViewModel>() ?? []),
         ];
 
-        if (points.Length < 2 || RenderSize.Width <= 0 || RenderSize.Height <= 0)
+        if (points.Length == 0 || RenderSize.Width <= 100 || RenderSize.Height <= 70)
         {
             return;
         }
@@ -63,10 +55,30 @@ public sealed class PriceChart : FrameworkElement
         minimum -= padding;
         maximum += padding;
         range = maximum - minimum;
-        const double horizontalPadding = 12d;
-        const double verticalPadding = 12d;
-        double chartWidth = Math.Max(1d, RenderSize.Width - horizontalPadding * 2d);
-        double chartHeight = Math.Max(1d, RenderSize.Height - verticalPadding * 2d);
+        const double plotLeft = 12d;
+        const double plotTop = 12d;
+        double plotRight = Math.Max(plotLeft + 1d, RenderSize.Width - 70d);
+        double plotBottom = Math.Max(plotTop + 1d, RenderSize.Height - 30d);
+        double plotWidth = plotRight - plotLeft;
+        double plotHeight = plotBottom - plotTop;
+        DateTimeOffset firstTimestamp = points[0].TimestampUtc;
+        DateTimeOffset lastTimestamp = points[^1].TimestampUtc;
+
+        if (lastTimestamp <= firstTimestamp)
+        {
+            lastTimestamp = firstTimestamp.AddSeconds(15);
+        }
+
+        DrawAxes(
+            drawingContext,
+            minimum,
+            maximum,
+            firstTimestamp,
+            lastTimestamp,
+            plotLeft,
+            plotTop,
+            plotRight,
+            plotBottom);
 
         var geometry = new StreamGeometry();
 
@@ -74,10 +86,18 @@ public sealed class PriceChart : FrameworkElement
         {
             for (int index = 0; index < points.Length; index++)
             {
-                double x = horizontalPadding +
-                    chartWidth * index / Math.Max(1d, points.Length - 1d);
-                double normalized = (double)((points[index].Price - minimum) / range);
-                double y = verticalPadding + chartHeight * (1d - normalized);
+                double x = MapTimestamp(
+                    points[index].TimestampUtc,
+                    firstTimestamp,
+                    lastTimestamp,
+                    plotLeft,
+                    plotWidth);
+                double y = MapPrice(
+                    points[index].Price,
+                    minimum,
+                    range,
+                    plotTop,
+                    plotHeight);
                 var point = new Point(x, y);
 
                 if (index == 0)
@@ -91,27 +111,99 @@ public sealed class PriceChart : FrameworkElement
             }
         }
 
-        geometry.Freeze();
         var accentBrush = new SolidColorBrush(Color.FromRgb(94, 230, 177));
-        var linePen = new Pen(accentBrush, 2);
-        drawingContext.DrawGeometry(null, linePen, geometry);
+
+        if (points.Length > 1)
+        {
+            geometry.Freeze();
+            var linePen = new Pen(accentBrush, 2);
+            drawingContext.DrawGeometry(null, linePen, geometry);
+        }
 
         DrawTradeMarkers(
             drawingContext,
             points,
             minimum,
             range,
-            horizontalPadding,
-            verticalPadding,
-            chartWidth,
-            chartHeight);
+            firstTimestamp,
+            lastTimestamp,
+            plotLeft,
+            plotTop,
+            plotWidth,
+            plotHeight);
 
         PricePointViewModel last = points[^1];
-        double lastNormalized = (double)((last.Price - minimum) / range);
         var lastPoint = new Point(
-            horizontalPadding + chartWidth,
-            verticalPadding + chartHeight * (1d - lastNormalized));
+            MapTimestamp(
+                last.TimestampUtc,
+                firstTimestamp,
+                lastTimestamp,
+                plotLeft,
+                plotWidth),
+            MapPrice(last.Price, minimum, range, plotTop, plotHeight));
         drawingContext.DrawEllipse(accentBrush, null, lastPoint, 4, 4);
+    }
+
+    private void DrawAxes(
+        DrawingContext drawingContext,
+        decimal minimum,
+        decimal maximum,
+        DateTimeOffset firstTimestamp,
+        DateTimeOffset lastTimestamp,
+        double plotLeft,
+        double plotTop,
+        double plotRight,
+        double plotBottom)
+    {
+        const int tickCount = 5;
+        double plotWidth = plotRight - plotLeft;
+        double plotHeight = plotBottom - plotTop;
+        var gridPen = new Pen(new SolidColorBrush(Color.FromRgb(25, 38, 54)), 1);
+        var axisPen = new Pen(new SolidColorBrush(Color.FromRgb(48, 65, 88)), 1);
+        var labelBrush = new SolidColorBrush(Color.FromRgb(113, 133, 156));
+        var typeface = new Typeface("Segoe UI");
+        double pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        TimeSpan visibleTime = lastTimestamp - firstTimestamp;
+
+        for (int index = 0; index < tickCount; index++)
+        {
+            double fraction = index / (double)(tickCount - 1);
+            double y = plotTop + plotHeight * fraction;
+            double x = plotLeft + plotWidth * fraction;
+            drawingContext.DrawLine(gridPen, new(plotLeft, y), new(plotRight, y));
+            drawingContext.DrawLine(gridPen, new(x, plotTop), new(x, plotBottom));
+
+            decimal price = maximum - (maximum - minimum) * (decimal)fraction;
+            FormattedText priceLabel = CreateLabel(
+                FormatPrice(price),
+                typeface,
+                labelBrush,
+                pixelsPerDip);
+            drawingContext.DrawText(
+                priceLabel,
+                new(plotRight + 7d, y - priceLabel.Height / 2d));
+
+            DateTimeOffset timestamp = firstTimestamp.AddTicks(
+                (long)(visibleTime.Ticks * fraction));
+            string timeFormat = visibleTime >= TimeSpan.FromHours(1)
+                ? "HH:mm"
+                : "HH:mm:ss";
+            FormattedText timeLabel = CreateLabel(
+                timestamp.ToLocalTime().ToString(timeFormat, CultureInfo.InvariantCulture),
+                typeface,
+                labelBrush,
+                pixelsPerDip);
+            double labelX = index switch
+            {
+                0 => x,
+                tickCount - 1 => x - timeLabel.Width,
+                _ => x - timeLabel.Width / 2d,
+            };
+            drawingContext.DrawText(timeLabel, new(labelX, plotBottom + 7d));
+        }
+
+        drawingContext.DrawLine(axisPen, new(plotRight, plotTop), new(plotRight, plotBottom));
+        drawingContext.DrawLine(axisPen, new(plotLeft, plotBottom), new(plotRight, plotBottom));
     }
 
     private void DrawTradeMarkers(
@@ -119,10 +211,12 @@ public sealed class PriceChart : FrameworkElement
         IReadOnlyList<PricePointViewModel> points,
         decimal minimum,
         decimal range,
-        double horizontalPadding,
-        double verticalPadding,
-        double chartWidth,
-        double chartHeight)
+        DateTimeOffset firstTimestamp,
+        DateTimeOffset lastTimestamp,
+        double plotLeft,
+        double plotTop,
+        double plotWidth,
+        double plotHeight)
     {
         var typeface = new Typeface("Segoe UI Semibold");
         double pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
@@ -136,10 +230,18 @@ public sealed class PriceChart : FrameworkElement
                 continue;
             }
 
-            double x = horizontalPadding +
-                chartWidth * index / Math.Max(1d, points.Count - 1d);
-            double normalized = (double)((item.Price - minimum) / range);
-            double y = verticalPadding + chartHeight * (1d - normalized);
+            double x = MapTimestamp(
+                item.TimestampUtc,
+                firstTimestamp,
+                lastTimestamp,
+                plotLeft,
+                plotWidth);
+            double y = MapPrice(
+                item.Price,
+                minimum,
+                range,
+                plotTop,
+                plotHeight);
             bool isBuy = item.Marker is ChartTradeMarker.Buy;
             Color color = isBuy
                 ? Color.FromRgb(94, 230, 177)
@@ -170,6 +272,49 @@ public sealed class PriceChart : FrameworkElement
             drawingContext.DrawText(text, new(x - text.Width / 2d, labelY));
         }
     }
+
+    private static double MapTimestamp(
+        DateTimeOffset timestamp,
+        DateTimeOffset firstTimestamp,
+        DateTimeOffset lastTimestamp,
+        double plotLeft,
+        double plotWidth)
+    {
+        double totalTicks = Math.Max(1d, (lastTimestamp - firstTimestamp).Ticks);
+        double elapsedTicks = (timestamp - firstTimestamp).Ticks;
+        return plotLeft + plotWidth * Math.Clamp(elapsedTicks / totalTicks, 0d, 1d);
+    }
+
+    private static double MapPrice(
+        decimal price,
+        decimal minimum,
+        decimal range,
+        double plotTop,
+        double plotHeight)
+    {
+        double normalized = (double)((price - minimum) / range);
+        return plotTop + plotHeight * (1d - normalized);
+    }
+
+    private static string FormatPrice(decimal price) => price switch
+    {
+        < 1m => price.ToString("$0.0000", CultureInfo.InvariantCulture),
+        _ => price.ToString("$0.00", CultureInfo.InvariantCulture),
+    };
+
+    private static FormattedText CreateLabel(
+        string text,
+        Typeface typeface,
+        Brush brush,
+        double pixelsPerDip) =>
+        new(
+            text,
+            CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight,
+            typeface,
+            9d,
+            brush,
+            pixelsPerDip);
 
     private static void OnPointsChanged(
         DependencyObject dependencyObject,

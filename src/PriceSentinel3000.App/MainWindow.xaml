@@ -488,13 +488,6 @@
                                 Background="#0C131C" BorderBrush="#253447"
                                 BorderThickness="1" CornerRadius="8">
                             <Grid>
-                                <UniformGrid Rows="5" IsHitTestVisible="False">
-                                    <Border BorderBrush="#192636" BorderThickness="0,0,0,1" />
-                                    <Border BorderBrush="#192636" BorderThickness="0,0,0,1" />
-                                    <Border BorderBrush="#192636" BorderThickness="0,0,0,1" />
-                                    <Border BorderBrush="#192636" BorderThickness="0,0,0,1" />
-                                    <Border />
-                                </UniformGrid>
                                 <controls:PriceChart Margin="4"
                                                      Points="{Binding ChartPoints}" />
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
