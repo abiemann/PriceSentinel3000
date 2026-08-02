@@ -49,6 +49,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private bool _hasMarketData;
     private bool _isMarketDataConnected;
     private bool _isChartManualScale;
+    private int _chartScaleResetVersion;
     private string _statusMessage;
     private string _currentPrice = "--";
     private string _bidAskDisplay = "-- / --";
@@ -219,6 +220,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public string ChartScaleLabel => IsChartManualScale
         ? "SCALE: MANUAL"
         : "SCALE: AUTO";
+    public int ChartScaleResetVersion => _chartScaleResetVersion;
     public bool HasMarketData => _hasMarketData;
     public string StrategyMessage => _strategyMessage;
     public string StrategyStateLabel => _strategyStateLabel;
@@ -831,6 +833,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _paperTradingEngine = new(instrument, settings);
         _marketDataRequest = null;
         _tradeMarkers.Clear();
+        _chartScaleResetVersion++;
+        OnPropertyChanged(nameof(ChartScaleResetVersion));
         ChartPoints.Clear();
         _hasMarketData = false;
         _currentPrice = "--";

@@ -51,6 +51,15 @@ public sealed class PriceChart : FrameworkElement
             FrameworkPropertyMetadataOptions.AffectsRender,
             OnIsManualScaleChanged));
 
+    public static readonly DependencyProperty ScaleResetVersionProperty = DependencyProperty.Register(
+        nameof(ScaleResetVersion),
+        typeof(int),
+        typeof(PriceChart),
+        new FrameworkPropertyMetadata(
+            0,
+            FrameworkPropertyMetadataOptions.None,
+            OnScaleResetVersionChanged));
+
     private INotifyCollectionChanged? _observedCollection;
 
     public IEnumerable? Points
@@ -69,6 +78,12 @@ public sealed class PriceChart : FrameworkElement
     {
         get => (bool)GetValue(IsManualScaleProperty);
         set => SetValue(IsManualScaleProperty, value);
+    }
+
+    public int ScaleResetVersion
+    {
+        get => (int)GetValue(ScaleResetVersionProperty);
+        set => SetValue(ScaleResetVersionProperty, value);
     }
 
     public PriceChart()
@@ -896,8 +911,6 @@ public sealed class PriceChart : FrameworkElement
             chart._observedCollection.CollectionChanged += chart.OnCollectionChanged;
         }
 
-        chart.ResetManualScale();
-
         chart.InvalidateVisual();
     }
 
@@ -922,15 +935,18 @@ public sealed class PriceChart : FrameworkElement
         chart.InvalidateVisual();
     }
 
-    private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs eventArgs)
+    private static void OnScaleResetVersionChanged(
+        DependencyObject dependencyObject,
+        DependencyPropertyChangedEventArgs eventArgs)
     {
-        if (eventArgs.Action is NotifyCollectionChangedAction.Reset)
-        {
-            ResetManualScale();
-        }
-
-        InvalidateVisual();
+        var chart = (PriceChart)dependencyObject;
+        chart.ResetManualScale();
+        chart.InvalidateVisual();
     }
+
+    private void OnCollectionChanged(
+        object? sender,
+        NotifyCollectionChangedEventArgs eventArgs) => InvalidateVisual();
 
     private void ResetManualScale()
     {

@@ -496,6 +496,7 @@
                                 <controls:PriceChart Margin="1"
                                                      IsManualScale="{Binding IsChartManualScale}"
                                                      Points="{Binding ChartPoints}"
+                                                     ScaleResetVersion="{Binding ChartScaleResetVersion}"
                                                      WindowMinutes="{Binding BufferMinutes}" />
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <StackPanel.Style>
