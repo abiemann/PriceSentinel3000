@@ -74,10 +74,43 @@ public sealed class PriceRingBuffer
         left.Bid == right.Bid &&
         left.Ask == right.Ask &&
         left.Last == right.Last &&
-        left.Volume == right.Volume;
+        left.Volume == right.Volume &&
+        left.OpenPrice == right.OpenPrice &&
+        left.HighPrice == right.HighPrice &&
+        left.LowPrice == right.LowPrice &&
+        left.ClosePrice == right.ClosePrice;
 
     private static bool HasValidMarketPrices(MarketQuote quote) =>
-        quote.HasTwoSidedMarket || quote.Bid == 0m && quote.Ask == 0m;
+        (quote.HasTwoSidedMarket || quote.Bid == 0m && quote.Ask == 0m) &&
+        HasValidCandle(quote);
+
+    private static bool HasValidCandle(MarketQuote quote)
+    {
+        bool hasAnyCandleValue =
+            quote.OpenPrice.HasValue ||
+            quote.HighPrice.HasValue ||
+            quote.LowPrice.HasValue ||
+            quote.ClosePrice.HasValue;
+
+        if (!hasAnyCandleValue)
+        {
+            return true;
+        }
+
+        if (!quote.OpenPrice.HasValue ||
+            !quote.HighPrice.HasValue ||
+            !quote.LowPrice.HasValue ||
+            !quote.ClosePrice.HasValue)
+        {
+            return false;
+        }
+
+        decimal bodyHigh = Math.Max(quote.OpenPrice.Value, quote.ClosePrice.Value);
+        decimal bodyLow = Math.Min(quote.OpenPrice.Value, quote.ClosePrice.Value);
+        return quote.LowPrice.Value > 0m &&
+               quote.LowPrice.Value <= bodyLow &&
+               quote.HighPrice.Value >= bodyHigh;
+    }
 
     private void TrimExpired()
     {

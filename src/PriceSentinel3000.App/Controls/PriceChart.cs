@@ -9,6 +9,8 @@ namespace PriceSentinel3000.App.Controls;
 
 public sealed class PriceChart : FrameworkElement
 {
+    private static readonly TimeSpan CandleInterval = TimeSpan.FromSeconds(15);
+
     public static readonly DependencyProperty PointsProperty = DependencyProperty.Register(
         nameof(Points),
         typeof(IEnumerable),
@@ -54,9 +56,9 @@ public sealed class PriceChart : FrameworkElement
             return;
         }
 
-        decimal observedMinimum = points.Min(point => point.Price);
-        decimal observedMaximum = points.Max(point => point.Price);
-        decimal openingPrice = points[0].Price;
+        decimal observedMinimum = points.Min(point => point.Low);
+        decimal observedMaximum = points.Max(point => point.High);
+        decimal openingPrice = points[0].Open;
         decimal minimumRange = Math.Max(0.01m, Math.Abs(openingPrice) * 0.02m);
         decimal halfMinimumRange = minimumRange / 2m;
         decimal observedRange = observedMaximum - observedMinimum;
@@ -74,7 +76,7 @@ public sealed class PriceChart : FrameworkElement
         double plotBottom = Math.Max(plotTop + 1d, RenderSize.Height - 30d);
         double plotWidth = plotRight - plotLeft;
         double plotHeight = plotBottom - plotTop;
-        DateTimeOffset lastTimestamp = points[^1].TimestampUtc;
+        DateTimeOffset lastTimestamp = points[^1].TimestampUtc + CandleInterval;
         double windowMinutes = double.IsFinite(WindowMinutes)
             ? Math.Clamp(WindowMinutes, 1d, 60d)
             : 7d;
@@ -91,45 +93,17 @@ public sealed class PriceChart : FrameworkElement
             plotRight,
             plotBottom);
 
-        var geometry = new StreamGeometry();
-
-        using (StreamGeometryContext context = geometry.Open())
-        {
-            for (int index = 0; index < points.Length; index++)
-            {
-                double x = MapTimestamp(
-                    points[index].TimestampUtc,
-                    firstTimestamp,
-                    lastTimestamp,
-                    plotLeft,
-                    plotWidth);
-                double y = MapPrice(
-                    points[index].Price,
-                    minimum,
-                    range,
-                    plotTop,
-                    plotHeight);
-                var point = new Point(x, y);
-
-                if (index == 0)
-                {
-                    context.BeginFigure(point, isFilled: false, isClosed: false);
-                }
-                else
-                {
-                    context.LineTo(point, isStroked: true, isSmoothJoin: true);
-                }
-            }
-        }
-
-        var accentBrush = new SolidColorBrush(Color.FromRgb(94, 230, 177));
-
-        if (points.Length > 1)
-        {
-            geometry.Freeze();
-            var linePen = new Pen(accentBrush, 2);
-            drawingContext.DrawGeometry(null, linePen, geometry);
-        }
+        DrawCandles(
+            drawingContext,
+            points,
+            minimum,
+            range,
+            firstTimestamp,
+            lastTimestamp,
+            plotLeft,
+            plotTop,
+            plotWidth,
+            plotHeight);
 
         DrawTradeMarkers(
             drawingContext,
@@ -142,17 +116,74 @@ public sealed class PriceChart : FrameworkElement
             plotTop,
             plotWidth,
             plotHeight);
+    }
 
-        PricePointViewModel last = points[^1];
-        var lastPoint = new Point(
-            MapTimestamp(
-                last.TimestampUtc,
+    private static void DrawCandles(
+        DrawingContext drawingContext,
+        IReadOnlyList<PricePointViewModel> points,
+        decimal minimum,
+        decimal range,
+        DateTimeOffset firstTimestamp,
+        DateTimeOffset lastTimestamp,
+        double plotLeft,
+        double plotTop,
+        double plotWidth,
+        double plotHeight)
+    {
+        double candleSlotWidth = plotWidth *
+            CandleInterval.Ticks /
+            Math.Max(1d, (lastTimestamp - firstTimestamp).Ticks);
+        double bodyWidth = Math.Clamp(candleSlotWidth * 0.68d, 3d, 22d);
+
+        foreach (PricePointViewModel candle in points)
+        {
+            DateTimeOffset centerTimestamp = candle.TimestampUtc + CandleInterval / 2d;
+
+            if (centerTimestamp < firstTimestamp || centerTimestamp > lastTimestamp)
+            {
+                continue;
+            }
+
+            double x = MapTimestamp(
+                centerTimestamp,
                 firstTimestamp,
                 lastTimestamp,
                 plotLeft,
-                plotWidth),
-            MapPrice(last.Price, minimum, range, plotTop, plotHeight));
-        drawingContext.DrawEllipse(accentBrush, null, lastPoint, 4, 4);
+                plotWidth);
+            double highY = MapPrice(
+                candle.High, minimum, range, plotTop, plotHeight);
+            double lowY = MapPrice(
+                candle.Low, minimum, range, plotTop, plotHeight);
+            double openY = MapPrice(
+                candle.Open, minimum, range, plotTop, plotHeight);
+            double closeY = MapPrice(
+                candle.Close, minimum, range, plotTop, plotHeight);
+            Color color = candle.Close.CompareTo(candle.Open) switch
+            {
+                > 0 => Color.FromRgb(94, 230, 177),
+                < 0 => Color.FromRgb(255, 138, 120),
+                _ => Color.FromRgb(142, 160, 183),
+            };
+            var wickBrush = new SolidColorBrush(color);
+            var bodyBrush = new SolidColorBrush(Color.FromArgb(
+                218,
+                color.R,
+                color.G,
+                color.B));
+            var candlePen = new Pen(wickBrush, 1d);
+            drawingContext.DrawLine(candlePen, new(x, highY), new(x, lowY));
+
+            double bodyTop = Math.Min(openY, closeY);
+            double bodyHeight = Math.Max(2d, Math.Abs(closeY - openY));
+            drawingContext.DrawRectangle(
+                bodyBrush,
+                candlePen,
+                new(
+                    x - bodyWidth / 2d,
+                    bodyTop - (bodyHeight == 2d ? 1d : 0d),
+                    bodyWidth,
+                    bodyHeight));
+        }
     }
 
     private void DrawAxes(
@@ -241,14 +272,22 @@ public sealed class PriceChart : FrameworkElement
                 continue;
             }
 
+            DateTimeOffset centerTimestamp =
+                item.TimestampUtc + CandleInterval / 2d;
+
+            if (centerTimestamp < firstTimestamp || centerTimestamp > lastTimestamp)
+            {
+                continue;
+            }
+
             double x = MapTimestamp(
-                item.TimestampUtc,
+                centerTimestamp,
                 firstTimestamp,
                 lastTimestamp,
                 plotLeft,
                 plotWidth);
             double y = MapPrice(
-                item.Price,
+                item.MarkerPrice ?? item.Close,
                 minimum,
                 range,
                 plotTop,

@@ -34,8 +34,9 @@ authenticated Robinhood data foundation:
   plus unlimited quantity or a user-entered maximum-share limit
 - Maximum entries, maximum daily loss, fixed/percentage stop loss, and a
   30-second re-entry cooldown are enforced before simulated execution
-- A WPF price chart shows the real or replayed stream, current price, bid/ask,
-  minute-block direction, close, and quote counts
+- The WPF chart always renders 15-second candlesticks. Replay preserves
+  Robinhood's true OHLC bars, while Paper Trader aggregates incoming quotes into
+  live candles; the chart also shows current price, bid/ask, and minute blocks
 - The chart labels simulated BUY and SELL fills, while Session Status shows paper
   buying power, equity, position, realized/unrealized P&L, and entry count
 - SQLite WAL journaling records sessions, observations, every strategy decision,

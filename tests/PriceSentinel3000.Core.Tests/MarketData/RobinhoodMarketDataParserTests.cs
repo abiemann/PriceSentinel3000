@@ -57,6 +57,9 @@ public sealed class RobinhoodMarketDataParserTests
                   "bars": [
                     {
                       "begins_at": "2026-07-31T18:00:15Z",
+                      "open_price": "16.38",
+                      "high_price": "16.42",
+                      "low_price": "16.37",
                       "close_price": "16.40",
                       "volume": 200
                     },
@@ -88,6 +91,11 @@ public sealed class RobinhoodMarketDataParserTests
         Assert.Equal(16.39m, quotes[0].Last);
         Assert.Equal(16.40m, quotes[1].Last);
         Assert.Equal(100m, quotes[0].Volume);
+        Assert.Equal(16.38m, quotes[1].OpenPrice);
+        Assert.Equal(16.42m, quotes[1].HighPrice);
+        Assert.Equal(16.37m, quotes[1].LowPrice);
+        Assert.Equal(16.40m, quotes[1].ClosePrice);
+        Assert.Equal(16.39m, quotes[0].CandleOpen);
         Assert.All(quotes, quote => Assert.Equal(0m, quote.Bid));
     }
 }

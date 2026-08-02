@@ -11,6 +11,80 @@ namespace PriceSentinel3000.Core.Tests.Storage;
 public sealed class SqliteTradingJournalTests
 {
     [Fact]
+    public void Initialize_MigratesLegacyQuoteTableWithOhlcColumns()
+    {
+        string directory = Path.Combine(
+            Path.GetTempPath(),
+            "PriceSentinel3000.Tests",
+            Guid.NewGuid().ToString("N"));
+        string databasePath = Path.Combine(directory, "legacy-journal.db");
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+            {
+                connection.Open();
+                using SqliteCommand legacySchema = connection.CreateCommand();
+                legacySchema.CommandText =
+                    """
+                    CREATE TABLE schema_version (
+                        version INTEGER NOT NULL PRIMARY KEY,
+                        applied_at_utc TEXT NOT NULL
+                    );
+                    INSERT INTO schema_version(version, applied_at_utc)
+                    VALUES (1, '2026-08-01T00:00:00Z');
+                    CREATE TABLE quotes (
+                        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        session_id TEXT NOT NULL,
+                        symbol TEXT NOT NULL,
+                        asset_class TEXT NOT NULL,
+                        observed_at_utc TEXT NOT NULL,
+                        source_at_utc TEXT NOT NULL,
+                        bid REAL NOT NULL,
+                        ask REAL NOT NULL,
+                        last REAL NOT NULL,
+                        volume REAL NOT NULL,
+                        ingestion_kind TEXT NOT NULL
+                    );
+                    """;
+                legacySchema.ExecuteNonQuery();
+            }
+
+            using (var journal = new SqliteTradingJournal(databasePath))
+            {
+                journal.Initialize();
+            }
+
+            using var verification = new SqliteConnection($"Data Source={databasePath}");
+            verification.Open();
+            using SqliteCommand inspect = verification.CreateCommand();
+            inspect.CommandText = "PRAGMA table_info(quotes);";
+            using SqliteDataReader reader = inspect.ExecuteReader();
+            var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            while (reader.Read())
+            {
+                columns.Add(reader.GetString(1));
+            }
+
+            Assert.Contains("open_price", columns);
+            Assert.Contains("high_price", columns);
+            Assert.Contains("low_price", columns);
+            Assert.Contains("close_price", columns);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void Journal_PersistsSessionsQuotesActivitiesAndReplaySource()
     {
         string directory = Path.Combine(
@@ -32,7 +106,13 @@ public sealed class SqliteTradingJournalTests
                 10_000m,
                 "{}",
                 start);
-            MarketQuote first = Quote(instrument, start, 10m);
+            MarketQuote first = Quote(instrument, start, 10m) with
+            {
+                OpenPrice = 9.95m,
+                HighPrice = 10.05m,
+                LowPrice = 9.90m,
+                ClosePrice = 10m,
+            };
             MarketQuote second = Quote(instrument, start.AddSeconds(5), 10.1m);
 
             journal.AppendQuotes(
@@ -97,6 +177,10 @@ public sealed class SqliteTradingJournalTests
             Assert.NotNull(replaySource);
             Assert.Equal(session.Id, replaySource.Id);
             Assert.Equal(2, replayQuotes.Count);
+            Assert.Equal(first.OpenPrice, replayQuotes[0].OpenPrice);
+            Assert.Equal(first.HighPrice, replayQuotes[0].HighPrice);
+            Assert.Equal(first.LowPrice, replayQuotes[0].LowPrice);
+            Assert.Equal(first.ClosePrice, replayQuotes[0].ClosePrice);
         }
         finally
         {

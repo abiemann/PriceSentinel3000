@@ -200,8 +200,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public string StrategyMetrics => _strategyMetrics;
     public string JournalStatus => _journalReady ? "SQLITE WAL" : "OFFLINE";
     public string PriceActionCaption => EffectiveMode is TradingMode.Replay
-        ? "15 SECOND REPLAY PRICE ACTION"
-        : $"{QuotePollingSeconds} SECOND PRICE ACTION";
+        ? "15 SECOND REPLAY CANDLES"
+        : $"15 SECOND CANDLES · {QuotePollingSeconds} SECOND UPDATES";
     public string PrimaryActionLabel =>
         SelectedMode is TradingMode.Replay ? "START REPLAY" : "START PAPER TRADER";
     public string SessionStateLabel => EffectiveMode is TradingMode.Off
@@ -882,11 +882,27 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
 
         ChartPoints.Clear();
+        IReadOnlyList<PriceCandle> candles = PriceCandleAggregator.Aggregate(
+            snapshot,
+            TimeSpan.FromSeconds(15));
 
-        foreach (MarketQuote quote in snapshot)
+        foreach (PriceCandle candle in candles)
         {
-            _tradeMarkers.TryGetValue(quote.SourceTimestampUtc, out ChartTradeMarker marker);
-            ChartPoints.Add(new(quote.SourceTimestampUtc, quote.Last, marker));
+            MarketQuote? markedQuote = snapshot.LastOrDefault(quote =>
+                quote.SourceTimestampUtc >= candle.StartsAtUtc &&
+                quote.SourceTimestampUtc < candle.EndsAtUtc &&
+                _tradeMarkers.ContainsKey(quote.SourceTimestampUtc));
+            ChartTradeMarker marker = markedQuote is null
+                ? ChartTradeMarker.None
+                : _tradeMarkers[markedQuote.SourceTimestampUtc];
+            ChartPoints.Add(new(
+                candle.StartsAtUtc,
+                candle.Open,
+                candle.High,
+                candle.Low,
+                candle.Close,
+                marker,
+                markedQuote?.Last));
         }
 
         MarketQuote latest = snapshot[^1];

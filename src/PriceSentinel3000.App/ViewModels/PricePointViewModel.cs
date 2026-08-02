@@ -9,5 +9,9 @@ public enum ChartTradeMarker
 
 public sealed record PricePointViewModel(
     DateTimeOffset TimestampUtc,
-    decimal Price,
-    ChartTradeMarker Marker = ChartTradeMarker.None);
+    decimal Open,
+    decimal High,
+    decimal Low,
+    decimal Close,
+    ChartTradeMarker Marker = ChartTradeMarker.None,
+    decimal? MarkerPrice = null);

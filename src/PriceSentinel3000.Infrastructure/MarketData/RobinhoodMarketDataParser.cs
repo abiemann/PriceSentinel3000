@@ -82,6 +82,9 @@ internal static class RobinhoodMarketDataParser
             }
 
             decimal close = ParseDecimal(bar, "close_price");
+            decimal open = ParseDecimalOrDefault(bar, "open_price", close);
+            decimal high = ParseDecimalOrDefault(bar, "high_price", close);
+            decimal low = ParseDecimalOrDefault(bar, "low_price", close);
             decimal volume = bar.TryGetProperty("volume", out JsonElement volumeNode)
                 ? volumeNode.GetDecimal()
                 : 0m;
@@ -92,7 +95,11 @@ internal static class RobinhoodMarketDataParser
                 0m,
                 0m,
                 close,
-                volume));
+                volume,
+                open,
+                high,
+                low,
+                close));
         }
 
         return quotes
@@ -166,6 +173,28 @@ internal static class RobinhoodMarketDataParser
         }
 
         return parsed;
+    }
+
+    private static decimal ParseDecimalOrDefault(
+        JsonElement element,
+        string propertyName,
+        decimal defaultValue)
+    {
+        if (!element.TryGetProperty(propertyName, out JsonElement node))
+        {
+            return defaultValue;
+        }
+
+        string? value = node.ValueKind is JsonValueKind.String
+            ? node.GetString()
+            : node.GetRawText();
+        return decimal.TryParse(
+            value,
+            NumberStyles.Number,
+            CultureInfo.InvariantCulture,
+            out decimal parsed)
+            ? parsed
+            : defaultValue;
     }
 
     private static DateTimeOffset ParseTimestamp(

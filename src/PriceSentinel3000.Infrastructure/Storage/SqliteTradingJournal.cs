@@ -74,6 +74,10 @@ public sealed class SqliteTradingJournal : ITradingJournal
                 ask REAL NOT NULL,
                 last REAL NOT NULL,
                 volume REAL NOT NULL,
+                open_price REAL NULL,
+                high_price REAL NULL,
+                low_price REAL NULL,
+                close_price REAL NULL,
                 ingestion_kind TEXT NOT NULL,
                 FOREIGN KEY(session_id) REFERENCES sessions(id)
             );
@@ -171,6 +175,7 @@ public sealed class SqliteTradingJournal : ITradingJournal
             );
             """;
         schema.ExecuteNonQuery();
+        EnsureQuoteCandleColumns(connection);
         _initialized = true;
     }
 
@@ -238,10 +243,12 @@ public sealed class SqliteTradingJournal : ITradingJournal
             """
             INSERT INTO quotes(
                 session_id, symbol, asset_class, observed_at_utc,
-                source_at_utc, bid, ask, last, volume, ingestion_kind)
+                source_at_utc, bid, ask, last, volume,
+                open_price, high_price, low_price, close_price, ingestion_kind)
             VALUES(
                 $session_id, $symbol, $asset_class, $observed_at_utc,
-                $source_at_utc, $bid, $ask, $last, $volume, $ingestion_kind);
+                $source_at_utc, $bid, $ask, $last, $volume,
+                $open_price, $high_price, $low_price, $close_price, $ingestion_kind);
             """;
         SqliteParameter sessionParameter = command.Parameters.Add("$session_id", SqliteType.Text);
         SqliteParameter symbolParameter = command.Parameters.Add("$symbol", SqliteType.Text);
@@ -252,6 +259,10 @@ public sealed class SqliteTradingJournal : ITradingJournal
         SqliteParameter askParameter = command.Parameters.Add("$ask", SqliteType.Real);
         SqliteParameter lastParameter = command.Parameters.Add("$last", SqliteType.Real);
         SqliteParameter volumeParameter = command.Parameters.Add("$volume", SqliteType.Real);
+        SqliteParameter openParameter = command.Parameters.Add("$open_price", SqliteType.Real);
+        SqliteParameter highParameter = command.Parameters.Add("$high_price", SqliteType.Real);
+        SqliteParameter lowParameter = command.Parameters.Add("$low_price", SqliteType.Real);
+        SqliteParameter closeParameter = command.Parameters.Add("$close_price", SqliteType.Real);
         SqliteParameter kindParameter = command.Parameters.Add("$ingestion_kind", SqliteType.Text);
         command.Prepare();
 
@@ -266,6 +277,10 @@ public sealed class SqliteTradingJournal : ITradingJournal
             askParameter.Value = (double)quote.Ask;
             lastParameter.Value = (double)quote.Last;
             volumeParameter.Value = (double)quote.Volume;
+            openParameter.Value = ToDatabaseValue(quote.OpenPrice);
+            highParameter.Value = ToDatabaseValue(quote.HighPrice);
+            lowParameter.Value = ToDatabaseValue(quote.LowPrice);
+            closeParameter.Value = ToDatabaseValue(quote.ClosePrice);
             kindParameter.Value = ingestionKind.ToString();
             command.ExecuteNonQuery();
         }
@@ -498,7 +513,9 @@ public sealed class SqliteTradingJournal : ITradingJournal
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT q.observed_at_utc, q.source_at_utc, q.bid, q.ask, q.last, q.volume
+            SELECT
+                q.observed_at_utc, q.source_at_utc, q.bid, q.ask, q.last, q.volume,
+                q.open_price, q.high_price, q.low_price, q.close_price
             FROM quotes AS q
             INNER JOIN (
                 SELECT source_at_utc, MAX(id) AS latest_id
@@ -529,7 +546,11 @@ public sealed class SqliteTradingJournal : ITradingJournal
                 Convert.ToDecimal(reader.GetDouble(2), CultureInfo.InvariantCulture),
                 Convert.ToDecimal(reader.GetDouble(3), CultureInfo.InvariantCulture),
                 Convert.ToDecimal(reader.GetDouble(4), CultureInfo.InvariantCulture),
-                Convert.ToDecimal(reader.GetDouble(5), CultureInfo.InvariantCulture)));
+                Convert.ToDecimal(reader.GetDouble(5), CultureInfo.InvariantCulture),
+                ReadNullableDecimal(reader, 6),
+                ReadNullableDecimal(reader, 7),
+                ReadNullableDecimal(reader, 8),
+                ReadNullableDecimal(reader, 9)));
         }
 
         return quotes;
@@ -556,6 +577,55 @@ public sealed class SqliteTradingJournal : ITradingJournal
         foreignKeys.ExecuteNonQuery();
         return connection;
     }
+
+    private static void EnsureQuoteCandleColumns(SqliteConnection connection)
+    {
+        using SqliteCommand inspect = connection.CreateCommand();
+        inspect.CommandText = "PRAGMA table_info(quotes);";
+        using SqliteDataReader reader = inspect.ExecuteReader();
+        var existingColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        while (reader.Read())
+        {
+            existingColumns.Add(reader.GetString(1));
+        }
+
+        reader.Close();
+
+        foreach (string column in new[]
+                 {
+                     "open_price",
+                     "high_price",
+                     "low_price",
+                     "close_price",
+                 })
+        {
+            if (existingColumns.Contains(column))
+            {
+                continue;
+            }
+
+            using SqliteCommand alter = connection.CreateCommand();
+            alter.CommandText = $"ALTER TABLE quotes ADD COLUMN {column} REAL NULL;";
+            alter.ExecuteNonQuery();
+        }
+
+        using SqliteCommand version = connection.CreateCommand();
+        version.CommandText =
+            """
+            INSERT OR IGNORE INTO schema_version(version, applied_at_utc)
+            VALUES (2, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+            """;
+        version.ExecuteNonQuery();
+    }
+
+    private static object ToDatabaseValue(decimal? value) =>
+        value.HasValue ? (double)value.Value : DBNull.Value;
+
+    private static decimal? ReadNullableDecimal(SqliteDataReader reader, int ordinal) =>
+        reader.IsDBNull(ordinal)
+            ? null
+            : Convert.ToDecimal(reader.GetDouble(ordinal), CultureInfo.InvariantCulture);
 
     private void EnsureInitialized()
     {
