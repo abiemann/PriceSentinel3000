@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using PriceSentinel3000.Core.Journaling;
+using PriceSentinel3000.Core.LiveTrading;
 using PriceSentinel3000.Core.MarketData;
 using PriceSentinel3000.Core.Modes;
 using PriceSentinel3000.Core.PaperTrading;
@@ -123,6 +124,27 @@ public sealed class SqliteTradingJournal : ITradingJournal
                 broker_order_id TEXT NULL,
                 FOREIGN KEY(session_id) REFERENCES sessions(id)
             );
+
+            CREATE TABLE IF NOT EXISTS live_order_events (
+                id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                occurred_at_utc TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                client_reference_id TEXT NOT NULL,
+                broker_order_id TEXT NULL,
+                symbol TEXT NOT NULL,
+                side TEXT NOT NULL,
+                quantity REAL NOT NULL,
+                state TEXT NOT NULL,
+                details_json TEXT NOT NULL,
+                FOREIGN KEY(session_id) REFERENCES sessions(id)
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_live_order_events_session_time
+            ON live_order_events(session_id, occurred_at_utc);
+
+            CREATE INDEX IF NOT EXISTS ix_live_order_events_reference
+            ON live_order_events(client_reference_id, occurred_at_utc);
 
             CREATE TABLE IF NOT EXISTS fills (
                 id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
@@ -412,6 +434,143 @@ public sealed class SqliteTradingJournal : ITradingJournal
         transaction.Commit();
     }
 
+    public void AppendLiveOrderEvent(
+        Guid sessionId,
+        Instrument instrument,
+        string eventType,
+        BrokerOrderIntent intent,
+        BrokerOrderReview? review,
+        BrokerOrderSnapshot? order,
+        DateTimeOffset occurredAtUtc)
+    {
+        EnsureInitialized();
+        ArgumentNullException.ThrowIfNull(instrument);
+        ArgumentException.ThrowIfNullOrWhiteSpace(eventType);
+        ArgumentNullException.ThrowIfNull(intent);
+
+        string clientReference = intent.ClientReferenceId.ToString("D");
+        string state = order?.State.ToString() ??
+                       (review is null ? "CREATED" : "REVIEWED");
+        string details = JsonSerializer.Serialize(new
+        {
+            Intent = new { intent.Reason, intent.CreatedAtUtc },
+            Review = review is null ? null : new
+            {
+                review.Accepted,
+                review.Blockers,
+                review.BidPrice,
+                review.AskPrice,
+                review.LastPrice,
+                review.MarketDataDisclosure,
+                OrderChecks = review.RawOrderChecksJson,
+            },
+            Order = order is null ? null : new
+            {
+                order.BrokerOrderId,
+                State = order.State.ToString(),
+                order.FilledQuantity,
+                order.AveragePrice,
+                order.RejectionReason,
+                order.UpdatedAtUtc,
+                order.Executions,
+            },
+        });
+
+        using SqliteConnection connection = OpenConnection();
+        using SqliteTransaction transaction = connection.BeginTransaction();
+
+        using (SqliteCommand orderCommand = connection.CreateCommand())
+        {
+            orderCommand.Transaction = transaction;
+            orderCommand.CommandText =
+                """
+                INSERT INTO orders(
+                    id, session_id, submitted_at_utc, side, quantity,
+                    order_type, limit_price, status, broker_order_id)
+                VALUES(
+                    $id, $session_id, $submitted_at_utc, $side, $quantity,
+                    'LIVE_MARKET', NULL, $status, $broker_order_id)
+                ON CONFLICT(id) DO UPDATE SET
+                    status = excluded.status,
+                    broker_order_id = COALESCE(excluded.broker_order_id, orders.broker_order_id);
+                """;
+            orderCommand.Parameters.AddWithValue("$id", clientReference);
+            orderCommand.Parameters.AddWithValue("$session_id", sessionId.ToString("D"));
+            orderCommand.Parameters.AddWithValue("$submitted_at_utc", Format(intent.CreatedAtUtc));
+            orderCommand.Parameters.AddWithValue("$side", intent.Side.ToString());
+            orderCommand.Parameters.AddWithValue("$quantity", (double)intent.Quantity);
+            orderCommand.Parameters.AddWithValue("$status", state);
+            orderCommand.Parameters.AddWithValue(
+                "$broker_order_id",
+                string.IsNullOrWhiteSpace(order?.BrokerOrderId)
+                    ? DBNull.Value
+                    : order.BrokerOrderId);
+            orderCommand.ExecuteNonQuery();
+        }
+
+        using (SqliteCommand eventCommand = connection.CreateCommand())
+        {
+            eventCommand.Transaction = transaction;
+            eventCommand.CommandText =
+                """
+                INSERT INTO live_order_events(
+                    session_id, occurred_at_utc, event_type,
+                    client_reference_id, broker_order_id, symbol,
+                    side, quantity, state, details_json)
+                VALUES(
+                    $session_id, $occurred_at_utc, $event_type,
+                    $client_reference_id, $broker_order_id, $symbol,
+                    $side, $quantity, $state, $details_json);
+                """;
+            eventCommand.Parameters.AddWithValue("$session_id", sessionId.ToString("D"));
+            eventCommand.Parameters.AddWithValue("$occurred_at_utc", Format(occurredAtUtc));
+            eventCommand.Parameters.AddWithValue("$event_type", eventType);
+            eventCommand.Parameters.AddWithValue("$client_reference_id", clientReference);
+            eventCommand.Parameters.AddWithValue(
+                "$broker_order_id",
+                string.IsNullOrWhiteSpace(order?.BrokerOrderId)
+                    ? DBNull.Value
+                    : order.BrokerOrderId);
+            eventCommand.Parameters.AddWithValue("$symbol", instrument.Symbol);
+            eventCommand.Parameters.AddWithValue("$side", intent.Side.ToString());
+            eventCommand.Parameters.AddWithValue("$quantity", (double)intent.Quantity);
+            eventCommand.Parameters.AddWithValue("$state", state);
+            eventCommand.Parameters.AddWithValue("$details_json", details);
+            eventCommand.ExecuteNonQuery();
+        }
+
+        if (order is not null)
+        {
+            AppendLiveExecutions(connection, transaction, clientReference, order.Executions);
+        }
+
+        transaction.Commit();
+    }
+
+    public decimal? GetLiveStartingBalanceSince(
+        DateTimeOffset startedAtGteUtc)
+    {
+        EnsureInitialized();
+
+        using SqliteConnection connection = OpenConnection();
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT starting_balance
+            FROM sessions
+            WHERE mode = $mode AND started_at_utc >= $started_at_gte_utc
+            ORDER BY started_at_utc ASC
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$mode", TradingMode.Live.ToString());
+        command.Parameters.AddWithValue("$started_at_gte_utc", Format(startedAtGteUtc));
+        command.Prepare();
+        object? result = command.ExecuteScalar();
+        return result is null or DBNull
+            ? null
+            : Convert.ToDecimal(result, CultureInfo.InvariantCulture);
+    }
+
     public void CompleteSession(Guid sessionId, DateTimeOffset endedAtUtc, string outcome)
     {
         EnsureInitialized();
@@ -626,6 +785,37 @@ public sealed class SqliteTradingJournal : ITradingJournal
         reader.IsDBNull(ordinal)
             ? null
             : Convert.ToDecimal(reader.GetDouble(ordinal), CultureInfo.InvariantCulture);
+
+    private static void AppendLiveExecutions(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string orderId,
+        IEnumerable<BrokerExecution> executions)
+    {
+        foreach (BrokerExecution execution in executions)
+        {
+            using SqliteCommand fillCommand = connection.CreateCommand();
+            fillCommand.Transaction = transaction;
+            fillCommand.CommandText =
+                """
+                INSERT INTO fills(order_id, filled_at_utc, quantity, price, fees)
+                SELECT $order_id, $filled_at_utc, $quantity, $price, 0
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM fills
+                    WHERE order_id = $order_id
+                      AND filled_at_utc = $filled_at_utc
+                      AND quantity = $quantity
+                      AND price = $price);
+                """;
+            fillCommand.Parameters.AddWithValue("$order_id", orderId);
+            fillCommand.Parameters.AddWithValue(
+                "$filled_at_utc",
+                Format(execution.OccurredAtUtc));
+            fillCommand.Parameters.AddWithValue("$quantity", (double)execution.Quantity);
+            fillCommand.Parameters.AddWithValue("$price", (double)execution.Price);
+            fillCommand.ExecuteNonQuery();
+        }
+    }
 
     private void EnsureInitialized()
     {

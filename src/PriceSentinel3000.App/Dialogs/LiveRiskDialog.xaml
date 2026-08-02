@@ -176,7 +176,7 @@
                            FontSize="13"
                            LineHeight="20"
                            TextWrapping="Wrap"
-                           Text="Robinhood is already connected for market data. Agreeing enters LIVE mode, but this version keeps broker execution disarmed and cannot submit an order." />
+                           Text="I AGREE enters LIVE mode in a disarmed state. After you explicitly choose START LIVE TRADER, PriceSentinel can submit reviewed automated equity market orders through Robinhood. STOP disarms the strategy and requests cancellation of an active order, but cancellation is not complete until Robinhood confirms it." />
             </StackPanel>
 
             <Grid Grid.Row="2"

@@ -10,8 +10,8 @@ for a user-selected stock or ETF.
 
 ## Status
 
-Stage 5 adds an auditable paper strategy and simulated execution engine to the
-authenticated Robinhood data foundation:
+The current development build adds an auditable, explicitly armed LIVE equity
+execution path to the authenticated Robinhood data foundation:
 
 - OFF / Replay / Paper Trader / LIVE rotary mode selection, with OFF at startup
 - Paper Trader polls real Robinhood quotes at the configured interval, evaluates
@@ -40,8 +40,16 @@ authenticated Robinhood data foundation:
 - The chart labels simulated BUY and SELL fills, while Session Status shows paper
   buying power, equity, position, realized/unrealized P&L, and entry count
 - SQLite WAL journaling records sessions, observations, every strategy decision,
-  paper orders, fills, position snapshots, and activities
-- Separate selected and effective modes keep LIVE execution safely disarmed
+  paper orders, fills, position snapshots, activities, and idempotent LIVE order events
+- LIVE enters disarmed, then **Start Live Trader** reconciles the agentic account,
+  buying power, position, symbol tradability, existing orders, daily loss baseline,
+  and daily entry count before it can arm
+- Every LIVE intent is reviewed by Robinhood; missing/malformed review data, any
+  non-empty broker alert, stale prices, excessive review-price drift, ambiguous
+  acknowledgements, and duplicate/open orders fail closed
+- LIVE uses regular-hours GFD market orders with a stable idempotency reference;
+  STOP disarms immediately, requests cancellation, and briefly reconciles the
+  broker's final state because cancellation is asynchronous
 - Startup silently restores a saved Robinhood session when possible; otherwise
   the welcome dialog offers EXIT or LOGIN before opening safely in OFF mode
 - The first LIVE selection still shows the loss warning before entering disarmed LIVE
@@ -50,8 +58,9 @@ authenticated Robinhood data foundation:
 
 Paper Trader and Replay now create simulated trades from real Robinhood prices.
 The current thresholds are documented research defaults inferred from the example
-charts; they are a premise to test, not evidence of profitability. LIVE remains
-explicitly disarmed and no order-submission tool is called anywhere in the app.
+charts; they are a premise to test, not evidence of profitability. LIVE can submit
+real equity orders only after the warning is accepted and the user explicitly
+starts a fully reconciled LIVE session.
 
 ## Paper Trader workflow
 
@@ -76,7 +85,30 @@ explicitly disarmed and no order-submission tool is called anywhere in the app.
 There is no generated-price fallback. If authorization, Robinhood, or the network
 is unavailable, the session stops and reports the failure.
 
-## Stage 5 research defaults
+## LIVE workflow
+
+1. Confirm the selected symbol has no existing position or open order in the
+   agentic account. This v1 intentionally starts only from a flat position.
+2. Select **LIVE**, read the loss warning, and choose **I AGREE**. This enters LIVE
+   mode but does not arm execution or submit an order.
+3. Configure conservative risk limits, then choose **Start Live Trader**. The app
+   fetches the account from Robinhood instead of using the paper starting balance.
+4. LIVE arms only after account, balance, buying power, tradability, position,
+   open-order, daily-entry, and daily-loss reconciliation succeeds.
+5. A strategy signal creates an intent. Robinhood reviews the exact order first;
+   the app records and displays the market-data disclosure and blocks every
+   non-empty pre-trade alert before placement.
+6. After submission, the app polls the broker order, blocks duplicate signals,
+   records state transitions and fills, and refreshes the authoritative position.
+7. **STOP** disarms the session and requests cancellation of a PriceSentinel order.
+   Robinhood cancellation is asynchronous, so always confirm the final order and
+   position in Robinhood. An order can fill while cancellation is in flight.
+
+LIVE is experimental and not production-proven. The first market-hours validation
+should use the smallest practical position, one maximum entry, and direct Robinhood
+monitoring. Market orders prioritize speed but do not guarantee an execution price.
+
+## Strategy research defaults
 
 The first deterministic detector uses the supplied labeled screenshots as a
 starting hypothesis:
@@ -190,6 +222,7 @@ dotnet test PriceSentinel3000.sln
 ~~~
 
 The workspace always starts OFF after the required Robinhood connection succeeds.
-Accepting the LIVE warning makes LIVE the effective mode, but broker execution
-remains disarmed until a later, separately reviewed implementation stage adds
-account, risk, order-preview, and order-submission safeguards.
+Accepting the LIVE warning makes LIVE the effective mode while broker execution
+remains disarmed. **Start Live Trader** performs the broker preflight and arms the
+session only when every check succeeds; confirmed signals can then submit real
+orders to the connected Robinhood agentic account.

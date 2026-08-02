@@ -1,3 +1,4 @@
+using PriceSentinel3000.Core.LiveTrading;
 using PriceSentinel3000.Core.MarketData;
 using PriceSentinel3000.Core.Modes;
 using PriceSentinel3000.Core.PaperTrading;
@@ -66,6 +67,18 @@ public interface ITradingJournal : IDisposable
         PaperOrder order,
         PaperFill fill,
         PaperAccountSnapshot account);
+
+    void AppendLiveOrderEvent(
+        Guid sessionId,
+        Instrument instrument,
+        string eventType,
+        BrokerOrderIntent intent,
+        BrokerOrderReview? review,
+        BrokerOrderSnapshot? order,
+        DateTimeOffset occurredAtUtc);
+
+    decimal? GetLiveStartingBalanceSince(
+        DateTimeOffset startedAtGteUtc);
 
     void CompleteSession(Guid sessionId, DateTimeOffset endedAtUtc, string outcome);
 

@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using PriceSentinel3000.Core.Configuration;
 using PriceSentinel3000.Core.Journaling;
+using PriceSentinel3000.Core.LiveTrading;
 using PriceSentinel3000.Core.MarketData;
 using PriceSentinel3000.Core.Modes;
 using PriceSentinel3000.Core.PaperTrading;
@@ -19,6 +20,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private static readonly TimeSpan MaximumWarmStart = TimeSpan.FromMinutes(4);
 
     private readonly IMarketDataSource _marketDataSource;
+    private readonly ILiveBrokerGateway? _liveBrokerGateway;
     private readonly ITradingJournal _journal;
     private readonly JsonUserPreferencesStore _preferencesStore;
     private ModeState _modeState = ModeState.SafeDefault;
@@ -74,6 +76,14 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private PriceRingBuffer? _chartRingBuffer;
     private MarketDataRequest? _marketDataRequest;
     private PaperTradingEngine? _paperTradingEngine;
+    private LiveExecutionEngine? _liveExecutionEngine;
+    private BrokerAccount? _liveAccount;
+    private EquityTradability? _liveTradability;
+    private BrokerOrderSnapshot? _activeLiveOrder;
+    private BrokerOrderIntent? _activeLiveIntent;
+    private BrokerOrderReview? _activeLiveReview;
+    private DateTimeOffset? _activeLiveTriggerTimestamp;
+    private readonly SemaphoreSlim _liveOrderGate = new(1, 1);
     private readonly Dictionary<DateTimeOffset, ChartTradeMarker> _tradeMarkers = [];
     private bool _disposed;
 
@@ -91,6 +101,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         JsonUserPreferencesStore preferencesStore)
     {
         _marketDataSource = marketDataSource;
+        _liveBrokerGateway = marketDataSource as ILiveBrokerGateway;
         _journal = journal;
         _preferencesStore = preferencesStore;
 
@@ -166,8 +177,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         AddActivity("Application started with operating mode OFF.");
         AddActivity(
             _journalReady
-                ? "Stage 5 paper strategy loaded; SQLite journal is ready."
-                : "Stage 5 paper strategy loaded; SQLite journal could not be initialized.",
+                ? "Trading strategy loaded; SQLite journal is ready."
+                : "Trading strategy loaded; SQLite journal could not be initialized.",
             _journalReady ? "INFO" : "ERROR");
     }
 
@@ -194,6 +205,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public bool IsReplaySelected => SelectedMode is TradingMode.Replay;
     public bool IsPaperTraderSelected => SelectedMode is TradingMode.PaperTrader;
     public bool IsLiveSelected => SelectedMode is TradingMode.Live;
+    public bool IsLiveEffective => EffectiveMode is TradingMode.Live;
     public bool IsConfigurationPanelExpanded =>
         EffectiveMode is not TradingMode.Off;
     public bool LiveArmed => _modeState.LiveArmed;
@@ -208,9 +220,25 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public string BrokerExecutionForeground => EffectiveMode switch
     {
         TradingMode.PaperTrader => "#5EE6B1",
+        TradingMode.Live when LiveArmed => "#5EE6B1",
         TradingMode.Live => "#FF8A78",
         _ => "#8EA0B7",
     };
+    public string AccountPanelCaption => IsLiveEffective ? "LIVE ACCOUNT" : "PAPER ACCOUNT";
+    public string AccountBalanceCaption => IsLiveEffective ? "Account equity (API)" : "Starting balance";
+    public string SessionEquityCaption => IsLiveEffective ? "Account equity" : "Paper equity";
+    public bool IsStartingBalanceEditable => !IsLiveEffective;
+    public decimal AccountBalanceValue
+    {
+        get => IsLiveEffective ? _paperEquity : StartingBalance;
+        set
+        {
+            if (!IsLiveEffective)
+            {
+                StartingBalance = value;
+            }
+        }
+    }
     public string MarketDataStatus => _marketDataStatus;
     public string MarketDataStateLabel => _marketDataStateLabel;
     public string CurrentPrice => _currentPrice;
@@ -512,6 +540,16 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public void RequestModeSelection(TradingMode mode)
     {
+        if (EffectiveMode is TradingMode.Live &&
+            (IsSessionRunning || _isStartingSession) &&
+            mode is not TradingMode.Live)
+        {
+            StatusMessage =
+                "Choose STOP before leaving an active LIVE session. PriceSentinel must reconcile any in-flight order before changing modes.";
+            AddActivity("Mode change blocked until the active LIVE session is stopped safely.", "WARNING");
+            return;
+        }
+
         if (IsSessionRunning || _isStartingSession)
         {
             StopActiveSession("MODE_CHANGED", "The active data session was stopped before changing modes.");
@@ -562,8 +600,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             SetMarketDataState("ROBINHOOD READY", "VERIFYING", isConnected: false);
             await _marketDataSource.ConnectAsync(_sessionCancellation.Token);
             SetMarketDataState("ROBINHOOD READY", "CONNECTED");
-            StatusMessage = "Robinhood remains connected. LIVE order execution is disarmed in this stage.";
-            AddActivity("Robinhood connection verified; LIVE execution remains disarmed.");
+            StatusMessage = "Robinhood is connected. Review the controls, then choose START LIVE TRADER to reconcile and arm execution.";
+            AddActivity("Robinhood connection verified; LIVE execution awaits explicit START LIVE TRADER arming.");
         }
         catch (OperationCanceledException)
         {
@@ -646,6 +684,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _disposed = true;
         SavePreferences();
         _sessionCancellation?.Cancel();
+        if (_activeLiveOrder?.IsOpen is true)
+        {
+            CancelActiveLiveOrderAsync().GetAwaiter().GetResult();
+        }
+
 
         if (_activeSession is not null)
         {
@@ -655,6 +698,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _sessionCancellation?.Dispose();
         _marketDataSource.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _journal.Dispose();
+        _liveOrderGate.Dispose();
     }
 
     public void SavePreferences() =>
@@ -671,7 +715,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         StartSelectedSession();
     }
 
-    private void ExecuteSecondarySessionAction()
+    private async void ExecuteSecondarySessionAction()
     {
         if (EffectiveMode is TradingMode.Replay &&
             IsSessionRunning &&
@@ -681,7 +725,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             return;
         }
 
-        StopSession();
+        await StopSessionAsync();
     }
 
     private async void StartSelectedSession()
@@ -768,7 +812,74 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         StatusMessage = "Connecting to Robinhood. Complete the secure browser login if it opens.";
         SetMarketDataState("ROBINHOOD LOGIN", "AUTHORIZING", isConnected: false);
         await _marketDataSource.ConnectAsync(token);
-        PrepareDataSession(instrument, settings, mode);
+        PaperTraderSettings sessionSettings = settings;
+        LiveBrokerSnapshot? initialBroker = null;
+
+        if (isLive)
+        {
+            if (_liveBrokerGateway is null)
+            {
+                throw new InvalidOperationException(
+                    "The connected market-data adapter cannot execute LIVE orders.");
+            }
+
+            StatusMessage = "Reconciling the Robinhood agentic account before arming LIVE execution...";
+            initialBroker = await InitializeLiveBrokerAsync(instrument, token);
+            sessionSettings = settings with
+            {
+                StartingBalance = initialBroker.Portfolio.TotalValue,
+            };
+
+            if (initialBroker.HasOpenOrder)
+            {
+                throw new InvalidOperationException(
+                    "An open Robinhood order already exists for this symbol. Resolve it before starting LIVE Trader.");
+            }
+
+            if (initialBroker.Position.HasPosition)
+            {
+                throw new InvalidOperationException(
+                    $"Robinhood already holds {initialBroker.Position.Quantity:0.######} {instrument.Symbol} shares. This v1 starts LIVE only from a flat position; manage the existing position in Robinhood first.");
+            }
+
+            DateTimeOffset tradingDayStartUtc = GetEasternTradingDayStartUtc(
+                DateTimeOffset.UtcNow);
+            IReadOnlyList<BrokerOrderSnapshot> ordersToday =
+                await _liveBrokerGateway.GetOrdersCreatedSinceAsync(
+                    _liveAccount!.AccountNumber,
+                    tradingDayStartUtc,
+                    token);
+            int initialEntriesToday = ordersToday
+                .Where(order => order.Side is BrokerOrderSide.Buy && order.FilledQuantity > 0m)
+                .Select(order => string.IsNullOrWhiteSpace(order.BrokerOrderId)
+                    ? order.ClientReferenceId.ToString("D")
+                    : order.BrokerOrderId)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count();
+            decimal dailyStartingEquity =
+                _journal.GetLiveStartingBalanceSince(tradingDayStartUtc) ??
+                initialBroker.Portfolio.TotalValue;
+            if (dailyStartingEquity <= 0m)
+            {
+                throw new InvalidOperationException("The saved LIVE daily-equity baseline is invalid; execution remains disarmed.");
+            }
+
+            _liveExecutionEngine = new(
+                sessionSettings,
+                dailyStartingEquity,
+                initialEntriesToday: initialEntriesToday);
+        }
+
+        PrepareDataSession(instrument, sessionSettings, mode);
+
+        if (initialBroker is not null)
+        {
+            UpdateLiveAccount(initialBroker, 0m);
+            _modeState = _modeState.ArmLive();
+            NotifyModeProperties();
+            AddActivity(
+                $"LIVE execution armed for agentic account {_liveAccount!.MaskedNumber}; buying power {initialBroker.Portfolio.BuyingPower:C2}. No order exists at startup.");
+        }
         DateTimeOffset now = DateTimeOffset.UtcNow;
         TimeSpan warmStart = TimeSpan.FromMinutes(
             Math.Min(settings.BufferMinutes, (int)MaximumWarmStart.TotalMinutes));
@@ -793,14 +904,21 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _ringBuffer.Merge([current]);
         _chartRingBuffer.Merge([current]);
         SetQuoteMarketState(current);
-        ProcessPaperObservation(current);
+        if (isLive)
+        {
+            await ProcessLiveObservationAsync(current, token);
+        }
+        else
+        {
+            ProcessPaperObservation(current);
+        }
         RefreshMarketView();
         StatusMessage = isLive
-            ? $"LIVE Trader is watching real {instrument.Symbol} prices every {settings.QuotePollingSeconds} seconds; broker execution remains disarmed."
+            ? $"LIVE Trader is armed and watching real {instrument.Symbol} prices every {settings.QuotePollingSeconds} seconds."
             : $"Paper Trader is watching real {instrument.Symbol} prices every {settings.QuotePollingSeconds} seconds; order execution is paper-only.";
         AddActivity(
             isLive
-                ? $"LIVE Trader started with {warmMerge.Added} real warm-start bars plus the current Robinhood quote; strategy actions are tracked in the paper shadow account and no real orders can be sent."
+                ? $"LIVE Trader started with {warmMerge.Added} real warm-start bars plus the current Robinhood quote; confirmed strategy actions can submit reviewed Robinhood market orders."
                 : $"Paper Trader started with {warmMerge.Added} real warm-start bars plus the current Robinhood quote; no real orders can be sent.");
 
         DateTimeOffset nextReconciliation =
@@ -843,7 +961,14 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                     observedAt.AddSeconds(settings.ReconciliationSeconds);
             }
 
-            ProcessPaperObservation(quote);
+            if (isLive)
+            {
+                await ProcessLiveObservationAsync(quote, token);
+            }
+            else
+            {
+                ProcessPaperObservation(quote);
+            }
             RefreshMarketView();
         }
     }
@@ -979,7 +1104,15 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _chartRingBuffer = new(
             instrument,
             TimeSpan.FromMinutes(settings.BufferMinutes) + MaximumWarmStart);
-        _paperTradingEngine = new(instrument, settings);
+        _paperTradingEngine = mode is TradingMode.Live
+            ? null
+            : new(instrument, settings);
+        ClearActiveLiveOrderContext();
+
+        if (mode is not TradingMode.Live)
+        {
+            _liveExecutionEngine = null;
+        }
         _marketDataRequest = null;
         _tradeMarkers.Clear();
         _chartScaleResetVersion++;
@@ -1076,8 +1209,204 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         resumeSource?.TrySetResult(true);
     }
 
-    private void StopSession() =>
-        StopActiveSession("STOPPED_BY_USER", "Data session stopped. No market orders were sent.");
+    private async Task StopSessionAsync()
+    {
+        bool wasLive = EffectiveMode is TradingMode.Live;
+        bool hadLiveOrderContext = _activeLiveIntent is not null ||
+                                   _activeLiveOrder?.IsOpen is true;
+        _sessionCancellation?.Cancel();
+        bool orderStopHandled = await CancelActiveLiveOrderAsync();
+        StopActiveSession(
+            "STOPPED_BY_USER",
+            orderStopHandled
+                ? "LIVE session stopped; the active order was reconciled or cancellation was requested. Confirm its final state in Robinhood."
+                : wasLive && hadLiveOrderContext
+                    ? "LIVE session stopped, but order cancellation was not confirmed. Verify Robinhood immediately."
+                    : wasLive
+                        ? "LIVE Trader stopped and disarmed; no active PriceSentinel order was found."
+                        : "Data session stopped.");
+    }
+
+    private async Task<bool> CancelActiveLiveOrderAsync()
+    {
+        BrokerOrderSnapshot? order = _activeLiveOrder;
+
+        if (_liveBrokerGateway is null ||
+            _liveAccount is null ||
+            (_activeLiveIntent is null && order is null))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(12));
+            if (order is null || string.IsNullOrWhiteSpace(order.BrokerOrderId))
+            {
+                order = await FindActiveLiveOrderByReferenceAsync(5, timeout.Token);
+            }
+
+            if (order is null)
+            {
+                AddActivity(
+                    "STOP could not locate the in-flight order by its idempotent reference. Verify Robinhood immediately.",
+                    "ERROR");
+                return false;
+            }
+
+            _activeLiveOrder = order;
+            if (order.IsTerminal)
+            {
+                RecordStoppedLiveOrderState(order, "TERMINAL");
+                _liveExecutionEngine?.ObserveTerminalOrder(order);
+                ClearActiveLiveOrderContext();
+                AddActivity(
+                    $"STOP found the Robinhood order already {order.State}; no cancellation request was sent. Verify the resulting position.",
+                    order.State is BrokerOrderState.Filled ? "WARNING" : "INFO");
+                return true;
+            }
+
+            await _liveBrokerGateway.CancelOrderAsync(
+                _liveAccount.AccountNumber,
+                order.BrokerOrderId,
+                timeout.Token);
+            RecordStoppedLiveOrderState(order, "CANCEL_REQUESTED");
+            AddActivity(
+                "STOP requested cancellation of the active Robinhood order; waiting briefly for its final broker state.",
+                "WARNING");
+
+            for (int attempt = 0; attempt < 8; attempt++)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(750), timeout.Token);
+                order = await _liveBrokerGateway.GetOrderAsync(
+                    _liveAccount.AccountNumber,
+                    order.BrokerOrderId,
+                    timeout.Token);
+                _activeLiveOrder = order;
+                RecordStoppedLiveOrderState(
+                    order,
+                    order.IsTerminal ? "TERMINAL" : "CANCEL_RECONCILE");
+
+                if (!order.IsTerminal)
+                {
+                    continue;
+                }
+
+                _liveExecutionEngine?.ObserveTerminalOrder(order);
+                if (order.FilledQuantity > 0m)
+                {
+                    AddActivity(
+                        $"STOP reconciliation found {order.FilledQuantity:0.######} shares filled before the order reached {order.State}. Check the resulting Robinhood position immediately.",
+                        "ERROR");
+                }
+                else
+                {
+                    AddActivity($"Robinhood order reached final state {order.State} after STOP.");
+                }
+
+                ClearActiveLiveOrderContext();
+                return true;
+            }
+
+            AddActivity(
+                $"Robinhood accepted cancellation, but the order is still {order.State}. Verify its final state and any position in Robinhood.",
+                "WARNING");
+            return true;
+        }
+        catch (Exception exception)
+        {
+            AddActivity(
+                $"STOP could not confirm Robinhood order cancellation: {exception.Message}. Verify Robinhood immediately.",
+                "ERROR");
+            return false;
+        }
+    }
+
+    private void RecordStoppedLiveOrderState(
+        BrokerOrderSnapshot order,
+        string eventType)
+    {
+        if (_activeSession is null ||
+            _ringBuffer is null ||
+            _activeLiveIntent is null)
+        {
+            return;
+        }
+
+        _journal.AppendLiveOrderEvent(
+            _activeSession.Id,
+            _ringBuffer.Instrument,
+            eventType,
+            _activeLiveIntent,
+            _activeLiveReview,
+            order,
+            DateTimeOffset.UtcNow);
+    }
+
+    private async Task<BrokerOrderSnapshot?> FindActiveLiveOrderByReferenceAsync(
+        int attempts,
+        CancellationToken cancellationToken)
+    {
+        if (_liveBrokerGateway is null ||
+            _liveAccount is null ||
+            _activeLiveIntent is null)
+        {
+            return null;
+        }
+
+        Instrument instrument = _ringBuffer?.Instrument ??
+                                new Instrument(Symbol, AssetClass.Equity);
+        for (int attempt = 0; attempt < attempts; attempt++)
+        {
+            BrokerOrderSnapshot? recovered =
+                await _liveBrokerGateway.FindOrderByClientReferenceAsync(
+                    _liveAccount.AccountNumber,
+                    instrument,
+                    _activeLiveIntent.ClientReferenceId,
+                    cancellationToken);
+            if (recovered is null)
+            {
+                IReadOnlyList<BrokerOrderSnapshot> recentOrders =
+                    await _liveBrokerGateway.GetOrdersCreatedSinceAsync(
+                        _liveAccount.AccountNumber,
+                        _activeLiveIntent.CreatedAtUtc.AddSeconds(-5),
+                        cancellationToken);
+                BrokerOrderSnapshot[] exactMatches = recentOrders
+                    .Where(order =>
+                        string.Equals(order.Symbol, _activeLiveIntent.Symbol, StringComparison.OrdinalIgnoreCase) &&
+                        order.Side == _activeLiveIntent.Side &&
+                        order.RequestedQuantity == _activeLiveIntent.Quantity)
+                    .GroupBy(order => order.BrokerOrderId, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First())
+                    .ToArray();
+                if (exactMatches.Length > 1)
+                {
+                    AddActivity(
+                        "More than one recent Robinhood order matched the uncertain placement. Automatic recovery is blocked; verify Robinhood immediately.",
+                        "ERROR");
+                    return null;
+                }
+
+                recovered = exactMatches.SingleOrDefault();
+            }
+            if (recovered is not null)
+            {
+                recovered = recovered with
+                {
+                    ClientReferenceId = _activeLiveIntent.ClientReferenceId,
+                };
+                _activeLiveOrder = recovered;
+                return recovered;
+            }
+
+            if (attempt + 1 < attempts)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            }
+        }
+
+        return null;
+    }
 
     private void StopActiveSession(string outcome, string statusMessage)
     {
@@ -1092,6 +1421,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
 
         IsSessionRunning = false;
+        if (EffectiveMode is TradingMode.Live && SelectedMode is TradingMode.Live)
+        {
+            _modeState = _modeState.ActivateLiveDisarmed();
+            NotifyModeProperties();
+        }
+
         SetMarketDataState("ADAPTER OFFLINE", "OFFLINE", isConnected: false);
         _strategyStateLabel = "IDLE";
         _strategyMessage = ChartPoints.Count > 0
@@ -1325,10 +1660,17 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(IsReplaySelected));
         OnPropertyChanged(nameof(IsPaperTraderSelected));
         OnPropertyChanged(nameof(IsLiveSelected));
+        OnPropertyChanged(nameof(IsLiveEffective));
         OnPropertyChanged(nameof(IsConfigurationPanelExpanded));
         OnPropertyChanged(nameof(LiveArmed));
         OnPropertyChanged(nameof(BrokerExecutionLabel));
         OnPropertyChanged(nameof(BrokerExecutionForeground));
+        OnPropertyChanged(nameof(AccountPanelCaption));
+        OnPropertyChanged(nameof(AccountBalanceCaption));
+        OnPropertyChanged(nameof(SessionEquityCaption));
+        OnPropertyChanged(nameof(IsStartingBalanceEditable));
+        OnPropertyChanged(nameof(AccountBalanceValue));
+
         OnPropertyChanged(nameof(PriceActionCaption));
         OnPropertyChanged(nameof(PrimaryActionLabel));
         OnPropertyChanged(nameof(SecondaryActionLabel));
@@ -1344,6 +1686,554 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(StrategyMessage));
         OnPropertyChanged(nameof(StrategyStateLabel));
         OnPropertyChanged(nameof(StrategyMetrics));
+    }
+
+    private async Task<LiveBrokerSnapshot> InitializeLiveBrokerAsync(
+        Instrument instrument,
+        CancellationToken cancellationToken)
+    {
+        ILiveBrokerGateway gateway = _liveBrokerGateway ??
+            throw new InvalidOperationException("LIVE broker execution is unavailable.");
+        _liveAccount = await gateway.GetAgenticAccountAsync(cancellationToken);
+        BrokerPortfolio portfolio = await gateway.GetPortfolioAsync(
+            _liveAccount.AccountNumber,
+            cancellationToken);
+        BrokerPosition position = await gateway.GetPositionAsync(
+            _liveAccount.AccountNumber,
+            instrument,
+            cancellationToken);
+        _liveTradability = await gateway.GetTradabilityAsync(
+            _liveAccount.AccountNumber,
+            _liveAccount.AccountType,
+            instrument,
+            cancellationToken);
+        IReadOnlyList<BrokerOrderSnapshot> orders = await gateway.GetOpenOrdersAsync(
+            _liveAccount.AccountNumber,
+            instrument,
+            cancellationToken);
+
+        if (portfolio.TotalValue <= 0m)
+        {
+            throw new InvalidOperationException(
+                "Robinhood returned an invalid account value; LIVE execution remains disarmed.");
+        }
+
+        if (!_liveTradability.Tradeable)
+        {
+            throw new InvalidOperationException(
+                _liveTradability.Reason ??
+                $"Robinhood reports {instrument.Symbol} is not tradeable.");
+        }
+
+        return new(
+            _liveAccount,
+            portfolio,
+            position,
+            _liveTradability,
+            orders,
+            DateTimeOffset.UtcNow);
+    }
+
+    private async Task<LiveBrokerSnapshot> CaptureLiveBrokerAsync(
+        Instrument instrument,
+        CancellationToken cancellationToken)
+    {
+        ILiveBrokerGateway gateway = _liveBrokerGateway ??
+            throw new InvalidOperationException("LIVE broker execution is unavailable.");
+        BrokerAccount account = _liveAccount ??
+            throw new InvalidOperationException("No agentic Robinhood account is selected.");
+        EquityTradability tradability = _liveTradability ??
+            throw new InvalidOperationException("Equity tradability was not verified.");
+        BrokerPortfolio portfolio = await gateway.GetPortfolioAsync(
+            account.AccountNumber,
+            cancellationToken);
+        BrokerPosition position = await gateway.GetPositionAsync(
+            account.AccountNumber,
+            instrument,
+            cancellationToken);
+        IReadOnlyList<BrokerOrderSnapshot> orders = await gateway.GetOpenOrdersAsync(
+            account.AccountNumber,
+            instrument,
+            cancellationToken);
+        return new(
+            account,
+            portfolio,
+            position,
+            tradability,
+            orders,
+            DateTimeOffset.UtcNow);
+    }
+
+    private async Task ProcessLiveObservationAsync(
+        MarketQuote trigger,
+        CancellationToken cancellationToken)
+    {
+        if (_ringBuffer is null ||
+            _activeSession is null ||
+            _liveExecutionEngine is null ||
+            _liveBrokerGateway is null ||
+            _liveAccount is null)
+        {
+            return;
+        }
+
+        if (!IsFreshObservation(trigger))
+        {
+            _strategyStateLabel = "MARKET CLOSED";
+            _strategyMessage =
+                "The newest Robinhood venue timestamp is stale; LIVE decisions and orders are paused.";
+            _strategyMetrics = "RSI --  |  MOM --  |  CONF --";
+            NotifyStrategyProperties();
+            return;
+        }
+        if (await ReconcileActiveLiveOrderAsync(cancellationToken))
+        {
+            return;
+        }
+
+
+        LiveBrokerSnapshot broker = await CaptureLiveBrokerAsync(
+            _ringBuffer.Instrument,
+            cancellationToken);
+        UpdateLiveAccount(broker, trigger.Last);
+        LiveTradeEvaluation evaluation = _liveExecutionEngine.Evaluate(
+            _ringBuffer.Snapshot(),
+            broker);
+        _journal.AppendDecision(_activeSession.Id, evaluation.Decision);
+        UpdateStrategyDecision(evaluation.Decision);
+
+        BrokerOrderIntent? intent = evaluation.Intent;
+        if (intent is null)
+        {
+            return;
+        }
+
+        if (!LiveArmed)
+        {
+            AddActivity(
+                $"LIVE {intent.Side.ToString().ToUpperInvariant()} signal ignored because broker execution is disarmed.",
+                "WARNING");
+            return;
+        }
+
+        if (!IsRegularEquityMarketHours(DateTimeOffset.UtcNow))
+        {
+            _strategyStateLabel = "MARKET HOURS ONLY";
+            _strategyMessage =
+                "A confirmed signal occurred outside regular equity hours; no LIVE order was submitted.";
+            NotifyStrategyProperties();
+            AddActivity(
+                $"LIVE {intent.Side.ToString().ToUpperInvariant()} blocked outside 9:30 AM?4:00 PM ET regular equity hours.",
+                "WARNING");
+            return;
+        }
+
+        if (!broker.Tradability.FractionalTradeable &&
+            intent.Quantity != Math.Floor(intent.Quantity))
+        {
+            AddActivity(
+                $"LIVE order blocked because Robinhood does not allow fractional trading for {intent.Symbol}.",
+                "WARNING");
+            return;
+        }
+
+        if (!await _liveOrderGate.WaitAsync(0, cancellationToken))
+        {
+            AddActivity("A LIVE order workflow is already active; duplicate signal ignored.", "WARNING");
+            return;
+        }
+
+        try
+        {
+            await ReviewPlaceAndReconcileOrderAsync(
+                trigger,
+                intent,
+                cancellationToken);
+        }
+        finally
+        {
+            _liveOrderGate.Release();
+        }
+    }
+
+    private async Task ReviewPlaceAndReconcileOrderAsync(
+        MarketQuote trigger,
+        BrokerOrderIntent intent,
+        CancellationToken cancellationToken)
+    {
+        ILiveBrokerGateway gateway = _liveBrokerGateway!;
+        BrokerAccount account = _liveAccount!;
+        JournalSession session = _activeSession!;
+        Instrument instrument = _ringBuffer!.Instrument;
+        _journal.AppendLiveOrderEvent(
+            session.Id,
+            instrument,
+            "INTENT_CREATED",
+            intent,
+            null,
+            null,
+            DateTimeOffset.UtcNow);
+        AddActivity(
+            $"Reviewing LIVE {intent.Side.ToString().ToUpperInvariant()} {intent.Quantity:0.######} {intent.Symbol} with Robinhood. Reason: {intent.Reason}.");
+
+        BrokerOrderReview review = await gateway.ReviewOrderAsync(
+            account.AccountNumber,
+            intent,
+            cancellationToken);
+        _journal.AppendLiveOrderEvent(
+            session.Id,
+            instrument,
+            review.Accepted ? "REVIEW_ACCEPTED" : "REVIEW_BLOCKED",
+            intent,
+            review,
+            null,
+            DateTimeOffset.UtcNow);
+
+        if (!string.IsNullOrWhiteSpace(review.MarketDataDisclosure))
+        {
+            AddActivity(
+                $"Robinhood market data for LIVE review: {review.MarketDataDisclosure}");
+        }
+
+        if (!review.Accepted)
+        {
+            string reason = review.Blockers.FirstOrDefault() ??
+                            "Robinhood did not accept the order review.";
+            AddActivity($"LIVE order review blocked: {reason}", "WARNING");
+            return;
+        }
+
+        decimal triggerPrice = intent.Side is BrokerOrderSide.Buy
+            ? trigger.HasTwoSidedMarket ? trigger.Ask : trigger.Last
+            : trigger.HasTwoSidedMarket ? trigger.Bid : trigger.Last;
+        decimal? reviewedPrice = intent.Side is BrokerOrderSide.Buy
+            ? review.AskPrice ?? review.LastPrice
+            : review.BidPrice ?? review.LastPrice;
+
+        if (reviewedPrice is null or <= 0m || triggerPrice <= 0m)
+        {
+            AddActivity(
+                "LIVE order blocked because Robinhood did not return a valid reviewed execution-side price.",
+                "WARNING");
+            return;
+        }
+
+        if (reviewedPrice is > 0m && triggerPrice > 0m &&
+            Math.Abs(reviewedPrice.Value - triggerPrice) / triggerPrice > 0.005m)
+        {
+            AddActivity(
+                $"LIVE order blocked because Robinhood's reviewed price moved more than 0.50% from the triggering quote.",
+                "WARNING");
+            return;
+        }
+
+        _activeLiveIntent = intent;
+        _activeLiveReview = review;
+        _activeLiveTriggerTimestamp = trigger.SourceTimestampUtc;
+        BrokerOrderSnapshot placed;
+
+        try
+        {
+            placed = await gateway.PlaceOrderAsync(
+                account.AccountNumber,
+                intent,
+                cancellationToken);
+        }
+        catch (Exception firstException) when (firstException is not OperationCanceledException)
+        {
+            AddActivity(
+                "Robinhood placement response was uncertain; retrying once with the same idempotent reference ID.",
+                "WARNING");
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            try
+            {
+                placed = await gateway.PlaceOrderAsync(
+                    account.AccountNumber,
+                    intent,
+                    cancellationToken);
+            }
+            catch (Exception secondException) when (secondException is not OperationCanceledException)
+            {
+                BrokerOrderSnapshot? recovered =
+                    await FindActiveLiveOrderByReferenceAsync(3, cancellationToken);
+                if (recovered is null)
+                {
+                    _journal.AppendLiveOrderEvent(
+                        session.Id,
+                        instrument,
+                        "PLACEMENT_UNCERTAIN",
+                        intent,
+                        review,
+                        null,
+                        DateTimeOffset.UtcNow);
+                    DisarmLiveExecution(
+                        "Robinhood did not confirm whether the LIVE order was accepted. Verify Robinhood immediately before restarting.");
+                    throw new InvalidOperationException(
+                        "Robinhood placement remained uncertain after an idempotent retry; verify Robinhood immediately.",
+                        secondException);
+                }
+
+                placed = recovered;
+                AddActivity("Recovered the Robinhood order by its idempotent reference after a lost placement response.", "WARNING");
+            }
+        }
+
+        placed = placed with { ClientReferenceId = intent.ClientReferenceId };
+        ValidatePlacedOrder(placed, intent);
+        _activeLiveOrder = placed;
+        _journal.AppendLiveOrderEvent(
+            session.Id,
+            instrument,
+            "SUBMITTED",
+            intent,
+            review,
+            placed,
+            DateTimeOffset.UtcNow);
+        AddActivity(
+            $"LIVE {intent.Side.ToString().ToUpperInvariant()} submitted to Robinhood; state {placed.State.ToString().ToUpperInvariant()}.");
+
+        BrokerOrderState priorState = placed.State;
+
+        for (int attempt = 0; attempt < 30 && !placed.IsTerminal; attempt++)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            placed = await gateway.GetOrderAsync(
+                account.AccountNumber,
+                placed.BrokerOrderId,
+                cancellationToken);
+            placed = placed with { ClientReferenceId = intent.ClientReferenceId };
+            _activeLiveOrder = placed;
+
+            if (placed.State == priorState && attempt % 5 != 4)
+            {
+                continue;
+            }
+
+            _journal.AppendLiveOrderEvent(
+                session.Id,
+                instrument,
+                "BROKER_STATE",
+                intent,
+                review,
+                placed,
+                DateTimeOffset.UtcNow);
+            priorState = placed.State;
+        }
+
+        if (!placed.IsTerminal)
+        {
+            AddActivity(
+                $"Robinhood order remains {placed.State}; PriceSentinel will block duplicate orders and continue reconciliation.",
+                "WARNING");
+            return;
+        }
+
+        _journal.AppendLiveOrderEvent(
+            session.Id,
+            instrument,
+            "TERMINAL",
+            intent,
+            review,
+            placed,
+            DateTimeOffset.UtcNow);
+        ClearActiveLiveOrderContext();
+
+        _liveExecutionEngine!.ObserveTerminalOrder(placed);
+        if (placed.State is BrokerOrderState.Filled)
+        {
+            _tradeMarkers[trigger.SourceTimestampUtc] =
+                intent.Side is BrokerOrderSide.Buy
+                    ? ChartTradeMarker.Buy
+                    : ChartTradeMarker.Sell;
+            AddActivity(
+                $"LIVE {intent.Side.ToString().ToUpperInvariant()} filled {placed.FilledQuantity:0.######} {intent.Symbol} @ {(placed.AveragePrice ?? reviewedPrice ?? triggerPrice):C2}.");
+            LiveBrokerSnapshot reconciled = await CaptureLiveBrokerAsync(
+                instrument,
+                cancellationToken);
+            UpdateLiveAccount(reconciled, trigger.Last);
+            return;
+        }
+
+        if (placed.FilledQuantity > 0m)
+        {
+            LiveBrokerSnapshot partiallyFilled = await CaptureLiveBrokerAsync(
+                instrument,
+                cancellationToken);
+            UpdateLiveAccount(partiallyFilled, trigger.Last);
+        }
+
+        AddActivity(
+            $"LIVE order ended {placed.State}: {placed.RejectionReason ?? "no broker reason supplied"}. Execution has been disarmed.",
+            "ERROR");
+        DisarmLiveExecution("A Robinhood order did not fill successfully; inspect the journal before re-arming.");
+    }
+
+    private async Task<bool> ReconcileActiveLiveOrderAsync(
+        CancellationToken cancellationToken)
+    {
+        if (_activeLiveOrder?.IsOpen is not true)
+        {
+            return false;
+        }
+
+        if (_liveBrokerGateway is null ||
+            _liveAccount is null ||
+            _activeSession is null ||
+            _ringBuffer is null ||
+            _activeLiveIntent is null ||
+            _activeLiveReview is null)
+        {
+            DisarmLiveExecution(
+                "An active LIVE order could not be reconciled from memory. Verify Robinhood before restarting PriceSentinel.");
+            return true;
+        }
+
+        BrokerOrderSnapshot order = await _liveBrokerGateway.GetOrderAsync(
+            _liveAccount.AccountNumber,
+            _activeLiveOrder.BrokerOrderId,
+            cancellationToken);
+        order = order with
+        {
+            ClientReferenceId = _activeLiveIntent.ClientReferenceId,
+        };
+        _activeLiveOrder = order;
+        _journal.AppendLiveOrderEvent(
+            _activeSession.Id,
+            _ringBuffer.Instrument,
+            order.IsTerminal ? "TERMINAL" : "BROKER_STATE",
+            _activeLiveIntent,
+            _activeLiveReview,
+            order,
+            DateTimeOffset.UtcNow);
+
+        if (!order.IsTerminal)
+        {
+            _strategyStateLabel = "ORDER PENDING";
+            _strategyMessage =
+                $"Robinhood order {order.State} is still active; all new LIVE orders are blocked.";
+            NotifyStrategyProperties();
+            return true;
+        }
+
+        BrokerOrderIntent intent = _activeLiveIntent;
+        DateTimeOffset? triggerTimestamp = _activeLiveTriggerTimestamp;
+        ClearActiveLiveOrderContext();
+
+        _liveExecutionEngine!.ObserveTerminalOrder(order);
+        if (order.State is BrokerOrderState.Filled)
+        {
+            if (triggerTimestamp is not null)
+            {
+                _tradeMarkers[triggerTimestamp.Value] = intent.Side is BrokerOrderSide.Buy
+                    ? ChartTradeMarker.Buy
+                    : ChartTradeMarker.Sell;
+            }
+
+            AddActivity(
+                $"LIVE {intent.Side.ToString().ToUpperInvariant()} reached FILLED during reconciliation: {order.FilledQuantity:0.######} {intent.Symbol} @ {(order.AveragePrice ?? 0m):C2}.");
+            LiveBrokerSnapshot reconciled = await CaptureLiveBrokerAsync(
+                _ringBuffer.Instrument,
+                cancellationToken);
+            UpdateLiveAccount(reconciled, 0m);
+            return true;
+        }
+
+        if (order.FilledQuantity > 0m)
+        {
+            LiveBrokerSnapshot partiallyFilled = await CaptureLiveBrokerAsync(
+                _ringBuffer.Instrument,
+                cancellationToken);
+            UpdateLiveAccount(partiallyFilled, 0m);
+        }
+
+        AddActivity(
+            $"LIVE order ended {order.State}: {order.RejectionReason ?? "no broker reason supplied"}. Execution has been disarmed.",
+            "ERROR");
+        DisarmLiveExecution(
+            "A Robinhood order did not fill successfully; inspect the journal before re-arming.");
+        return true;
+    }
+
+    private static void ValidatePlacedOrder(
+        BrokerOrderSnapshot order,
+        BrokerOrderIntent intent)
+    {
+        if (string.IsNullOrWhiteSpace(order.BrokerOrderId) ||
+            order.State is BrokerOrderState.Unknown ||
+            !string.Equals(order.Symbol, intent.Symbol, StringComparison.OrdinalIgnoreCase) ||
+            order.Side != intent.Side ||
+            order.RequestedQuantity != intent.Quantity)
+        {
+            throw new InvalidOperationException(
+                "Robinhood returned an incomplete or mismatched order acknowledgement. LIVE execution is stopped; verify Robinhood immediately.");
+        }
+    }
+
+    private void ClearActiveLiveOrderContext()
+    {
+        _activeLiveOrder = null;
+        _activeLiveIntent = null;
+        _activeLiveReview = null;
+        _activeLiveTriggerTimestamp = null;
+    }
+
+    private void UpdateStrategyDecision(StrategyDecision decision)
+    {
+        _strategyStateLabel = decision.State;
+        _strategyMessage = decision.Reasons.FirstOrDefault() ?? "Observing price action.";
+        _strategyMetrics =
+            $"RSI {(decision.SimpleRsi is null ? "--" : decision.SimpleRsi.Value.ToString("0.0", CultureInfo.InvariantCulture))}" +
+            $"  |  MOM {decision.MomentumPercent:+0.000;-0.000;0.000}%" +
+            $"  |  CONF {decision.Confidence:P0}";
+        NotifyStrategyProperties();
+    }
+
+    private void UpdateLiveAccount(LiveBrokerSnapshot broker, decimal mark)
+    {
+        _paperBuyingPower = broker.Portfolio.BuyingPower;
+        _paperEquity = broker.Portfolio.TotalValue;
+        _paperPositionQuantity = broker.Position.Quantity;
+        _paperAveragePrice = broker.Position.AverageBuyPrice;
+        _paperUnrealizedProfitLoss = broker.Position.HasPosition && mark > 0m
+            ? broker.Position.Quantity * (mark - broker.Position.AverageBuyPrice)
+            : 0m;
+        _paperEntries = _liveExecutionEngine?.EntriesToday ?? 0;
+        OnPropertyChanged(nameof(AccountBalanceValue));
+        OnPropertyChanged(nameof(BuyingPowerDisplay));
+        OnPropertyChanged(nameof(AccountEquityDisplay));
+        OnPropertyChanged(nameof(PositionDisplay));
+        OnPropertyChanged(nameof(ProfitLossDisplay));
+        OnPropertyChanged(nameof(EntriesDisplay));
+    }
+
+    private void DisarmLiveExecution(string reason)
+    {
+        if (SelectedMode is TradingMode.Live)
+        {
+            _modeState = _modeState.ActivateLiveDisarmed();
+            NotifyModeProperties();
+        }
+
+        StatusMessage = reason;
+    }
+
+    private static DateTimeOffset GetEasternTradingDayStartUtc(DateTimeOffset nowUtc)
+    {
+        TimeZoneInfo eastern = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+        DateTimeOffset easternNow = TimeZoneInfo.ConvertTime(nowUtc, eastern);
+        DateTime easternDate = DateTime.SpecifyKind(easternNow.Date, DateTimeKind.Unspecified);
+        TimeSpan offset = eastern.GetUtcOffset(easternDate);
+        return new DateTimeOffset(easternDate, offset).ToUniversalTime();
+    }
+
+    private static bool IsRegularEquityMarketHours(DateTimeOffset nowUtc)
+    {
+        TimeZoneInfo eastern = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+        DateTimeOffset easternNow = TimeZoneInfo.ConvertTime(nowUtc, eastern);
+        TimeOnly time = TimeOnly.FromDateTime(easternNow.DateTime);
+        return easternNow.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday &&
+               time >= new TimeOnly(9, 30) &&
+               time < new TimeOnly(16, 0);
     }
 
     private void ProcessPaperObservation(
@@ -1416,8 +2306,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(EntriesDisplay));
     }
 
-    private static bool IsFreshObservation(MarketQuote quote) =>
-        quote.ObservedAtUtc - quote.SourceTimestampUtc <= TimeSpan.FromMinutes(2);
+    private static bool IsFreshObservation(MarketQuote quote)
+    {
+        TimeSpan age = quote.ObservedAtUtc - quote.SourceTimestampUtc;
+        return age >= TimeSpan.FromSeconds(-30) &&
+               age <= TimeSpan.FromMinutes(2);
+    }
 
     private bool SetField<T>(
         ref T field,

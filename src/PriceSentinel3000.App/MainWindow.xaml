@@ -314,7 +314,7 @@
                         <StackPanel>
                     <Border Margin="0,12,0,0" Style="{StaticResource CardStyle}">
                         <StackPanel>
-                            <TextBlock Style="{StaticResource SectionLabelStyle}" Text="PAPER ACCOUNT" />
+                            <TextBlock Style="{StaticResource SectionLabelStyle}" Text="{Binding AccountPanelCaption}" />
                             <Grid Margin="0,14,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="100" />
@@ -328,9 +328,10 @@
                                              Text="{Binding Symbol, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Starting balance" />
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="{Binding AccountBalanceCaption}" />
                                     <TextBox Style="{StaticResource InputTextBoxStyle}"
-                                             Text="{Binding StartingBalance, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                                             IsReadOnly="{Binding IsLiveEffective}"
+                                             Text="{Binding AccountBalanceValue, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
                                 </StackPanel>
                             </Grid>
                         </StackPanel>
@@ -735,7 +736,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Paper equity" />
+                            <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="{Binding SessionEquityCaption}" />
                             <TextBlock Grid.Column="1" Foreground="#CBD5E1"
                                        FontWeight="SemiBold" Text="{Binding AccountEquityDisplay}" />
                         </Grid>

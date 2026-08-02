@@ -1,7 +1,9 @@
+using System.Globalization;
 using System.Text.Json;
 using ModelContextProtocol.Authentication;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
+using PriceSentinel3000.Core.LiveTrading;
 using PriceSentinel3000.Core.MarketData;
 using PriceSentinel3000.Infrastructure.Authentication;
 using PriceSentinel3000.Infrastructure.Storage;
@@ -10,7 +12,8 @@ namespace PriceSentinel3000.Infrastructure.MarketData;
 
 public sealed class RobinhoodMcpMarketDataSource :
     IMarketDataSource,
-    ICachedAuthenticationMarketDataSource
+    ICachedAuthenticationMarketDataSource,
+    ILiveBrokerGateway
 {
     private static readonly Uri Endpoint =
         new("https://agent.robinhood.com/mcp/trading");
@@ -240,6 +243,237 @@ public sealed class RobinhoodMcpMarketDataSource :
                 quote.SourceTimestampUtc >= start &&
                 quote.SourceTimestampUtc <= end)
             .ToArray();
+    }
+
+    public async Task<BrokerAccount> GetAgenticAccountAsync(
+        CancellationToken cancellationToken)
+    {
+        JsonElement root = await CallStructuredToolAsync(
+            "get_accounts",
+            new Dictionary<string, object?>(),
+            cancellationToken).ConfigureAwait(false);
+        return RobinhoodBrokerParser.ParseAgenticAccount(root);
+    }
+
+    public async Task<BrokerPortfolio> GetPortfolioAsync(
+        string accountNumber,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountNumber);
+        JsonElement root = await CallStructuredToolAsync(
+            "get_portfolio",
+            new Dictionary<string, object?>
+            {
+                ["account_number"] = accountNumber,
+            },
+            cancellationToken).ConfigureAwait(false);
+        return RobinhoodBrokerParser.ParsePortfolio(root);
+    }
+
+    public async Task<BrokerPosition> GetPositionAsync(
+        string accountNumber,
+        Instrument instrument,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountNumber);
+        ArgumentNullException.ThrowIfNull(instrument);
+        JsonElement root = await CallStructuredToolAsync(
+            "get_equity_positions",
+            new Dictionary<string, object?>
+            {
+                ["account_number"] = accountNumber,
+            },
+            cancellationToken).ConfigureAwait(false);
+        return RobinhoodBrokerParser.ParsePosition(root, instrument.Symbol);
+    }
+
+    public async Task<EquityTradability> GetTradabilityAsync(
+        string accountNumber,
+        string accountType,
+        Instrument instrument,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountNumber);
+        ArgumentNullException.ThrowIfNull(instrument);
+        JsonElement root = await CallStructuredToolAsync(
+            "get_equity_tradability",
+            new Dictionary<string, object?>
+            {
+                ["account_number"] = accountNumber,
+                ["symbols"] = new[] { instrument.Symbol },
+            },
+            cancellationToken).ConfigureAwait(false);
+        return RobinhoodBrokerParser.ParseTradability(
+            root,
+            instrument.Symbol,
+            accountType);
+    }
+
+    public async Task<IReadOnlyList<BrokerOrderSnapshot>> GetOpenOrdersAsync(
+        string accountNumber,
+        Instrument instrument,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountNumber);
+        ArgumentNullException.ThrowIfNull(instrument);
+        JsonElement root = await CallStructuredToolAsync(
+            "get_equity_orders",
+            new Dictionary<string, object?>
+            {
+                ["account_number"] = accountNumber,
+                ["symbol"] = instrument.Symbol,
+            },
+            cancellationToken).ConfigureAwait(false);
+        return RobinhoodBrokerParser.ParseOrders(root)
+            .Where(order => order.IsOpen)
+            .ToArray();
+    }
+
+    public async Task<IReadOnlyList<BrokerOrderSnapshot>> GetOrdersCreatedSinceAsync(
+        string accountNumber,
+        DateTimeOffset createdAtGteUtc,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountNumber);
+        JsonElement root = await CallStructuredToolAsync(
+            "get_equity_orders",
+            new Dictionary<string, object?>
+            {
+                ["account_number"] = accountNumber,
+                ["created_at_gte"] = createdAtGteUtc.ToUniversalTime()
+                    .ToString("O", CultureInfo.InvariantCulture),
+                ["placed_agent"] = "agentic",
+            },
+            cancellationToken).ConfigureAwait(false);
+        return RobinhoodBrokerParser.ParseOrders(root);
+    }
+
+    public async Task<BrokerOrderReview> ReviewOrderAsync(
+        string accountNumber,
+        BrokerOrderIntent intent,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountNumber);
+        ArgumentNullException.ThrowIfNull(intent);
+        JsonElement root = await CallStructuredToolAsync(
+            "review_equity_order",
+            OrderArguments(accountNumber, intent, includeReferenceId: false),
+            cancellationToken).ConfigureAwait(false);
+        return RobinhoodBrokerParser.ParseReview(root, intent);
+    }
+
+    public async Task<BrokerOrderSnapshot> PlaceOrderAsync(
+        string accountNumber,
+        BrokerOrderIntent intent,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountNumber);
+        ArgumentNullException.ThrowIfNull(intent);
+        JsonElement root = await CallStructuredToolAsync(
+            "place_equity_order",
+            OrderArguments(accountNumber, intent, includeReferenceId: true),
+            cancellationToken).ConfigureAwait(false);
+        return RobinhoodBrokerParser.ParsePlacedOrder(
+            root,
+            intent.ClientReferenceId);
+    }
+
+    public async Task<BrokerOrderSnapshot> GetOrderAsync(
+        string accountNumber,
+        string brokerOrderId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountNumber);
+        ArgumentException.ThrowIfNullOrWhiteSpace(brokerOrderId);
+        JsonElement root = await CallStructuredToolAsync(
+            "get_equity_orders",
+            new Dictionary<string, object?>
+            {
+                ["account_number"] = accountNumber,
+                ["order_id"] = brokerOrderId,
+            },
+            cancellationToken).ConfigureAwait(false);
+        BrokerOrderSnapshot? order = RobinhoodBrokerParser.ParseOrders(root)
+            .FirstOrDefault(item => string.Equals(
+                item.BrokerOrderId,
+                brokerOrderId,
+                StringComparison.OrdinalIgnoreCase));
+        return order ?? throw new InvalidOperationException(
+            $"Robinhood returned no state for order {brokerOrderId}.");
+    }
+
+    public async Task<BrokerOrderSnapshot?> FindOrderByClientReferenceAsync(
+        string accountNumber,
+        Instrument instrument,
+        Guid clientReferenceId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountNumber);
+        ArgumentNullException.ThrowIfNull(instrument);
+        JsonElement root = await CallStructuredToolAsync(
+            "get_equity_orders",
+            new Dictionary<string, object?>
+            {
+                ["account_number"] = accountNumber,
+                ["symbol"] = instrument.Symbol,
+            },
+            cancellationToken).ConfigureAwait(false);
+        BrokerOrderSnapshot? order = RobinhoodBrokerParser.ParseOrders(root)
+            .FirstOrDefault(item =>
+                item.ClientReferenceId == clientReferenceId);
+        return order is null
+            ? null
+            : order with
+            {
+                ClientReferenceId = clientReferenceId,
+            };
+    }
+
+    public async Task CancelOrderAsync(
+        string accountNumber,
+        string brokerOrderId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountNumber);
+        ArgumentException.ThrowIfNullOrWhiteSpace(brokerOrderId);
+        JsonElement root = await CallStructuredToolAsync(
+            "cancel_equity_order",
+            new Dictionary<string, object?>
+            {
+                ["account_number"] = accountNumber,
+                ["order_id"] = brokerOrderId,
+            },
+            cancellationToken).ConfigureAwait(false);
+
+        if (!RobinhoodBrokerParser.ParseCancellationAccepted(root))
+        {
+            throw new InvalidOperationException(
+                $"Robinhood did not accept cancellation for order {brokerOrderId}.");
+        }
+    }
+
+    private static IReadOnlyDictionary<string, object?> OrderArguments(
+        string accountNumber,
+        BrokerOrderIntent intent,
+        bool includeReferenceId)
+    {
+        var arguments = new Dictionary<string, object?>
+        {
+            ["account_number"] = accountNumber,
+            ["symbol"] = intent.Symbol,
+            ["side"] = intent.Side is BrokerOrderSide.Buy ? "buy" : "sell",
+            ["quantity"] = intent.Quantity.ToString("0.######", CultureInfo.InvariantCulture),
+            ["type"] = "market",
+            ["market_hours"] = "regular_hours",
+            ["time_in_force"] = "gfd",
+        };
+
+        if (includeReferenceId)
+        {
+            arguments["ref_id"] = intent.ClientReferenceId.ToString("D");
+        }
+
+        return arguments;
     }
 
     public async ValueTask DisposeAsync()
