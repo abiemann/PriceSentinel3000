@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Specialized;
 using System.Globalization;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media;
 using PriceSentinel3000.App.ViewModels;
 
@@ -13,6 +14,7 @@ public sealed class PriceChart : FrameworkElement
     private static readonly Color UpCandleColor = Color.FromRgb(90, 203, 60);
     private static readonly Color DownCandleColor = Color.FromRgb(255, 90, 31);
     private static readonly Color FlatCandleColor = Color.FromRgb(142, 160, 183);
+    private Point? _pointerPosition;
 
     public static readonly DependencyProperty PointsProperty = DependencyProperty.Register(
         nameof(Points),
@@ -45,9 +47,18 @@ public sealed class PriceChart : FrameworkElement
         set => SetValue(WindowMinutesProperty, value);
     }
 
+    public PriceChart()
+    {
+        Cursor = Cursors.Cross;
+    }
+
     protected override void OnRender(DrawingContext drawingContext)
     {
         base.OnRender(drawingContext);
+        drawingContext.DrawRectangle(
+            Brushes.Transparent,
+            null,
+            new Rect(RenderSize));
 
         PricePointViewModel[] points =
         [
@@ -74,9 +85,9 @@ public sealed class PriceChart : FrameworkElement
             observedMaximum + expansionPadding);
         (minimum, maximum, decimal priceStep) = CreatePriceScale(minimum, maximum);
         decimal range = maximum - minimum;
-        const double plotLeft = 12d;
+        const double plotLeft = 4d;
         const double plotTop = 12d;
-        double plotRight = Math.Max(plotLeft + 1d, RenderSize.Width - 70d);
+        double plotRight = Math.Max(plotLeft + 1d, RenderSize.Width - 52d);
         double plotBottom = Math.Max(plotTop + 1d, RenderSize.Height - 30d);
         double plotWidth = plotRight - plotLeft;
         double plotHeight = plotBottom - plotTop;
@@ -131,6 +142,31 @@ public sealed class PriceChart : FrameworkElement
             plotTop,
             plotWidth,
             plotHeight);
+
+        DrawPointerReadout(
+            drawingContext,
+            minimum,
+            range,
+            firstTimestamp,
+            lastTimestamp,
+            plotLeft,
+            plotTop,
+            plotRight,
+            plotBottom);
+    }
+
+    protected override void OnMouseMove(MouseEventArgs eventArgs)
+    {
+        base.OnMouseMove(eventArgs);
+        _pointerPosition = eventArgs.GetPosition(this);
+        InvalidateVisual();
+    }
+
+    protected override void OnMouseLeave(MouseEventArgs eventArgs)
+    {
+        base.OnMouseLeave(eventArgs);
+        _pointerPosition = null;
+        InvalidateVisual();
     }
 
     private static void DrawCandles(
@@ -354,6 +390,136 @@ public sealed class PriceChart : FrameworkElement
             new(
                 labelBounds.Left + horizontalPadding,
                 labelBounds.Top + verticalPadding));
+    }
+
+    private void DrawPointerReadout(
+        DrawingContext drawingContext,
+        decimal minimum,
+        decimal range,
+        DateTimeOffset firstTimestamp,
+        DateTimeOffset lastTimestamp,
+        double plotLeft,
+        double plotTop,
+        double plotRight,
+        double plotBottom)
+    {
+        if (_pointerPosition is not Point pointer ||
+            pointer.X < plotLeft ||
+            pointer.X > plotRight ||
+            pointer.Y < plotTop ||
+            pointer.Y > plotBottom)
+        {
+            return;
+        }
+
+        double plotWidth = plotRight - plotLeft;
+        double plotHeight = plotBottom - plotTop;
+        double xFraction = Math.Clamp(
+            (pointer.X - plotLeft) / plotWidth,
+            0d,
+            1d);
+        double yFraction = Math.Clamp(
+            (pointer.Y - plotTop) / plotHeight,
+            0d,
+            1d);
+        DateTimeOffset timestamp = firstTimestamp.AddTicks(
+            (long)((lastTimestamp - firstTimestamp).Ticks * xFraction));
+        decimal price = minimum + range * (decimal)(1d - yFraction);
+        var guidePen = new Pen(
+            new SolidColorBrush(Color.FromArgb(195, 126, 147, 171)),
+            1d)
+        {
+            DashStyle = new DashStyle([3d, 3d], 0d),
+        };
+        var labelBrush = new SolidColorBrush(Color.FromRgb(51, 70, 92));
+        guidePen.Freeze();
+        labelBrush.Freeze();
+
+        drawingContext.DrawLine(
+            guidePen,
+            new(pointer.X, plotTop),
+            new(pointer.X, plotBottom));
+        drawingContext.DrawLine(
+            guidePen,
+            new(plotLeft, pointer.Y),
+            new(plotRight, pointer.Y));
+
+        double pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var typeface = new Typeface("Segoe UI Semibold");
+        FormattedText timeLabel = new(
+            timestamp.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture),
+            CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight,
+            typeface,
+            9d,
+            Brushes.White,
+            pixelsPerDip);
+        FormattedText priceLabel = new(
+            FormatPrice(price),
+            CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight,
+            typeface,
+            9d,
+            Brushes.White,
+            pixelsPerDip);
+
+        const double horizontalPadding = 5d;
+        const double verticalPadding = 2d;
+        double timeWidth = timeLabel.Width + horizontalPadding * 2d;
+        double timeLeft = Math.Clamp(
+            pointer.X - timeWidth / 2d,
+            plotLeft,
+            plotRight - timeWidth);
+        var timeBounds = new Rect(
+            timeLeft,
+            plotBottom + 4d,
+            timeWidth,
+            timeLabel.Height + verticalPadding * 2d);
+        double priceWidth = priceLabel.Width + horizontalPadding * 2d;
+        double priceLeft = Math.Min(
+            plotRight + 4d,
+            RenderSize.Width - priceWidth - 2d);
+        var priceBounds = new Rect(
+            priceLeft,
+            pointer.Y - priceLabel.Height / 2d - verticalPadding,
+            priceWidth,
+            priceLabel.Height + verticalPadding * 2d);
+
+        DrawAxisReadout(
+            drawingContext,
+            labelBrush,
+            timeBounds,
+            timeLabel,
+            horizontalPadding,
+            verticalPadding);
+        DrawAxisReadout(
+            drawingContext,
+            labelBrush,
+            priceBounds,
+            priceLabel,
+            horizontalPadding,
+            verticalPadding);
+    }
+
+    private static void DrawAxisReadout(
+        DrawingContext drawingContext,
+        Brush background,
+        Rect bounds,
+        FormattedText text,
+        double horizontalPadding,
+        double verticalPadding)
+    {
+        drawingContext.DrawRoundedRectangle(
+            background,
+            null,
+            bounds,
+            3d,
+            3d);
+        drawingContext.DrawText(
+            text,
+            new(
+                bounds.Left + horizontalPadding,
+                bounds.Top + verticalPadding));
     }
 
     private void DrawTradeMarkers(
