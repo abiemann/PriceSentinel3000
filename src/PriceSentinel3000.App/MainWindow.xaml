@@ -256,6 +256,7 @@
                                 <StackPanel>
                                     <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Symbol" />
                                     <TextBox Style="{StaticResource InputTextBoxStyle}" MaxLength="10"
+                                             CharacterCasing="Upper"
                                              Text="{Binding Symbol, UpdateSourceTrigger=PropertyChanged}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">

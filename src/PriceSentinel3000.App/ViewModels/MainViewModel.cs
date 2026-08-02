@@ -239,7 +239,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         get => _symbol;
         set
         {
-            if (SetField(ref _symbol, value))
+            string normalized = value?.ToUpperInvariant() ?? string.Empty;
+
+            if (SetField(ref _symbol, normalized))
             {
                 OnPropertyChanged(nameof(SymbolDisplay));
             }
