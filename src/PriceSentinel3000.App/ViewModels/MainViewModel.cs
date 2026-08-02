@@ -48,6 +48,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private bool _journalReady;
     private bool _hasMarketData;
     private bool _isMarketDataConnected;
+    private bool _showRsi;
     private bool _isChartManualScale;
     private int _chartScaleResetVersion;
     private string _statusMessage;
@@ -65,6 +66,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private decimal _paperRealizedProfitLoss;
     private decimal _paperUnrealizedProfitLoss;
     private int _paperEntries;
+    private bool _isReplayPaused;
+    private TaskCompletionSource<bool>? _replayResumeSource;
     private CancellationTokenSource? _sessionCancellation;
     private JournalSession? _activeSession;
     private PriceRingBuffer? _ringBuffer;
@@ -147,12 +150,15 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         ];
 
         StartSessionCommand = new RelayCommand(
-            StartSelectedSession,
-            () => SelectedMode is TradingMode.PaperTrader or TradingMode.Replay &&
-                  EffectiveMode == SelectedMode &&
-                  !IsSessionRunning &&
-                  !_isStartingSession);
-        StopSessionCommand = new RelayCommand(StopSession, () => IsSessionRunning);
+            ExecutePrimarySessionAction,
+            () => IsReplayPaused ||
+                  (SelectedMode is TradingMode.PaperTrader or TradingMode.Replay &&
+                   EffectiveMode == SelectedMode &&
+                   !IsSessionRunning &&
+                   !_isStartingSession));
+        StopSessionCommand = new RelayCommand(
+            ExecuteSecondarySessionAction,
+            () => IsSessionRunning);
 
         RebuildBufferSegments();
         InitializeJournal();
@@ -206,6 +212,18 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public string MarketDataStateLabel => _marketDataStateLabel;
     public string CurrentPrice => _currentPrice;
     public string BidAskDisplay => _bidAskDisplay;
+    public bool ShowRsi
+    {
+        get => _showRsi;
+        set
+        {
+            if (SetField(ref _showRsi, value))
+            {
+                OnPropertyChanged(nameof(RsiToggleLabel));
+            }
+        }
+    }
+    public string RsiToggleLabel => ShowRsi ? "RSI: ON" : "RSI: OFF";
     public bool IsChartManualScale
     {
         get => _isChartManualScale;
@@ -231,20 +249,29 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public string PriceActionCaption => EffectiveMode is TradingMode.Replay
         ? "15 SECOND REPLAY CANDLES"
         : $"15 SECOND CANDLES · {QuotePollingSeconds} SECOND UPDATES";
-    public string PrimaryActionLabel =>
-        SelectedMode is TradingMode.Replay ? "START REPLAY" : "START PAPER TRADER";
+    public string PrimaryActionLabel => IsReplayPaused
+        ? "RESUME"
+        : SelectedMode is TradingMode.Replay ? "START REPLAY" : "START PAPER TRADER";
+    public string SecondaryActionLabel =>
+        EffectiveMode is TradingMode.Replay && IsSessionRunning && !IsReplayPaused
+            ? "PAUSE"
+            : "STOP";
     public string SessionStateLabel => EffectiveMode is TradingMode.Off
         ? "OFF"
         : EffectiveMode is TradingMode.Live && !LiveArmed ? "DISARMED"
+        : IsReplayPaused ? "PAUSED"
         : IsSessionRunning ? "RUNNING" : "READY";
     public string SessionStateBackground => EffectiveMode is TradingMode.Live && !LiveArmed
         ? "#3B211E"
+        : IsReplayPaused ? "#34251A"
         : EffectiveMode is TradingMode.Off ? "#202B39" : "#123528";
     public string SessionStateBorder => EffectiveMode is TradingMode.Live && !LiveArmed
         ? "#7F3C34"
+        : IsReplayPaused ? "#7B5426"
         : EffectiveMode is TradingMode.Off ? "#3A4B61" : "#24684C";
     public string SessionStateForeground => EffectiveMode is TradingMode.Live && !LiveArmed
         ? "#FF9B8C"
+        : IsReplayPaused ? "#F4B45E"
         : EffectiveMode is TradingMode.Off ? "#A8B6C7" : "#5EE6B1";
     public string MarketDataStatusBackground =>
         _isMarketDataConnected ? "#123528" : "#34251A";
@@ -442,6 +469,27 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             if (SetField(ref _isSessionRunning, value))
             {
                 OnPropertyChanged(nameof(SessionStateLabel));
+                OnPropertyChanged(nameof(PrimaryActionLabel));
+                OnPropertyChanged(nameof(SecondaryActionLabel));
+                StartSessionCommand.RaiseCanExecuteChanged();
+                StopSessionCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool IsReplayPaused
+    {
+        get => _isReplayPaused;
+        private set
+        {
+            if (SetField(ref _isReplayPaused, value))
+            {
+                OnPropertyChanged(nameof(PrimaryActionLabel));
+                OnPropertyChanged(nameof(SecondaryActionLabel));
+                OnPropertyChanged(nameof(SessionStateLabel));
+                OnPropertyChanged(nameof(SessionStateBackground));
+                OnPropertyChanged(nameof(SessionStateBorder));
+                OnPropertyChanged(nameof(SessionStateForeground));
                 StartSessionCommand.RaiseCanExecuteChanged();
                 StopSessionCommand.RaiseCanExecuteChanged();
             }
@@ -603,6 +651,30 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public void SavePreferences() =>
         _preferencesStore.Save(CreateSettings());
+
+    private void ExecutePrimarySessionAction()
+    {
+        if (IsReplayPaused)
+        {
+            ResumeReplay();
+            return;
+        }
+
+        StartSelectedSession();
+    }
+
+    private void ExecuteSecondarySessionAction()
+    {
+        if (EffectiveMode is TradingMode.Replay &&
+            IsSessionRunning &&
+            !IsReplayPaused)
+        {
+            PauseReplay();
+            return;
+        }
+
+        StopSession();
+    }
 
     private async void StartSelectedSession()
     {
@@ -794,10 +866,14 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         {
             if (index > 0)
             {
-                await Task.Delay(CalculateReplayDelay(
+                await DelayReplayAsync(CalculateReplayDelay(
                     historicalQuotes[index - 1].SourceTimestampUtc,
                     historicalQuotes[index].SourceTimestampUtc,
                     settings.ReplaySpeed), token);
+            }
+            else
+            {
+                await WaitWhileReplayPausedAsync(token);
             }
 
             MarketQuote replayed = historicalQuotes[index] with
@@ -826,11 +902,46 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             $"Replay completed for {instrument.Symbol}. The chart remains available for inspection.");
     }
 
+    private async Task DelayReplayAsync(
+        TimeSpan delay,
+        CancellationToken cancellationToken)
+    {
+        TimeSpan remaining = delay;
+        TimeSpan maximumSlice = TimeSpan.FromMilliseconds(100);
+
+        while (remaining > TimeSpan.Zero)
+        {
+            await WaitWhileReplayPausedAsync(cancellationToken);
+            TimeSpan slice = remaining < maximumSlice ? remaining : maximumSlice;
+            await Task.Delay(slice, cancellationToken);
+            remaining -= slice;
+        }
+
+        await WaitWhileReplayPausedAsync(cancellationToken);
+    }
+
+    private async Task WaitWhileReplayPausedAsync(
+        CancellationToken cancellationToken)
+    {
+        while (IsReplayPaused)
+        {
+            TaskCompletionSource<bool>? resumeSource = _replayResumeSource;
+
+            if (resumeSource is null)
+            {
+                return;
+            }
+
+            await resumeSource.Task.WaitAsync(cancellationToken);
+        }
+    }
+
     private void PrepareDataSession(
         Instrument instrument,
         PaperTraderSettings settings,
         TradingMode mode)
     {
+        ReleaseReplayPause();
         _ringBuffer = new(instrument, TimeSpan.FromMinutes(settings.BufferMinutes));
         _paperTradingEngine = new(instrument, settings);
         _marketDataRequest = null;
@@ -881,12 +992,61 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         IsSessionRunning = true;
     }
 
+    private void PauseReplay()
+    {
+        if (EffectiveMode is not TradingMode.Replay ||
+            !IsSessionRunning ||
+            IsReplayPaused)
+        {
+            return;
+        }
+
+        _replayResumeSource = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        IsReplayPaused = true;
+        _strategyStateLabel = "PAUSED";
+        _strategyMessage =
+            "Replay is paused; the chart, buffer, and paper account are preserved.";
+        NotifyStrategyProperties();
+        StatusMessage =
+            "Replay paused. Resume continues with the next historical observation.";
+        AddActivity("Historical Replay paused.");
+    }
+
+    private void ResumeReplay()
+    {
+        if (!IsReplayPaused)
+        {
+            return;
+        }
+
+        TaskCompletionSource<bool>? resumeSource = _replayResumeSource;
+        _replayResumeSource = null;
+        IsReplayPaused = false;
+        _strategyStateLabel = "REPLAYING";
+        _strategyMessage =
+            "Historical Robinhood prices are arriving as a new stream. Orders are simulated only.";
+        NotifyStrategyProperties();
+        StatusMessage = "Replay resumed from the next historical observation.";
+        AddActivity("Historical Replay resumed.");
+        resumeSource?.TrySetResult(true);
+    }
+
+    private void ReleaseReplayPause()
+    {
+        TaskCompletionSource<bool>? resumeSource = _replayResumeSource;
+        _replayResumeSource = null;
+        IsReplayPaused = false;
+        resumeSource?.TrySetResult(true);
+    }
+
     private void StopSession() =>
         StopActiveSession("STOPPED_BY_USER", "Data session stopped. No market orders were sent.");
 
     private void StopActiveSession(string outcome, string statusMessage)
     {
         _sessionCancellation?.Cancel();
+        ReleaseReplayPause();
 
         if (_activeSession is not null)
         {
@@ -1131,6 +1291,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(BrokerExecutionForeground));
         OnPropertyChanged(nameof(PriceActionCaption));
         OnPropertyChanged(nameof(PrimaryActionLabel));
+        OnPropertyChanged(nameof(SecondaryActionLabel));
         OnPropertyChanged(nameof(SessionStateLabel));
         OnPropertyChanged(nameof(SessionStateBackground));
         OnPropertyChanged(nameof(SessionStateBorder));

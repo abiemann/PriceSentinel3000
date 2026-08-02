@@ -51,6 +51,14 @@ public sealed class PriceChart : FrameworkElement
             FrameworkPropertyMetadataOptions.AffectsRender,
             OnIsManualScaleChanged));
 
+    public static readonly DependencyProperty ShowRsiProperty = DependencyProperty.Register(
+        nameof(ShowRsi),
+        typeof(bool),
+        typeof(PriceChart),
+        new FrameworkPropertyMetadata(
+            false,
+            FrameworkPropertyMetadataOptions.AffectsRender));
+
     public static readonly DependencyProperty ScaleResetVersionProperty = DependencyProperty.Register(
         nameof(ScaleResetVersion),
         typeof(int),
@@ -78,6 +86,12 @@ public sealed class PriceChart : FrameworkElement
     {
         get => (bool)GetValue(IsManualScaleProperty);
         set => SetValue(IsManualScaleProperty, value);
+    }
+
+    public bool ShowRsi
+    {
+        get => (bool)GetValue(ShowRsiProperty);
+        set => SetValue(ShowRsiProperty, value);
     }
 
     public int ScaleResetVersion
@@ -158,6 +172,7 @@ public sealed class PriceChart : FrameworkElement
         _lastRenderedMaximum = maximum;
         _hasRenderedScale = true;
         decimal range = maximum - minimum;
+        Rect chartBounds = GetChartBounds();
         Rect plotBounds = GetPlotBounds();
         double plotLeft = plotBounds.Left;
         double plotTop = plotBounds.Top;
@@ -181,7 +196,18 @@ public sealed class PriceChart : FrameworkElement
             plotLeft,
             plotTop,
             plotRight,
-            plotBottom);
+            plotBottom,
+            chartBounds.Bottom);
+
+        if (ShowRsi)
+        {
+            DrawRsiPanel(
+                drawingContext,
+                points,
+                firstTimestamp,
+                lastTimestamp,
+                GetRsiBounds());
+        }
 
         if (points[^1].Close >= minimum && points[^1].Close <= maximum)
         {
@@ -239,7 +265,8 @@ public sealed class PriceChart : FrameworkElement
             plotLeft,
             plotTop,
             plotRight,
-            plotBottom);
+            plotBottom,
+            chartBounds.Bottom);
     }
 
     private void HandlePreviewMouseMove(object sender, MouseEventArgs eventArgs)
@@ -331,7 +358,7 @@ public sealed class PriceChart : FrameworkElement
         InvalidateVisual();
     }
 
-    private Rect GetPlotBounds()
+    private Rect GetChartBounds()
     {
         const double plotLeft = 4d;
         const double plotTop = 4d;
@@ -342,6 +369,43 @@ public sealed class PriceChart : FrameworkElement
             plotTop,
             plotRight - plotLeft,
             plotBottom - plotTop);
+    }
+
+    private Rect GetPlotBounds()
+    {
+        Rect chartBounds = GetChartBounds();
+
+        if (!ShowRsi || chartBounds.Height < 220d)
+        {
+            return chartBounds;
+        }
+
+        double rsiHeight = Math.Clamp(chartBounds.Height * 0.27d, 96d, 150d);
+        const double panelGap = 10d;
+        return new(
+            chartBounds.Left,
+            chartBounds.Top,
+            chartBounds.Width,
+            Math.Max(1d, chartBounds.Height - rsiHeight - panelGap));
+    }
+
+    private Rect GetRsiBounds()
+    {
+        Rect chartBounds = GetChartBounds();
+        Rect priceBounds = GetPlotBounds();
+
+        if (!ShowRsi || priceBounds.Bottom >= chartBounds.Bottom)
+        {
+            return Rect.Empty;
+        }
+
+        const double panelGap = 10d;
+        double top = priceBounds.Bottom + panelGap;
+        return new(
+            chartBounds.Left,
+            top,
+            chartBounds.Width,
+            Math.Max(1d, chartBounds.Bottom - top));
     }
 
     private void ApplyScaleDrag(Point pointer)
@@ -490,9 +554,9 @@ public sealed class PriceChart : FrameworkElement
         double plotLeft,
         double plotTop,
         double plotRight,
-        double plotBottom)
+        double plotBottom,
+        double chartBottom)
     {
-        const int timeTickCount = 5;
         double plotWidth = plotRight - plotLeft;
         double plotHeight = plotBottom - plotTop;
         var horizontalGridPen = new Pen(
@@ -509,7 +573,6 @@ public sealed class PriceChart : FrameworkElement
         labelBrush.Freeze();
         var typeface = new Typeface("Segoe UI");
         double pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
-        TimeSpan visibleTime = lastTimestamp - firstTimestamp;
 
         int priceTickCount = Math.Max(
             2,
@@ -540,36 +603,205 @@ public sealed class PriceChart : FrameworkElement
                         RenderSize.Height - priceLabel.Height)));
         }
 
-        for (int index = 0; index < timeTickCount; index++)
+        DateTimeOffset firstUtc = firstTimestamp.ToUniversalTime();
+        DateTimeOffset lastUtc = lastTimestamp.ToUniversalTime();
+        long alignedMinuteTicks =
+            firstUtc.Ticks - firstUtc.Ticks % TimeSpan.TicksPerMinute;
+        var minuteTick = new DateTimeOffset(alignedMinuteTicks, TimeSpan.Zero);
+
+        if (minuteTick < firstUtc)
         {
-            double fraction = index / (double)(timeTickCount - 1);
-            double x = plotLeft + plotWidth * fraction;
+            minuteTick = minuteTick.AddMinutes(1);
+        }
+
+        while (minuteTick <= lastUtc)
+        {
+            double x = MapTimestamp(
+                minuteTick,
+                firstTimestamp,
+                lastTimestamp,
+                plotLeft,
+                plotWidth);
             drawingContext.DrawLine(
                 verticalGridPen,
                 new(x, plotTop),
-                new(x, plotBottom));
+                new(x, chartBottom));
 
-            DateTimeOffset timestamp = firstTimestamp.AddTicks(
-                (long)(visibleTime.Ticks * fraction));
-            string timeFormat = visibleTime >= TimeSpan.FromMinutes(5)
-                ? "HH:mm"
-                : "HH:mm:ss";
             FormattedText timeLabel = CreateLabel(
-                timestamp.ToLocalTime().ToString(timeFormat, CultureInfo.InvariantCulture),
+                minuteTick.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture),
                 typeface,
                 labelBrush,
                 pixelsPerDip);
-            double labelX = index switch
-            {
-                0 => x,
-                timeTickCount - 1 => x - timeLabel.Width,
-                _ => x - timeLabel.Width / 2d,
-            };
-            drawingContext.DrawText(timeLabel, new(labelX, plotBottom + 7d));
+            double labelX = Math.Clamp(
+                x - timeLabel.Width / 2d,
+                plotLeft,
+                Math.Max(plotLeft, plotRight - timeLabel.Width));
+            drawingContext.DrawText(timeLabel, new(labelX, chartBottom + 7d));
+            minuteTick = minuteTick.AddMinutes(1);
         }
 
-        drawingContext.DrawLine(axisPen, new(plotRight, plotTop), new(plotRight, plotBottom));
+        drawingContext.DrawLine(axisPen, new(plotRight, plotTop), new(plotRight, chartBottom));
         drawingContext.DrawLine(axisPen, new(plotLeft, plotBottom), new(plotRight, plotBottom));
+        drawingContext.DrawLine(axisPen, new(plotLeft, chartBottom), new(plotRight, chartBottom));
+    }
+
+    private void DrawRsiPanel(
+        DrawingContext drawingContext,
+        IReadOnlyList<PricePointViewModel> points,
+        DateTimeOffset firstTimestamp,
+        DateTimeOffset lastTimestamp,
+        Rect bounds)
+    {
+        if (bounds.IsEmpty || bounds.Width <= 1d || bounds.Height <= 1d)
+        {
+            return;
+        }
+
+        var bandBrush = new SolidColorBrush(Color.FromArgb(52, 46, 82, 126));
+        var guideBrush = new SolidColorBrush(Color.FromRgb(68, 123, 205));
+        var guidePen = new Pen(guideBrush, 1d)
+        {
+            DashStyle = new DashStyle([4d, 4d], 0d),
+        };
+        var midlinePen = new Pen(
+            new SolidColorBrush(Color.FromArgb(115, 42, 57, 75)),
+            1d);
+        var rsiBrush = new SolidColorBrush(Color.FromRgb(189, 233, 244));
+        var rsiPen = new Pen(rsiBrush, 1.6d);
+        var labelBrush = new SolidColorBrush(Color.FromRgb(155, 176, 202));
+        bandBrush.Freeze();
+        guideBrush.Freeze();
+        guidePen.Freeze();
+        midlinePen.Freeze();
+        rsiBrush.Freeze();
+        rsiPen.Freeze();
+        labelBrush.Freeze();
+
+        double y70 = MapRsi(70m, bounds.Top, bounds.Height);
+        double y50 = MapRsi(50m, bounds.Top, bounds.Height);
+        double y30 = MapRsi(30m, bounds.Top, bounds.Height);
+        drawingContext.DrawRectangle(
+            bandBrush,
+            null,
+            new Rect(bounds.Left, y70, bounds.Width, y30 - y70));
+        drawingContext.DrawLine(guidePen, new(bounds.Left, y70), new(bounds.Right, y70));
+        drawingContext.DrawLine(midlinePen, new(bounds.Left, y50), new(bounds.Right, y50));
+        drawingContext.DrawLine(guidePen, new(bounds.Left, y30), new(bounds.Right, y30));
+
+        List<(DateTimeOffset Timestamp, decimal Value)> samples = CalculateSimpleRsi(points);
+        List<(DateTimeOffset Timestamp, decimal Value)> visibleSamples =
+        [
+            .. samples.Where(sample =>
+                sample.Timestamp >= firstTimestamp &&
+                sample.Timestamp <= lastTimestamp),
+        ];
+
+        if (visibleSamples.Count > 0)
+        {
+            var geometry = new StreamGeometry();
+
+            using (StreamGeometryContext context = geometry.Open())
+            {
+                for (int index = 0; index < visibleSamples.Count; index++)
+                {
+                    (DateTimeOffset timestamp, decimal value) = visibleSamples[index];
+                    var point = new Point(
+                        MapTimestamp(
+                            timestamp,
+                            firstTimestamp,
+                            lastTimestamp,
+                            bounds.Left,
+                            bounds.Width),
+                        MapRsi(value, bounds.Top, bounds.Height));
+
+                    if (index == 0)
+                    {
+                        context.BeginFigure(point, isFilled: false, isClosed: false);
+                    }
+                    else
+                    {
+                        context.LineTo(point, isStroked: true, isSmoothJoin: true);
+                    }
+                }
+            }
+
+            geometry.Freeze();
+            var clip = new RectangleGeometry(bounds);
+            clip.Freeze();
+            drawingContext.PushClip(clip);
+            drawingContext.DrawGeometry(null, rsiPen, geometry);
+            drawingContext.Pop();
+        }
+
+        double pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var labelTypeface = new Typeface("Segoe UI Semibold");
+        string latestValue = visibleSamples.Count > 0
+            ? visibleSamples[^1].Value.ToString("0.0", CultureInfo.InvariantCulture)
+            : "--";
+        FormattedText title = CreateLabel(
+            $"RSI (14)  {latestValue}",
+            labelTypeface,
+            rsiBrush,
+            pixelsPerDip);
+        drawingContext.DrawText(title, new(bounds.Left + 5d, bounds.Top + 3d));
+
+        DrawRsiAxisLabel(drawingContext, "70", y70, bounds.Right, labelTypeface, labelBrush, pixelsPerDip);
+        DrawRsiAxisLabel(drawingContext, "50", y50, bounds.Right, labelTypeface, labelBrush, pixelsPerDip);
+        DrawRsiAxisLabel(drawingContext, "30", y30, bounds.Right, labelTypeface, labelBrush, pixelsPerDip);
+    }
+
+    private static List<(DateTimeOffset Timestamp, decimal Value)> CalculateSimpleRsi(
+        IReadOnlyList<PricePointViewModel> points)
+    {
+        const int period = 14;
+        var samples = new List<(DateTimeOffset Timestamp, decimal Value)>();
+
+        for (int index = period; index < points.Count; index++)
+        {
+            decimal totalGain = 0m;
+            decimal totalLoss = 0m;
+
+            for (int offset = index - period + 1; offset <= index; offset++)
+            {
+                decimal change = points[offset].Close - points[offset - 1].Close;
+
+                if (change > 0m)
+                {
+                    totalGain += change;
+                }
+                else
+                {
+                    totalLoss -= change;
+                }
+            }
+
+            decimal value = totalGain == 0m && totalLoss == 0m
+                ? 50m
+                : totalLoss == 0m
+                    ? 100m
+                    : totalGain == 0m
+                        ? 0m
+                        : 100m - 100m / (1m + totalGain / totalLoss);
+            samples.Add((points[index].TimestampUtc + CandleInterval / 2d, value));
+        }
+
+        return samples;
+    }
+
+    private static double MapRsi(decimal value, double top, double height) =>
+        top + height * (1d - (double)Math.Clamp(value, 0m, 100m) / 100d);
+
+    private static void DrawRsiAxisLabel(
+        DrawingContext drawingContext,
+        string text,
+        double y,
+        double right,
+        Typeface typeface,
+        Brush brush,
+        double pixelsPerDip)
+    {
+        FormattedText label = CreateLabel(text, typeface, brush, pixelsPerDip);
+        drawingContext.DrawText(label, new(right + 7d, y - label.Height / 2d));
     }
 
     private void DrawLastPriceGuide(
@@ -653,7 +885,8 @@ public sealed class PriceChart : FrameworkElement
         double plotLeft,
         double plotTop,
         double plotRight,
-        double plotBottom)
+        double plotBottom,
+        double chartBottom)
     {
         if (_pointerPosition is not Point pointer ||
             pointer.X < plotLeft ||
@@ -690,7 +923,7 @@ public sealed class PriceChart : FrameworkElement
         drawingContext.DrawLine(
             guidePen,
             new(pointer.X, plotTop),
-            new(pointer.X, plotBottom));
+            new(pointer.X, chartBottom));
         drawingContext.DrawLine(
             guidePen,
             new(plotLeft, pointer.Y),
@@ -724,7 +957,7 @@ public sealed class PriceChart : FrameworkElement
             plotRight - timeWidth);
         var timeBounds = new Rect(
             timeLeft,
-            plotBottom + 4d,
+            chartBottom + 4d,
             timeWidth,
             timeLabel.Height + verticalPadding * 2d);
         double priceWidth = priceLabel.Width + horizontalPadding * 2d;
