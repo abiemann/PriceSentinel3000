@@ -14,4 +14,7 @@ public partial class LiveRiskDialog : Window
 
     private void Cancel_Click(object sender, RoutedEventArgs e) =>
         DialogResult = false;
+
+    private void CloseButton_Click(object sender, RoutedEventArgs e) =>
+        DialogResult = false;
 }

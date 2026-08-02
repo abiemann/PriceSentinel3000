@@ -1,14 +1,58 @@
 <Window x:Class="PriceSentinel3000.App.Dialogs.LiveRiskDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="LIVE trading warning"
         Width="540"
         Height="390"
         ResizeMode="NoResize"
+        WindowStyle="None"
         ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner"
         Background="#10151D">
-    <Grid Margin="32">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="36"
+                            CornerRadius="8"
+                            GlassFrameThickness="0"
+                            ResizeBorderThickness="0"
+                            UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="36" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Border Grid.RowSpan="2"
+                BorderBrush="#4A3532"
+                BorderThickness="1"
+                CornerRadius="8"
+                IsHitTestVisible="False" />
+        <Border Background="#0A1018"
+                BorderBrush="#3F302E"
+                BorderThickness="1,1,1,0"
+                CornerRadius="8,8,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Margin="14,0,0,0"
+                           VerticalAlignment="Center"
+                           Foreground="#D7C3BE"
+                           FontSize="11"
+                           FontWeight="SemiBold"
+                           Text="LIVE TRADING WARNING" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource CloseTitleBarButtonStyle}"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                        Click="CloseButton_Click"
+                        Content="&#xE8BB;"
+                        ToolTip="Close" />
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1" Margin="32">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -79,6 +123,7 @@
                     FontWeight="Bold"
                     IsDefault="True"
                     Content="I AGREE" />
+        </Grid>
         </Grid>
     </Grid>
 </Window>

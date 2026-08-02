@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:controls="clr-namespace:PriceSentinel3000.App.Controls"
         mc:Ignorable="d"
         Title="PriceSentinel 3000"
@@ -10,17 +11,82 @@
         Height="920"
         MinWidth="1180"
         MinHeight="760"
+        WindowStyle="None"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource WindowBrush}"
-        FontFamily="Segoe UI">
+        FontFamily="Segoe UI"
+        StateChanged="Window_StateChanged">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="36"
+                            CornerRadius="0"
+                            GlassFrameThickness="0"
+                            ResizeBorderThickness="6"
+                            UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
+
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="36" />
             <RowDefinition Height="72" />
             <RowDefinition Height="*" />
             <RowDefinition Height="38" />
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0"
+                Background="#0A1018"
+                BorderBrush="#243143"
+                BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Margin="14,0,0,0"
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal">
+                    <Border Width="20"
+                            Height="20"
+                            VerticalAlignment="Center"
+                            Background="#123528"
+                            BorderBrush="#5EE6B1"
+                            BorderThickness="1"
+                            CornerRadius="10">
+                        <TextBlock HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Foreground="#5EE6B1"
+                                   FontSize="11"
+                                   FontWeight="Bold"
+                                   Text="P" />
+                    </Border>
+                    <TextBlock Margin="9,0,0,0"
+                               VerticalAlignment="Center"
+                               Foreground="#B8C5D4"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Text="PriceSentinel 3000" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button Style="{StaticResource TitleBarButtonStyle}"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                            Click="MinimizeButton_Click"
+                            Content="&#xE921;"
+                            ToolTip="Minimize" />
+                    <Button x:Name="MaximizeButton"
+                            Style="{StaticResource TitleBarButtonStyle}"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                            Click="MaximizeButton_Click"
+                            Content="&#xE922;"
+                            ToolTip="Maximize" />
+                    <Button Style="{StaticResource CloseTitleBarButtonStyle}"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                            Click="CloseButton_Click"
+                            Content="&#xE8BB;"
+                            ToolTip="Close" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="1"
                 Padding="24,0"
                 Background="#101721"
                 BorderBrush="#243143"
@@ -78,7 +144,7 @@
             </Grid>
         </Border>
 
-        <Grid Grid.Row="1" Margin="18">
+        <Grid Grid.Row="2" Margin="18">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="340" />
                 <ColumnDefinition Width="14" />
@@ -617,7 +683,7 @@
             </Grid>
         </Grid>
 
-        <Border Grid.Row="2"
+        <Border Grid.Row="3"
                 Padding="18,0"
                 Background="#101721"
                 BorderBrush="#243143"

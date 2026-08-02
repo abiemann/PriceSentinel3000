@@ -66,6 +66,9 @@ public partial class WelcomeDialog : Window
         DialogResult = false;
     }
 
+    private void CloseButton_Click(object sender, RoutedEventArgs e) =>
+        Exit_Click(sender, e);
+
     protected override void OnClosing(CancelEventArgs e)
     {
         _isClosing = true;

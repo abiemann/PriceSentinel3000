@@ -22,6 +22,28 @@ public partial class MainWindow : Window
         DataContext = _viewModel;
     }
 
+    private void MinimizeButton_Click(object sender, RoutedEventArgs e) =>
+        WindowState = WindowState.Minimized;
+
+    private void MaximizeButton_Click(object sender, RoutedEventArgs e) =>
+        WindowState = WindowState is WindowState.Maximized
+            ? WindowState.Normal
+            : WindowState.Maximized;
+
+    private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
+
+    private void Window_StateChanged(object? sender, EventArgs e)
+    {
+        if (MaximizeButton is null)
+        {
+            return;
+        }
+
+        bool isMaximized = WindowState is WindowState.Maximized;
+        MaximizeButton.Content = isMaximized ? "\uE923" : "\uE922";
+        MaximizeButton.ToolTip = isMaximized ? "Restore" : "Maximize";
+    }
+
     private async void ModeButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string modeName } ||
