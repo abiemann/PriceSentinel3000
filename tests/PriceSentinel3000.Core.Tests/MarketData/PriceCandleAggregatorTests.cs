@@ -55,6 +55,30 @@ public sealed class PriceCandleAggregatorTests
         Assert.Equal(130.2m, candles[1].Open);
     }
 
+    [Theory]
+    [InlineData(30, 2)]
+    [InlineData(60, 1)]
+    public void Aggregate_CombinesQuotesAtSelectableChartIntervals(
+        int intervalSeconds,
+        int expectedCount)
+    {
+        MarketQuote[] quotes =
+        [
+            Quote(Start.AddSeconds(1), 130.0m, 10m),
+            Quote(Start.AddSeconds(16), 130.4m, 20m),
+            Quote(Start.AddSeconds(31), 129.8m, 30m),
+            Quote(Start.AddSeconds(46), 130.2m, 40m),
+        ];
+
+        IReadOnlyList<PriceCandle> candles = PriceCandleAggregator.Aggregate(
+            quotes,
+            TimeSpan.FromSeconds(intervalSeconds));
+
+        Assert.Equal(expectedCount, candles.Count);
+        Assert.Equal(130.0m, candles[0].Open);
+        Assert.Equal(130.4m, candles[0].High);
+    }
+
     [Fact]
     public void Aggregate_FillsMissingIntervalsUsingPreviousClose()
     {

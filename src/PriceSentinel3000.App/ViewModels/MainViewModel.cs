@@ -55,6 +55,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private bool _showRsi;
     private bool _isChartManualScale;
     private int _chartScaleResetVersion;
+    private int _chartCandleIntervalSeconds;
     private string _statusMessage;
     private string _currentPrice = "--";
     private string _bidAskDisplay = "-- / --";
@@ -124,6 +125,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _stopLossValue = defaults.StopLossValue;
         _bufferMinutes = defaults.BufferMinutes;
         _quotePollingSeconds = defaults.QuotePollingSeconds;
+        _chartCandleIntervalSeconds =
+            defaults.ChartCandleIntervalSeconds is 15 or 30 or 60
+                ? defaults.ChartCandleIntervalSeconds
+                : 15;
         _reconciliationSeconds = defaults.ReconciliationSeconds;
         _reconciliationLookbackSeconds = defaults.ReconciliationLookbackSeconds;
         _reconciliationCompletionDelaySeconds =
@@ -165,6 +170,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 "Total position loss ($)",
                 StopLossBasis.TotalPositionLossAmount),
         ];
+        ChartCandleIntervalOptions =
+        [
+            new("15 sec", 15),
+            new("30 sec", 30),
+            new("60 sec", 60),
+        ];
 
         StartSessionCommand = new RelayCommand(
             ExecutePrimarySessionAction,
@@ -194,6 +205,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public IReadOnlyList<SelectionOption<bool>> EntryLimitOptions { get; }
     public IReadOnlyList<SelectionOption<AmountBasis>> DailyLossOptions { get; }
     public IReadOnlyList<SelectionOption<StopLossBasis>> StopLossOptions { get; }
+    public IReadOnlyList<SelectionOption<int>> ChartCandleIntervalOptions { get; }
 
     public ObservableCollection<BufferSegmentViewModel> BufferSegments { get; } = [];
     public ObservableCollection<ActivityEntryViewModel> ActivityLog { get; } = [];
@@ -274,6 +286,22 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public string ChartScaleLabel => IsChartManualScale
         ? "SCALE: MANUAL"
         : "SCALE: AUTO";
+    public int ChartCandleIntervalSeconds
+    {
+        get => _chartCandleIntervalSeconds;
+        set
+        {
+            if (value is not (15 or 30 or 60))
+            {
+                return;
+            }
+
+            if (SetPreferenceField(ref _chartCandleIntervalSeconds, value))
+            {
+                RefreshMarketView();
+            }
+        }
+    }
     public int ChartScaleResetVersion => _chartScaleResetVersion;
     public string VersionDisplay { get; } =
         $"VERSION {typeof(MainViewModel).Assembly.GetName().Version?.ToString(3) ?? "1.0.0"}";
@@ -1488,7 +1516,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             _chartRingBuffer?.Snapshot() ?? snapshot;
         IReadOnlyList<PriceCandle> candles = PriceCandleAggregator.Aggregate(
             chartSnapshot,
-            TimeSpan.FromSeconds(15));
+            TimeSpan.FromSeconds(ChartCandleIntervalSeconds));
         var refreshedPoints = new List<PricePointViewModel>(candles.Count);
 
         foreach (PriceCandle candle in candles)
@@ -1624,6 +1652,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         StopLossValue = StopLossValue,
         BufferMinutes = BufferMinutes,
         QuotePollingSeconds = QuotePollingSeconds,
+        ChartCandleIntervalSeconds = ChartCandleIntervalSeconds,
         ReconciliationSeconds = ReconciliationSeconds,
         ReconciliationLookbackSeconds = ReconciliationLookbackSeconds,
         ReconciliationCompletionDelaySeconds =

@@ -10,7 +10,6 @@ namespace PriceSentinel3000.App.Controls;
 
 public sealed class PriceChart : FrameworkElement
 {
-    private static readonly TimeSpan CandleInterval = TimeSpan.FromSeconds(15);
     private static readonly Color UpCandleColor = Color.FromRgb(90, 203, 60);
     private static readonly Color DownCandleColor = Color.FromRgb(255, 90, 31);
     private static readonly Color FlatCandleColor = Color.FromRgb(142, 160, 183);
@@ -43,6 +42,15 @@ public sealed class PriceChart : FrameworkElement
         new FrameworkPropertyMetadata(
             7d,
             FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty CandleIntervalSecondsProperty =
+        DependencyProperty.Register(
+            nameof(CandleIntervalSeconds),
+            typeof(int),
+            typeof(PriceChart),
+            new FrameworkPropertyMetadata(
+                15,
+                FrameworkPropertyMetadataOptions.AffectsRender));
 
     public static readonly DependencyProperty IsManualScaleProperty = DependencyProperty.Register(
         nameof(IsManualScale),
@@ -82,6 +90,12 @@ public sealed class PriceChart : FrameworkElement
     {
         get => (double)GetValue(WindowMinutesProperty);
         set => SetValue(WindowMinutesProperty, value);
+    }
+
+    public int CandleIntervalSeconds
+    {
+        get => (int)GetValue(CandleIntervalSecondsProperty);
+        set => SetValue(CandleIntervalSecondsProperty, value);
     }
 
     public bool IsManualScale
@@ -138,7 +152,9 @@ public sealed class PriceChart : FrameworkElement
             return;
         }
 
-        DateTimeOffset lastTimestamp = points[^1].TimestampUtc + CandleInterval;
+        TimeSpan candleInterval = TimeSpan.FromSeconds(
+            Math.Clamp(CandleIntervalSeconds, 1, 3600));
+        DateTimeOffset lastTimestamp = points[^1].TimestampUtc + candleInterval;
         double windowMinutes = double.IsFinite(WindowMinutes)
             ? Math.Clamp(WindowMinutes, 1d, 60d)
             : 7d;
@@ -148,7 +164,7 @@ public sealed class PriceChart : FrameworkElement
             .. points.Where(point =>
             {
                 DateTimeOffset centerTimestamp =
-                    point.TimestampUtc + CandleInterval / 2d;
+                    point.TimestampUtc + candleInterval / 2d;
                 return centerTimestamp >= firstTimestamp &&
                        centerTimestamp <= lastTimestamp;
             }),
@@ -215,6 +231,7 @@ public sealed class PriceChart : FrameworkElement
                 points,
                 firstTimestamp,
                 lastTimestamp,
+                candleInterval,
                 GetRsiBounds());
         }
 
@@ -242,6 +259,7 @@ public sealed class PriceChart : FrameworkElement
         DrawCandles(
             drawingContext,
             visiblePoints,
+            candleInterval,
             minimum,
             range,
             firstTimestamp,
@@ -254,6 +272,7 @@ public sealed class PriceChart : FrameworkElement
         DrawTradeMarkers(
             drawingContext,
             visiblePoints,
+            candleInterval,
             minimum,
             range,
             firstTimestamp,
@@ -473,6 +492,7 @@ public sealed class PriceChart : FrameworkElement
     private static void DrawCandles(
         DrawingContext drawingContext,
         IReadOnlyList<PricePointViewModel> points,
+        TimeSpan candleInterval,
         decimal minimum,
         decimal range,
         DateTimeOffset firstTimestamp,
@@ -483,13 +503,13 @@ public sealed class PriceChart : FrameworkElement
         double plotHeight)
     {
         double candleSlotWidth = plotWidth *
-            CandleInterval.Ticks /
+            candleInterval.Ticks /
             Math.Max(1d, (lastTimestamp - firstTimestamp).Ticks);
         double bodyWidth = Math.Clamp(candleSlotWidth * 0.80d, 4d, 28d);
 
         foreach (PricePointViewModel candle in points)
         {
-            DateTimeOffset centerTimestamp = candle.TimestampUtc + CandleInterval / 2d;
+            DateTimeOffset centerTimestamp = candle.TimestampUtc + candleInterval / 2d;
 
             if (centerTimestamp < firstTimestamp || centerTimestamp > lastTimestamp)
             {
@@ -645,6 +665,7 @@ public sealed class PriceChart : FrameworkElement
         IReadOnlyList<PricePointViewModel> points,
         DateTimeOffset firstTimestamp,
         DateTimeOffset lastTimestamp,
+        TimeSpan candleInterval,
         Rect bounds)
     {
         if (bounds.IsEmpty || bounds.Width <= 1d || bounds.Height <= 1d)
@@ -683,7 +704,8 @@ public sealed class PriceChart : FrameworkElement
         drawingContext.DrawLine(midlinePen, new(bounds.Left, y50), new(bounds.Right, y50));
         drawingContext.DrawLine(guidePen, new(bounds.Left, y30), new(bounds.Right, y30));
 
-        List<(DateTimeOffset Timestamp, decimal Value)> samples = CalculateSimpleRsi(points);
+        List<(DateTimeOffset Timestamp, decimal Value)> samples =
+            CalculateSimpleRsi(points, candleInterval);
         List<(DateTimeOffset Timestamp, decimal Value)> visibleSamples =
         [
             .. samples.Where(sample =>
@@ -746,7 +768,8 @@ public sealed class PriceChart : FrameworkElement
     }
 
     private static List<(DateTimeOffset Timestamp, decimal Value)> CalculateSimpleRsi(
-        IReadOnlyList<PricePointViewModel> points)
+        IReadOnlyList<PricePointViewModel> points,
+        TimeSpan candleInterval)
     {
         const int period = 14;
         var samples = new List<(DateTimeOffset Timestamp, decimal Value)>();
@@ -777,7 +800,7 @@ public sealed class PriceChart : FrameworkElement
                     : totalGain == 0m
                         ? 0m
                         : 100m - 100m / (1m + totalGain / totalLoss);
-            samples.Add((points[index].TimestampUtc + CandleInterval / 2d, value));
+            samples.Add((points[index].TimestampUtc + candleInterval / 2d, value));
         }
 
         return samples;
@@ -1008,6 +1031,7 @@ public sealed class PriceChart : FrameworkElement
     private void DrawTradeMarkers(
         DrawingContext drawingContext,
         IReadOnlyList<PricePointViewModel> points,
+        TimeSpan candleInterval,
         decimal minimum,
         decimal range,
         DateTimeOffset firstTimestamp,
@@ -1030,7 +1054,7 @@ public sealed class PriceChart : FrameworkElement
             }
 
             DateTimeOffset centerTimestamp =
-                item.TimestampUtc + CandleInterval / 2d;
+                item.TimestampUtc + candleInterval / 2d;
 
             if (centerTimestamp < firstTimestamp || centerTimestamp > lastTimestamp)
             {

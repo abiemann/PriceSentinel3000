@@ -591,10 +591,17 @@
                                        Foreground="{StaticResource PrimaryTextBrush}"
                                        FontSize="20" FontWeight="Bold"
                                        Text="{Binding SymbolDisplay}" />
-                            <TextBlock Grid.Column="1" Margin="12,2,0,0"
-                                       VerticalAlignment="Center"
-                                       Style="{StaticResource SectionLabelStyle}"
-                                       Text="{Binding PriceActionCaption}" />
+                            <ComboBox Grid.Column="1"
+                                      MinWidth="78" Height="26"
+                                      Margin="12,0,0,0" Padding="8,3"
+                                      VerticalAlignment="Center"
+                                      FontSize="9" FontWeight="SemiBold"
+                                      Style="{StaticResource InputComboBoxStyle}"
+                                      ItemsSource="{Binding ChartCandleIntervalOptions}"
+                                      DisplayMemberPath="Label"
+                                      SelectedValuePath="Value"
+                                      SelectedValue="{Binding ChartCandleIntervalSeconds, Mode=TwoWay}"
+                                      ToolTip="Choose the candle duration shown on the chart. Strategy evaluation and quote polling are unchanged." />
                             <ToggleButton x:Name="RsiToggle"
                                            Grid.Column="3" Margin="0,0,14,0"
                                            VerticalAlignment="Center"
@@ -622,6 +629,7 @@
                                 BorderThickness="1" CornerRadius="8">
                             <Grid>
                                  <controls:PriceChart Margin="1"
+                                                      CandleIntervalSeconds="{Binding ChartCandleIntervalSeconds}"
                                                       IsManualScale="{Binding IsChecked, ElementName=ChartScaleToggle}"
                                                       Points="{Binding ChartPoints}"
                                                       ScaleResetVersion="{Binding ChartScaleResetVersion}"

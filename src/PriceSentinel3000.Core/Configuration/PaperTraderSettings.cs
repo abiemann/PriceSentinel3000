@@ -20,6 +20,7 @@ public sealed record PaperTraderSettings
     public decimal StopLossValue { get; init; } = 1m;
     public int BufferMinutes { get; init; } = 7;
     public int QuotePollingSeconds { get; init; } = 5;
+    public int ChartCandleIntervalSeconds { get; init; } = 15;
     public int ReconciliationSeconds { get; init; } = 45;
     public int ReconciliationLookbackSeconds { get; init; } = 300;
     public int ReconciliationCompletionDelaySeconds { get; init; } = 30;
