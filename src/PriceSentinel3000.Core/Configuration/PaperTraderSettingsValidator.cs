@@ -65,9 +65,9 @@ public static class PaperTraderSettingsValidator
             errors.Add("Quote polling must be between 1 and 60 seconds.");
         }
 
-        if (settings.ChartCandleIntervalSeconds is not (15 or 30 or 60))
+        if (settings.ChartCandleIntervalSeconds is not (15 or 30 or 60 or 120))
         {
-            errors.Add("Chart candle interval must be 15, 30, or 60 seconds.");
+            errors.Add("Chart candle interval must be 15, 30, 60, or 120 seconds.");
         }
 
         if (settings.ReconciliationSeconds is < 15 or > 300)

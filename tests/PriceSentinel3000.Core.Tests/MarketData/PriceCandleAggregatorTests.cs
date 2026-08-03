@@ -58,6 +58,7 @@ public sealed class PriceCandleAggregatorTests
     [Theory]
     [InlineData(30, 2)]
     [InlineData(60, 1)]
+    [InlineData(120, 1)]
     public void Aggregate_CombinesQuotesAtSelectableChartIntervals(
         int intervalSeconds,
         int expectedCount)

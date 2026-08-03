@@ -37,7 +37,7 @@ public sealed class JsonUserPreferencesStoreTests
             StopLossValue = 18m,
             BufferMinutes = 9,
             QuotePollingSeconds = 7,
-            ChartCandleIntervalSeconds = 60,
+            ChartCandleIntervalSeconds = 120,
             ReconciliationSeconds = 60,
             ReconciliationLookbackSeconds = 600,
             ReconciliationCompletionDelaySeconds = 45,

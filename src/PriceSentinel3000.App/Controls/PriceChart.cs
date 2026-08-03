@@ -505,7 +505,7 @@ public sealed class PriceChart : FrameworkElement
         double candleSlotWidth = plotWidth *
             candleInterval.Ticks /
             Math.Max(1d, (lastTimestamp - firstTimestamp).Ticks);
-        double bodyWidth = Math.Clamp(candleSlotWidth * 0.80d, 4d, 28d);
+        double bodyWidth = Math.Clamp(candleSlotWidth * 0.80d, 4d, 128d);
 
         foreach (PricePointViewModel candle in points)
         {
@@ -1208,10 +1208,13 @@ public sealed class PriceChart : FrameworkElement
         var chart = (PriceChart)dependencyObject;
         chart.EndScaleDrag();
 
-        if ((bool)eventArgs.NewValue && chart._hasRenderedScale)
+        if ((bool)eventArgs.NewValue)
         {
-            chart._manualMinimum = chart._lastRenderedMinimum;
-            chart._manualMaximum = chart._lastRenderedMaximum;
+            if (!chart.TryFitManualScaleToVisibleCandles() && chart._hasRenderedScale)
+            {
+                chart._manualMinimum = chart._lastRenderedMinimum;
+                chart._manualMaximum = chart._lastRenderedMaximum;
+            }
         }
         else
         {
@@ -1220,6 +1223,61 @@ public sealed class PriceChart : FrameworkElement
         }
 
         chart.InvalidateVisual();
+    }
+
+    private bool TryFitManualScaleToVisibleCandles()
+    {
+        PricePointViewModel[] points =
+        [
+            .. (Points?.Cast<PricePointViewModel>() ?? []),
+        ];
+
+        if (points.Length == 0)
+        {
+            return false;
+        }
+
+        TimeSpan candleInterval = TimeSpan.FromSeconds(
+            Math.Clamp(CandleIntervalSeconds, 1, 3600));
+        DateTimeOffset lastTimestamp = points[^1].TimestampUtc + candleInterval;
+        double windowMinutes = double.IsFinite(WindowMinutes)
+            ? Math.Clamp(WindowMinutes, 1d, 60d)
+            : 7d;
+        DateTimeOffset firstTimestamp = lastTimestamp.AddMinutes(-windowMinutes);
+        PricePointViewModel[] visiblePoints =
+        [
+            .. points.Where(point =>
+            {
+                DateTimeOffset centerTimestamp =
+                    point.TimestampUtc + candleInterval / 2d;
+                return centerTimestamp >= firstTimestamp &&
+                       centerTimestamp <= lastTimestamp;
+            }),
+        ];
+
+        if (visiblePoints.Length == 0)
+        {
+            return false;
+        }
+
+        decimal observedMinimum = visiblePoints.Min(point => point.Low);
+        decimal observedMaximum = visiblePoints.Max(point => point.High);
+        decimal observedRange = observedMaximum - observedMinimum;
+        decimal referencePrice = Math.Abs(visiblePoints[^1].Close);
+        decimal minimumPadding = Math.Max(0.0001m, referencePrice * 0.00005m);
+        decimal padding = observedRange > 0m
+            ? Math.Max(observedRange * 0.08m, minimumPadding)
+            : Math.Max(0.005m, referencePrice * 0.0005m);
+
+        _manualMinimum = Math.Max(0m, observedMinimum - padding);
+        _manualMaximum = observedMaximum + padding;
+
+        if (_manualMaximum <= _manualMinimum)
+        {
+            _manualMaximum = _manualMinimum + Math.Max(0.0001m, padding * 2m);
+        }
+
+        return true;
     }
 
     private static void OnScaleResetVersionChanged(

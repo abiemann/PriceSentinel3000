@@ -104,6 +104,23 @@ public sealed class PaperTraderSettingsValidatorTests
     }
 
     [Theory]
+    [InlineData(15)]
+    [InlineData(30)]
+    [InlineData(60)]
+    [InlineData(120)]
+    public void SupportedChartCandleInterval_IsAccepted(int seconds)
+    {
+        PaperTraderSettings settings = PaperTraderSettings.Default with
+        {
+            ChartCandleIntervalSeconds = seconds,
+        };
+
+        IReadOnlyList<string> errors = PaperTraderSettingsValidator.Validate(settings);
+
+        Assert.DoesNotContain(errors, error => error.Contains("candle interval"));
+    }
+
+    [Theory]
     [InlineData(59)]
     [InlineData(3601)]
     public void ReconciliationLookbackOutsideRange_IsRejected(int seconds)

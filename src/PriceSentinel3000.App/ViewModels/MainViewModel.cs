@@ -126,7 +126,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _bufferMinutes = defaults.BufferMinutes;
         _quotePollingSeconds = defaults.QuotePollingSeconds;
         _chartCandleIntervalSeconds =
-            defaults.ChartCandleIntervalSeconds is 15 or 30 or 60
+            defaults.ChartCandleIntervalSeconds is 15 or 30 or 60 or 120
                 ? defaults.ChartCandleIntervalSeconds
                 : 15;
         _reconciliationSeconds = defaults.ReconciliationSeconds;
@@ -175,6 +175,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             new("15 sec", 15),
             new("30 sec", 30),
             new("60 sec", 60),
+            new("2 min", 120),
         ];
 
         StartSessionCommand = new RelayCommand(
@@ -291,7 +292,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         get => _chartCandleIntervalSeconds;
         set
         {
-            if (value is not (15 or 30 or 60))
+            if (value is not (15 or 30 or 60 or 120))
             {
                 return;
             }
@@ -1015,10 +1016,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                     _activeSession.Id,
                     verification,
                     QuoteIngestionKind.Reconciliation);
-                QuoteMergeResult merge = _ringBuffer.Merge(verification);
+                _ringBuffer.Merge(verification);
                 _chartRingBuffer.Merge(verification);
-                AddActivity(
-                    $"Robinhood history reconciled {verification.Count} bars: {merge.Duplicates} verified, {merge.Corrected} corrected, {merge.Added} gaps filled.");
                 nextReconciliation =
                     observedAt.AddSeconds(settings.ReconciliationSeconds);
             }

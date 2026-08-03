@@ -451,11 +451,15 @@
                                 <StackPanel>
                                     <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Buffer minutes" />
                                     <TextBox Style="{StaticResource InputTextBoxStyle}"
+                                             ToolTip="Minutes of recent market data kept for charting and strategy analysis. Allowed range: 5-15 minutes."
+                                             ToolTipService.ShowOnDisabled="True"
                                              Text="{Binding BufferMinutes, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
                                     <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Quote poll (sec)" />
                                     <TextBox Style="{StaticResource InputTextBoxStyle}"
+                                             ToolTip="How often PriceSentinel requests the latest quote. Lower values update faster but make more Robinhood requests. Allowed range: 1-60 seconds."
+                                             ToolTipService.ShowOnDisabled="True"
                                              Text="{Binding QuotePollingSeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
                                 </StackPanel>
                             </Grid>
@@ -468,11 +472,15 @@
                                 <StackPanel>
                                     <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Reconcile (sec)" />
                                     <TextBox Style="{StaticResource InputTextBoxStyle}"
+                                             ToolTip="How often PriceSentinel checks Robinhood price history to verify recent candles and fill gaps. Allowed range: 15-300 seconds."
+                                             ToolTipService.ShowOnDisabled="True"
                                              Text="{Binding ReconciliationSeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
                                     <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Lookback (sec)" />
                                     <TextBox Style="{StaticResource InputTextBoxStyle}"
+                                             ToolTip="How far back each reconciliation check requests price history. A longer window can repair older gaps but transfers more data. Allowed range: 60-3600 seconds."
+                                             ToolTipService.ShowOnDisabled="True"
                                              Text="{Binding ReconciliationLookbackSeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
                                 </StackPanel>
                             </Grid>
@@ -485,6 +493,8 @@
                                 <StackPanel>
                                     <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Completion delay (sec)" />
                                     <TextBox Style="{StaticResource InputTextBoxStyle}"
+                                             ToolTip="Leaves this many seconds at the newest edge out of reconciliation so Robinhood has time to finalize candles. Allowed range: 0-300 seconds."
+                                             ToolTipService.ShowOnDisabled="True"
                                              Text="{Binding ReconciliationCompletionDelaySeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
                                 </StackPanel>
                             </Grid>
@@ -565,8 +575,6 @@
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" />
-                    <RowDefinition Height="8" />
-                    <RowDefinition Height="160" />
                     <RowDefinition Height="8" />
                     <RowDefinition Height="120" />
                 </Grid.RowDefinitions>
@@ -657,53 +665,6 @@
                     </Grid>
                 </Border>
                 <Border Grid.Row="2" Style="{StaticResource CardStyle}">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Style="{StaticResource SectionLabelStyle}" Text="SERIAL RING BUFFER" />
-                            <TextBlock Grid.Column="1" Style="{StaticResource SectionLabelStyle}"
-                                       Text="{Binding BufferCaption}" />
-                        </Grid>
-                        <ItemsControl Grid.Row="1" Margin="0,14,0,0"
-                                      ItemsSource="{Binding BufferSegments}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <UniformGrid Rows="1" />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Margin="3,0" Padding="8"
-                                            Background="#101925" BorderBrush="#304158"
-                                            BorderThickness="1" CornerRadius="6">
-                                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                            <TextBlock HorizontalAlignment="Center" Foreground="#CBD5E1"
-                                                       FontSize="12" FontWeight="Bold" Text="{Binding Label}" />
-                                            <TextBlock Margin="0,4,0,0" HorizontalAlignment="Center"
-                                                       Foreground="{Binding Foreground}" FontSize="9"
-                                                       FontWeight="Bold" Text="{Binding State}" />
-                                            <TextBlock Margin="0,3,0,0" HorizontalAlignment="Center"
-                                                       Foreground="#CBD5E1" FontSize="10"
-                                                       Text="{Binding Price}" />
-                                            <TextBlock Margin="0,2,0,0" HorizontalAlignment="Center"
-                                                       Foreground="#647990" FontSize="8"
-                                                       Text="{Binding Detail}" />
-                                        </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </Grid>
-                </Border>
-
-                <Border Grid.Row="4" Style="{StaticResource CardStyle}">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
