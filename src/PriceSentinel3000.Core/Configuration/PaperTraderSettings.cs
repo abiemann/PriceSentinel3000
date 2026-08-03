@@ -21,7 +21,8 @@ public sealed record PaperTraderSettings
     public int BufferMinutes { get; init; } = 7;
     public int QuotePollingSeconds { get; init; } = 5;
     public int ReconciliationSeconds { get; init; } = 45;
-    public int ReconciliationOverlapSeconds { get; init; } = 15;
+    public int ReconciliationLookbackSeconds { get; init; } = 300;
+    public int ReconciliationCompletionDelaySeconds { get; init; } = 30;
     public string ReplayDate { get; init; } = GetDefaultReplayDate();
     public string ReplayTime { get; init; } = "09:30";
     public string ReplayEndTime { get; init; } = "11:00";

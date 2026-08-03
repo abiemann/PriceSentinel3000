@@ -40,7 +40,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private int _bufferMinutes;
     private int _quotePollingSeconds;
     private int _reconciliationSeconds;
-    private int _reconciliationOverlapSeconds;
+    private int _reconciliationLookbackSeconds;
+    private int _reconciliationCompletionDelaySeconds;
     private string _replayDate;
     private string _replayTime;
     private string _replayEndTime;
@@ -124,7 +125,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _bufferMinutes = defaults.BufferMinutes;
         _quotePollingSeconds = defaults.QuotePollingSeconds;
         _reconciliationSeconds = defaults.ReconciliationSeconds;
-        _reconciliationOverlapSeconds = defaults.ReconciliationOverlapSeconds;
+        _reconciliationLookbackSeconds = defaults.ReconciliationLookbackSeconds;
+        _reconciliationCompletionDelaySeconds =
+            defaults.ReconciliationCompletionDelaySeconds;
         _replayDate = defaults.ReplayDate;
         _replayTime = defaults.ReplayTime;
         _replayEndTime = defaults.ReplayEndTime;
@@ -475,10 +478,16 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         set => SetPreferenceField(ref _reconciliationSeconds, value);
     }
 
-    public int ReconciliationOverlapSeconds
+    public int ReconciliationLookbackSeconds
     {
-        get => _reconciliationOverlapSeconds;
-        set => SetPreferenceField(ref _reconciliationOverlapSeconds, value);
+        get => _reconciliationLookbackSeconds;
+        set => SetPreferenceField(ref _reconciliationLookbackSeconds, value);
+    }
+
+    public int ReconciliationCompletionDelaySeconds
+    {
+        get => _reconciliationCompletionDelaySeconds;
+        set => SetPreferenceField(ref _reconciliationCompletionDelaySeconds, value);
     }
 
     public string ReplayDate
@@ -964,14 +973,14 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
             if (observedAt >= nextReconciliation)
             {
-                DateTimeOffset from =
-                    observedAt.AddSeconds(
-                        -(settings.ReconciliationSeconds +
-                          settings.ReconciliationOverlapSeconds));
+                DateTimeOffset through = observedAt.AddSeconds(
+                    -settings.ReconciliationCompletionDelaySeconds);
+                DateTimeOffset from = through.AddSeconds(
+                    -settings.ReconciliationLookbackSeconds);
                 IReadOnlyList<MarketQuote> verification = await _marketDataSource.GetHistoryAsync(
                     _marketDataRequest,
                     from,
-                    observedAt,
+                    through,
                     observedAt,
                     token);
                 _journal.AppendQuotes(
@@ -1616,7 +1625,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         BufferMinutes = BufferMinutes,
         QuotePollingSeconds = QuotePollingSeconds,
         ReconciliationSeconds = ReconciliationSeconds,
-        ReconciliationOverlapSeconds = ReconciliationOverlapSeconds,
+        ReconciliationLookbackSeconds = ReconciliationLookbackSeconds,
+        ReconciliationCompletionDelaySeconds =
+            ReconciliationCompletionDelaySeconds,
         ReplayDate = ReplayDate,
         ReplayTime = ReplayTime,
         ReplayEndTime = ReplayEndTime,

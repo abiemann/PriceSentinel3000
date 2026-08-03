@@ -38,7 +38,8 @@ public sealed class JsonUserPreferencesStoreTests
             BufferMinutes = 9,
             QuotePollingSeconds = 7,
             ReconciliationSeconds = 60,
-            ReconciliationOverlapSeconds = 20,
+            ReconciliationLookbackSeconds = 600,
+            ReconciliationCompletionDelaySeconds = 45,
             ReplayDate = "2026-07-31",
             ReplayTime = "13:52",
             ReplayEndTime = "15:52",
@@ -78,6 +79,8 @@ public sealed class JsonUserPreferencesStoreTests
             PaperTraderSettings loaded = Assert.IsType<PaperTraderSettings>(store.Load());
 
             Assert.Equal("15:52", loaded.ReplayEndTime);
+            Assert.Equal(300, loaded.ReconciliationLookbackSeconds);
+            Assert.Equal(30, loaded.ReconciliationCompletionDelaySeconds);
         }
         finally
         {

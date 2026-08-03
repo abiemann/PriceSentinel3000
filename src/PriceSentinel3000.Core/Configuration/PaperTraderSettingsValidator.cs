@@ -70,10 +70,14 @@ public static class PaperTraderSettingsValidator
             errors.Add("Historical reconciliation must be between 15 and 300 seconds.");
         }
 
-        if (settings.ReconciliationOverlapSeconds is < 5 ||
-            settings.ReconciliationOverlapSeconds > settings.ReconciliationSeconds)
+        if (settings.ReconciliationLookbackSeconds is < 60 or > 3600)
         {
-            errors.Add("Reconciliation overlap must be at least 5 seconds and no longer than the reconciliation interval.");
+            errors.Add("Historical reconciliation lookback must be between 60 and 3600 seconds.");
+        }
+
+        if (settings.ReconciliationCompletionDelaySeconds is < 0 or > 300)
+        {
+            errors.Add("Historical reconciliation completion delay must be between 0 and 300 seconds.");
         }
 
         if (!DateOnly.TryParseExact(

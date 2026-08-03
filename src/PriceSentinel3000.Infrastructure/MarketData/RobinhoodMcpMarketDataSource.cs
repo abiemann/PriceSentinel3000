@@ -18,6 +18,7 @@ public sealed class RobinhoodMcpMarketDataSource :
     private static readonly Uri Endpoint =
         new("https://agent.robinhood.com/mcp/trading");
     internal const string RobinhoodProtocolVersion = "2025-11-25";
+    internal const string EquityHistoricalBounds = "24_5";
     internal static TimeSpan InteractiveAuthorizationTimeout { get; } =
         TimeSpan.FromMinutes(5);
     internal static TimeSpan CachedAuthorizationTimeout { get; } =
@@ -177,7 +178,7 @@ public sealed class RobinhoodMcpMarketDataSource :
                 ["start_time"] = fromUtc.ToUniversalTime().ToString("O"),
                 ["end_time"] = throughUtc.ToUniversalTime().ToString("O"),
                 ["interval"] = "15second",
-                ["bounds"] = "extended",
+                ["bounds"] = EquityHistoricalBounds,
                 ["adjustment_type"] = "split",
             },
             cancellationToken).ConfigureAwait(false);
@@ -231,7 +232,7 @@ public sealed class RobinhoodMcpMarketDataSource :
                 ["start_time"] = start.ToString("O"),
                 ["end_time"] = end.ToString("O"),
                 ["interval"] = "15second",
-                ["bounds"] = "extended",
+                ["bounds"] = EquityHistoricalBounds,
                 ["adjustment_type"] = "split",
             },
             cancellationToken).ConfigureAwait(false);

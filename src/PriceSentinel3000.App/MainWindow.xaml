@@ -471,9 +471,21 @@
                                              Text="{Binding ReconciliationSeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Overlap (sec)" />
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Lookback (sec)" />
                                     <TextBox Style="{StaticResource InputTextBoxStyle}"
-                                             Text="{Binding ReconciliationOverlapSeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                                             Text="{Binding ReconciliationLookbackSeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                                </StackPanel>
+                            </Grid>
+                            <Grid Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Completion delay (sec)" />
+                                    <TextBox Style="{StaticResource InputTextBoxStyle}"
+                                             Text="{Binding ReconciliationCompletionDelaySeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
                                 </StackPanel>
                             </Grid>
                             <Grid Margin="0,12,0,0">

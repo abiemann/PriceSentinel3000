@@ -87,6 +87,36 @@ public sealed class PaperTraderSettingsValidatorTests
         Assert.DoesNotContain(errors, error => error.Contains("Maximum entries"));
     }
 
+    [Theory]
+    [InlineData(59)]
+    [InlineData(3601)]
+    public void ReconciliationLookbackOutsideRange_IsRejected(int seconds)
+    {
+        PaperTraderSettings settings = PaperTraderSettings.Default with
+        {
+            ReconciliationLookbackSeconds = seconds,
+        };
+
+        IReadOnlyList<string> errors = PaperTraderSettingsValidator.Validate(settings);
+
+        Assert.Contains(errors, error => error.Contains("lookback"));
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(301)]
+    public void ReconciliationCompletionDelayOutsideRange_IsRejected(int seconds)
+    {
+        PaperTraderSettings settings = PaperTraderSettings.Default with
+        {
+            ReconciliationCompletionDelaySeconds = seconds,
+        };
+
+        IReadOnlyList<string> errors = PaperTraderSettingsValidator.Validate(settings);
+
+        Assert.Contains(errors, error => error.Contains("completion delay"));
+    }
+
     [Fact]
     public void UserSpecifiedQuantityMustBePositive()
     {
