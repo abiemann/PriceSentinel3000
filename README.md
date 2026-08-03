@@ -37,6 +37,10 @@ execution path to the authenticated Robinhood data foundation:
 - Live-price paper buys fill at the observed ask and sells at the observed bid.
   Historical Replay has no bid/ask series, so its simulated fills use the bar
   close; no fill is generated from a stale closed-market quote
+- Paper sale proceeds can either settle immediately or use a simulated equity
+  T+1 schedule. Delayed proceeds remain in paper-account equity but cannot fund
+  another buy until 9:30 AM Eastern on the next weekday; exchange holidays are
+  not yet modeled
 - Paper position sizing supports a fixed dollar amount or account percentage,
   plus "As many as possible" or a user-entered "No more than" share limit
 - Maximum entries, maximum daily loss, purchase-price percentage/total-position

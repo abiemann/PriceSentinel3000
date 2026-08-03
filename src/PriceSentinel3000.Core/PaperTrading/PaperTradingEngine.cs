@@ -24,7 +24,8 @@ public sealed record PaperFill(
     PaperOrderSide Side,
     decimal Quantity,
     decimal Price,
-    decimal RealizedProfitLoss);
+    decimal RealizedProfitLoss,
+    DateTimeOffset? ProceedsAvailableAtUtc = null);
 
 public sealed record PaperAccountSnapshot(
     decimal Cash,
@@ -51,8 +52,11 @@ public sealed record PaperTradeResult(
 public sealed class PaperTradingEngine
 {
     private static readonly TimeSpan ReentryCooldown = TimeSpan.FromSeconds(30);
+    private static readonly TimeOnly SettlementReleaseTime = new(9, 30);
+    private static readonly TimeZoneInfo EasternTimeZone = ResolveEasternTimeZone();
     private readonly PaperTraderSettings _settings;
     private readonly IPriceActionSignalEngine _strategy;
+    private readonly List<PendingSettlement> _pendingSettlements = [];
     private decimal _cash;
     private decimal _positionQuantity;
     private decimal _averagePrice;
@@ -90,6 +94,7 @@ public sealed class PaperTradingEngine
         }
 
         MarketQuote latest = quotes[^1];
+        ReleaseSettledProceeds(latest.SourceTimestampUtc);
         decimal mark = ExitPrice(latest);
 
         if (_lastEvaluatedUtc is not null && latest.SourceTimestampUtc <= _lastEvaluatedUtc)
@@ -177,7 +182,7 @@ public sealed class PaperTradingEngine
                 _averagePrice == 0m ? 0m : (mark - _averagePrice) / _averagePrice * 100m);
         }
 
-        decimal equity = _cash + _positionQuantity * mark;
+        decimal equity = Snapshot(mark).Equity;
         decimal dailyLoss = Math.Max(0m, _settings.StartingBalance - equity);
         decimal dailyLimit = DailyLossLimit();
 
@@ -250,12 +255,15 @@ public sealed class PaperTradingEngine
 
         if (quantity <= 0m)
         {
+            string reason = _pendingSettlements.Count > 0
+                ? $"Paper buying power is too low; {PendingProceeds():C2} in sale proceeds remains unsettled until {EarliestSettlement():u}."
+                : "Paper buying power is too low for a positive fractional quantity.";
             StrategyDecision blocked = decision with
             {
                 Signal = StrategySignalKind.Hold,
                 State = "NO BUYING POWER",
                 Confidence = 0m,
-                Reasons = ["Paper buying power is too low for a positive fractional quantity."],
+                Reasons = [reason],
             };
             return new(blocked, null, null, Snapshot(quote.Last));
         }
@@ -288,7 +296,19 @@ public sealed class PaperTradingEngine
         decimal fillPrice = ExitPrice(quote);
         decimal quantity = _positionQuantity;
         decimal realized = (fillPrice - _averagePrice) * quantity;
-        _cash += quantity * fillPrice;
+        decimal proceeds = quantity * fillPrice;
+        DateTimeOffset? proceedsAvailableAtUtc = null;
+
+        if (_settings.TradesSettleImmediately)
+        {
+            _cash += proceeds;
+        }
+        else
+        {
+            proceedsAvailableAtUtc = NextSettlementUtc(quote.SourceTimestampUtc);
+            _pendingSettlements.Add(new(proceeds, proceedsAvailableAtUtc.Value));
+        }
+
         _realizedProfitLoss += realized;
         _positionQuantity = 0m;
         _averagePrice = 0m;
@@ -297,7 +317,7 @@ public sealed class PaperTradingEngine
         _lastExitPrice = fillPrice;
 
         if (decision.Signal is StrategySignalKind.DailyLoss ||
-            Math.Max(0m, _settings.StartingBalance - _cash) >= DailyLossLimit())
+            Math.Max(0m, _settings.StartingBalance - Snapshot(fillPrice).Equity) >= DailyLossLimit())
         {
             _riskLocked = true;
         }
@@ -315,7 +335,8 @@ public sealed class PaperTradingEngine
             PaperOrderSide.Sell,
             quantity,
             fillPrice,
-            realized);
+            realized,
+            proceedsAvailableAtUtc);
         return new(decision, order, fill, Snapshot(fillPrice));
     }
 
@@ -323,10 +344,11 @@ public sealed class PaperTradingEngine
     {
         decimal marketValue = _positionQuantity * mark;
         decimal unrealized = _positionQuantity * (mark - _averagePrice);
+        decimal totalCash = _cash + PendingProceeds();
         return new(
+            totalCash,
             _cash,
-            _cash,
-            _cash + marketValue,
+            totalCash + marketValue,
             _positionQuantity,
             _averagePrice,
             marketValue,
@@ -342,6 +364,59 @@ public sealed class PaperTradingEngine
         _ => _settings.StartingBalance * _settings.MaximumDailyLossValue / 100m,
     };
 
+    private void ReleaseSettledProceeds(DateTimeOffset nowUtc)
+    {
+        for (int index = _pendingSettlements.Count - 1; index >= 0; index--)
+        {
+            PendingSettlement settlement = _pendingSettlements[index];
+
+            if (settlement.AvailableAtUtc > nowUtc)
+            {
+                continue;
+            }
+
+            _cash += settlement.Amount;
+            _pendingSettlements.RemoveAt(index);
+        }
+    }
+
+    private decimal PendingProceeds() =>
+        _pendingSettlements.Sum(settlement => settlement.Amount);
+
+    private DateTimeOffset? EarliestSettlement() =>
+        _pendingSettlements.Count == 0
+            ? null
+            : _pendingSettlements.Min(settlement => settlement.AvailableAtUtc);
+
+    private static DateTimeOffset NextSettlementUtc(DateTimeOffset saleTimestampUtc)
+    {
+        DateTime settlementDate = TimeZoneInfo
+            .ConvertTime(saleTimestampUtc, EasternTimeZone)
+            .Date
+            .AddDays(1);
+
+        while (settlementDate.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+        {
+            settlementDate = settlementDate.AddDays(1);
+        }
+
+        DateTime localRelease = settlementDate.Add(SettlementReleaseTime.ToTimeSpan());
+        DateTime utcRelease = TimeZoneInfo.ConvertTimeToUtc(localRelease, EasternTimeZone);
+        return new(utcRelease, TimeSpan.Zero);
+    }
+
+    private static TimeZoneInfo ResolveEasternTimeZone()
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
+        }
+    }
+
     private static decimal EntryPrice(MarketQuote quote) =>
         quote.HasTwoSidedMarket ? quote.Ask : quote.Last;
 
@@ -350,4 +425,8 @@ public sealed class PaperTradingEngine
 
     private static decimal FloorQuantity(decimal quantity) =>
         Math.Floor(quantity * 1_000_000m) / 1_000_000m;
+
+    private sealed record PendingSettlement(
+        decimal Amount,
+        DateTimeOffset AvailableAtUtc);
 }

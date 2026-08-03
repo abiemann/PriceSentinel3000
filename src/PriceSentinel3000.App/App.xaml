@@ -67,6 +67,63 @@
             <Setter Property="Margin" Value="0,0,0,6" />
         </Style>
 
+        <Style x:Key="PaperCheckBoxStyle" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid Background="Transparent">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="18" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border x:Name="CheckBoxBorder"
+                                    Width="16"
+                                    Height="16"
+                                    Background="#0F1722"
+                                    BorderBrush="#40546C"
+                                    BorderThickness="1"
+                                    CornerRadius="3" />
+                            <TextBlock x:Name="CheckMark"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Foreground="#07110E"
+                                       FontSize="12"
+                                       FontWeight="Bold"
+                                       Text="&#x2713;"
+                                       Visibility="Collapsed" />
+                            <ContentPresenter Grid.Column="2"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              RecognizesAccessKey="True" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="CheckBoxBorder"
+                                        Property="BorderBrush"
+                                        Value="{StaticResource AccentBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="CheckBoxBorder"
+                                        Property="Background"
+                                        Value="{StaticResource AccentBrush}" />
+                                <Setter TargetName="CheckBoxBorder"
+                                        Property="BorderBrush"
+                                        Value="{StaticResource AccentBrush}" />
+                                <Setter TargetName="CheckMark" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="InputTextBoxStyle" TargetType="TextBox">
             <Setter Property="Height" Value="36" />
             <Setter Property="Padding" Value="10,7" />

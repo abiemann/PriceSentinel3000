@@ -334,6 +334,21 @@
                                              Text="{Binding AccountBalanceValue, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
                                 </StackPanel>
                             </Grid>
+                                <CheckBox Margin="0,12,0,0"
+                                          Content="Trades settle right away"
+                                          IsChecked="{Binding TradesSettleImmediately}"
+                                          ToolTip="Checked: paper-sale proceeds become buying power immediately. Unchecked: proceeds use simulated T+1 weekday settlement.">
+                                    <CheckBox.Style>
+                                        <Style TargetType="CheckBox"
+                                               BasedOn="{StaticResource PaperCheckBoxStyle}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsLiveSelected}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </CheckBox.Style>
+                                </CheckBox>
                         </StackPanel>
                     </Border>
                     <Border Margin="0,12,0,0" Style="{StaticResource CardStyle}">
@@ -464,10 +479,10 @@
                             <Grid Margin="0,12,0,0">
                                 <Grid.Style>
                                     <Style TargetType="Grid">
-                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Setter Property="Visibility" Value="Collapsed" />
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsLiveSelected}" Value="True">
-                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            <DataTrigger Binding="{Binding IsReplaySelected}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -491,10 +506,10 @@
                             <Grid Margin="0,12,0,0">
                                 <Grid.Style>
                                     <Style TargetType="Grid">
-                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Setter Property="Visibility" Value="Collapsed" />
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsLiveSelected}" Value="True">
-                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            <DataTrigger Binding="{Binding IsReplaySelected}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>

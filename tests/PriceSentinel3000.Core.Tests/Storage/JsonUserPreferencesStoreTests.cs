@@ -24,6 +24,7 @@ public sealed class JsonUserPreferencesStoreTests
         {
             Symbol = "USO",
             StartingBalance = 12_345.67m,
+            TradesSettleImmediately = false,
             PositionSizeBasis = AmountBasis.FixedAmount,
             PositionSizeValue = 450m,
             QuantityLimitMode = QuantityLimitMode.NoMoreThan,

@@ -26,6 +26,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private ModeState _modeState = ModeState.SafeDefault;
     private string _symbol;
     private decimal _startingBalance;
+    private bool _tradesSettleImmediately;
     private AmountBasis _positionSizeBasis;
     private decimal _positionSizeValue;
     private QuantityLimitMode _quantityLimitMode;
@@ -109,6 +110,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             _preferencesStore.Load() ?? PaperTraderSettings.Default;
         _symbol = defaults.Symbol;
         _startingBalance = defaults.StartingBalance;
+        _tradesSettleImmediately = defaults.TradesSettleImmediately;
         _positionSizeBasis = defaults.PositionSizeBasis;
         _positionSizeValue = defaults.PositionSizeValue;
         _quantityLimitMode = defaults.QuantityLimitMode;
@@ -363,6 +365,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 OnPropertyChanged(nameof(BuyingPowerDisplay));
             }
         }
+    }
+
+    public bool TradesSettleImmediately
+    {
+        get => _tradesSettleImmediately;
+        set => SetPreferenceField(ref _tradesSettleImmediately, value);
     }
 
     public AmountBasis PositionSizeBasis
@@ -1595,6 +1603,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         Symbol = Symbol.Trim().ToUpperInvariant(),
         StartingBalance = StartingBalance,
         PositionSizeBasis = PositionSizeBasis,
+        TradesSettleImmediately = TradesSettleImmediately,
         PositionSizeValue = PositionSizeValue,
         QuantityLimitMode = QuantityLimitMode,
         MaximumQuantity = MaximumQuantity,
@@ -2302,8 +2311,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         string profitLoss = result.Fill.Side is PaperOrderSide.Sell
             ? $"; realized {result.Fill.RealizedProfitLoss:+$0.00;-$0.00;$0.00}"
             : string.Empty;
+        string settlement = result.Fill.ProceedsAvailableAtUtc is DateTimeOffset availableAtUtc
+            ? $"; proceeds available {availableAtUtc.ToLocalTime():g}"
+            : string.Empty;
         AddActivity(
-            $"PAPER {result.Fill.Side.ToString().ToUpperInvariant()} filled {result.Fill.Quantity:0.######} {SymbolDisplay} @ {result.Fill.Price:C2}{profitLoss}. " +
+            $"PAPER {result.Fill.Side.ToString().ToUpperInvariant()} filled {result.Fill.Quantity:0.######} {SymbolDisplay} @ {result.Fill.Price:C2}{profitLoss}{settlement}. " +
             $"Reason: {result.Decision.State}.");
     }
 

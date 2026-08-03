@@ -6,6 +6,7 @@ public sealed record PaperTraderSettings
 {
     public string Symbol { get; init; } = "SOFI";
     public decimal StartingBalance { get; init; } = 10_000m;
+    public bool TradesSettleImmediately { get; init; } = true;
     public AmountBasis PositionSizeBasis { get; init; } = AmountBasis.AccountPercentage;
     public decimal PositionSizeValue { get; init; } = 5m;
     public QuantityLimitMode QuantityLimitMode { get; init; } = QuantityLimitMode.AsManyAsPossible;

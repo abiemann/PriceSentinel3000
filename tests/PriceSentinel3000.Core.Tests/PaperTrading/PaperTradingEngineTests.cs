@@ -195,6 +195,93 @@ public sealed class PaperTradingEngineTests
     }
 
     [Fact]
+    public void Engine_DelayedSettlementExcludesSaleProceedsFromBuyingPowerUntilTPlusOne()
+    {
+        var instrument = new Instrument("SOFI");
+        PaperTraderSettings settings = PaperTraderSettings.Default with
+        {
+            StartingBalance = 100m,
+            TradesSettleImmediately = false,
+            PositionSizeBasis = AmountBasis.AccountPercentage,
+            PositionSizeValue = 100m,
+            QuantityLimitMode = QuantityLimitMode.AsManyAsPossible,
+            UnlimitedEntries = true,
+        };
+        var strategy = new ScriptedStrategy(
+            StrategySignalKind.Buy,
+            StrategySignalKind.Sell,
+            StrategySignalKind.Buy,
+            StrategySignalKind.Buy);
+        var engine = new PaperTradingEngine(instrument, settings, strategy);
+        DateTimeOffset friday = new(2026, 8, 7, 20, 0, 0, TimeSpan.Zero);
+        DateTimeOffset mondaySettlement = new(2026, 8, 10, 13, 30, 0, TimeSpan.Zero);
+        var quotes = new List<MarketQuote>
+        {
+            Quote(instrument, friday, 10m),
+        };
+
+        PaperTradeResult buy = engine.Process(quotes);
+        Assert.Equal(PaperOrderSide.Buy, buy.Fill?.Side);
+
+        quotes.Add(Quote(instrument, friday.AddSeconds(5), 10.20m));
+        PaperTradeResult sell = engine.Process(quotes);
+
+        Assert.Equal(PaperOrderSide.Sell, sell.Fill?.Side);
+        Assert.Equal(mondaySettlement, sell.Fill?.ProceedsAvailableAtUtc);
+        Assert.True(sell.Account.Cash > settings.StartingBalance);
+        Assert.True(sell.Account.BuyingPower < 0.01m);
+        Assert.Equal(sell.Account.Cash, sell.Account.Equity);
+
+        quotes.Add(Quote(instrument, mondaySettlement.AddMinutes(-1), 10.20m));
+        PaperTradeResult beforeSettlement = engine.Process(quotes);
+
+        Assert.Null(beforeSettlement.Fill);
+        Assert.Equal("NO BUYING POWER", beforeSettlement.Decision.State);
+        Assert.Contains(
+            "unsettled",
+            beforeSettlement.Decision.Reasons[0].ToLowerInvariant());
+
+        quotes.Add(Quote(instrument, mondaySettlement, 10.22m));
+        PaperTradeResult afterSettlement = engine.Process(quotes);
+
+        Assert.Equal(PaperOrderSide.Buy, afterSettlement.Fill?.Side);
+        Assert.True(afterSettlement.Account.PositionQuantity > 0m);
+    }
+
+    [Fact]
+    public void Engine_ImmediateSettlementRestoresBuyingPowerOnSell()
+    {
+        var instrument = new Instrument("SOFI");
+        PaperTraderSettings settings = PaperTraderSettings.Default with
+        {
+            StartingBalance = 100m,
+            TradesSettleImmediately = true,
+            PositionSizeBasis = AmountBasis.FixedAmount,
+            PositionSizeValue = 50m,
+        };
+        var engine = new PaperTradingEngine(
+            instrument,
+            settings,
+            new ScriptedStrategy(
+                StrategySignalKind.Buy,
+                StrategySignalKind.Sell));
+        DateTimeOffset start = new(2026, 8, 7, 20, 0, 0, TimeSpan.Zero);
+        var quotes = new List<MarketQuote>
+        {
+            Quote(instrument, start, 10m),
+        };
+
+        Assert.Equal(PaperOrderSide.Buy, engine.Process(quotes).Fill?.Side);
+        quotes.Add(Quote(instrument, start.AddSeconds(5), 10.20m));
+
+        PaperTradeResult sell = engine.Process(quotes);
+
+        Assert.Equal(PaperOrderSide.Sell, sell.Fill?.Side);
+        Assert.Null(sell.Fill?.ProceedsAvailableAtUtc);
+        Assert.Equal(sell.Account.Cash, sell.Account.BuyingPower);
+    }
+
+    [Fact]
     public void Engine_TotalPositionLossUsesCombinedDollarLoss()
     {
         var instrument = new Instrument("SOFI");
