@@ -188,6 +188,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         StopSessionCommand = new RelayCommand(
             ExecuteSecondarySessionAction,
             () => IsSessionRunning);
+        ClearActivityLogCommand = new RelayCommand(ActivityLog.Clear);
 
         RebuildBufferSegments();
         InitializeJournal();
@@ -214,6 +215,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public RelayCommand StartSessionCommand { get; }
     public RelayCommand StopSessionCommand { get; }
+    public RelayCommand ClearActivityLogCommand { get; }
 
     public TradingMode SelectedMode => _modeState.SelectedMode;
     public TradingMode EffectiveMode => _modeState.EffectiveMode;

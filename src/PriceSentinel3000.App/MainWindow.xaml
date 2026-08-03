@@ -800,7 +800,23 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
-                        <TextBlock Style="{StaticResource SectionLabelStyle}" Text="ACTIVITY JOURNAL" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center"
+                                       Style="{StaticResource SectionLabelStyle}"
+                                       Text="ACTIVITY JOURNAL" />
+                            <Button Grid.Column="1"
+                                    MinWidth="58" Height="24" Padding="9,2"
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource ModeButtonStyle}"
+                                    FontSize="9"
+                                    Command="{Binding ClearActivityLogCommand}"
+                                    Content="CLEAR"
+                                    ToolTip="Clear the on-screen activity list. Saved SQLite journal entries are not deleted." />
+                        </Grid>
                         <ListBox Grid.Row="1" Margin="0,14,0,0" Padding="0"
                                  Background="Transparent" BorderThickness="0"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
