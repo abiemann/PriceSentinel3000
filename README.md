@@ -109,6 +109,39 @@ charts; they are a premise to test, not evidence of profitability. LIVE can subm
 real equity orders only after the warning is accepted and the user explicitly
 starts a fully reconciled LIVE session.
 
+## Shared strategy, guarded execution
+
+Replay, Paper Trader, and LIVE feed their rolling `MarketQuote` history and current
+position context into the same deterministic
+[`PriceActionSignalEngine`](src/PriceSentinel3000.Core/Strategy/PriceActionSignalEngine.cs).
+It produces the shared `BOTTOM CONFIRMED` buy and `PEAK CONFIRMED` or
+`PROFIT STALLED` sell decisions. The selectable chart candle interval is a display
+setting and does not select a different trading strategy.
+
+What happens after a decision depends on the operating mode:
+
+- [`PaperTradingEngine`](src/PriceSentinel3000.Core/PaperTrading/PaperTradingEngine.cs)
+  applies the configured paper-account risk controls and creates simulated fills
+  for Replay and Paper Trader. Their chart markers represent completed simulated
+  fills, not merely an unexecuted strategy signal.
+- [`LiveExecutionEngine`](src/PriceSentinel3000.Core/LiveTrading/LiveExecutionEngine.cs)
+  applies corresponding limits against the authoritative Robinhood account,
+  position, buying power, and available shares before creating a broker-neutral
+  order intent.
+- [`LiveOrderCoordinator`](src/PriceSentinel3000.Application/LiveTrading/LiveOrderCoordinator.cs)
+  owns Robinhood review, idempotent placement, polling, reconciliation, and
+  cancellation. A LIVE chart marker appears only after Robinhood reports an
+  actual fill; a valid strategy signal can be blocked without producing a marker.
+
+Replay and LIVE should therefore make logically consistent decisions from
+equivalent observations, but they need not fill at the same price or timestamp.
+Replay uses historical bar closes, while LIVE uses fresh bid/ask data and adds
+market-hours, tradability, broker-state, fractional-share, and pre-trade-review
+gates. Executable examples live in
+[`PriceActionSignalEngineTests`](tests/PriceSentinel3000.Core.Tests/Strategy/PriceActionSignalEngineTests.cs)
+and
+[`LiveOrderCoordinatorTests`](tests/PriceSentinel3000.Application.Tests/LiveTrading/LiveOrderCoordinatorTests.cs).
+
 ## Paper Trader workflow
 
 1. On the first startup, click **LOGIN** and complete Robinhood's hosted browser
