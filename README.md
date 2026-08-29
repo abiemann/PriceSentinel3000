@@ -290,3 +290,9 @@ Accepting the LIVE warning makes LIVE the effective mode while broker execution
 remains disarmed. **Start Live Trader** performs the broker preflight and arms the
 session only when every check succeeds; confirmed signals can then submit real
 orders to the connected Robinhood agentic account.
+
+## License
+
+PriceSentinel 3000 is available under the [MIT License](LICENSE).
+
+Copyright (c) 2026 Alexander Biemann.
