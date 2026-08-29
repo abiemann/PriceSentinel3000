@@ -53,14 +53,14 @@
                TargetType="Button">
             <Setter Property="Background" Value="#202A37" />
             <Setter Property="BorderBrush" Value="#3B4A5E" />
-            <Setter Property="Foreground" Value="#E2E8F0" />
+            <Setter Property="Foreground" Value="{StaticResource InteractiveTextBrush}" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="BorderBrush" Value="#8AA2BC" />
+                    <Setter Property="BorderBrush" Value="{StaticResource InteractiveHoverBorderBrush}" />
                     <Setter Property="BorderThickness" Value="2" />
                 </Trigger>
                 <Trigger Property="IsKeyboardFocused" Value="True">
-                    <Setter Property="BorderBrush" Value="#8AA2BC" />
+                    <Setter Property="BorderBrush" Value="{StaticResource InteractiveHoverBorderBrush}" />
                     <Setter Property="BorderThickness" Value="2" />
                 </Trigger>
             </Style.Triggers>
@@ -69,17 +69,17 @@
         <Style x:Key="LiveDialogAgreeButtonStyle"
                BasedOn="{StaticResource LiveDialogButtonBaseStyle}"
                TargetType="Button">
-            <Setter Property="Background" Value="#3A201D" />
-            <Setter Property="BorderBrush" Value="#B95145" />
+            <Setter Property="Background" Value="{StaticResource DangerPanelBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource DangerBorderBrush}" />
             <Setter Property="Foreground" Value="#FFE9E5" />
             <Setter Property="FontWeight" Value="Bold" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="BorderBrush" Value="#FB8B7B" />
+                    <Setter Property="BorderBrush" Value="{StaticResource DangerHighlightBrush}" />
                     <Setter Property="BorderThickness" Value="2" />
                 </Trigger>
                 <Trigger Property="IsKeyboardFocused" Value="True">
-                    <Setter Property="BorderBrush" Value="#FB8B7B" />
+                    <Setter Property="BorderBrush" Value="{StaticResource DangerHighlightBrush}" />
                     <Setter Property="BorderThickness" Value="2" />
                 </Trigger>
             </Style.Triggers>
@@ -104,7 +104,7 @@
                 BorderThickness="1"
                 CornerRadius="8"
                 IsHitTestVisible="False" />
-        <Border Background="#0A1018"
+        <Border Background="{StaticResource ChromeSurfaceBrush}"
                 BorderBrush="#3F302E"
                 BorderThickness="1,1,1,0"
                 CornerRadius="8,8,0,0">
@@ -143,13 +143,13 @@
 
                 <Border Width="54"
                         Height="54"
-                        Background="#3A201D"
-                        BorderBrush="#F97360"
+                        Background="{StaticResource DangerPanelBrush}"
+                        BorderBrush="{StaticResource DangerBrush}"
                         BorderThickness="1"
                         CornerRadius="27">
                     <TextBlock HorizontalAlignment="Center"
                                VerticalAlignment="Center"
-                               Foreground="#FB8B7B"
+                               Foreground="{StaticResource DangerHighlightBrush}"
                                FontSize="26"
                                FontWeight="Bold"
                                Text="!" />
@@ -157,7 +157,7 @@
                 <TextBlock Grid.Column="1"
                            Margin="18,0,0,0"
                            VerticalAlignment="Center"
-                           Foreground="#F8FAFC"
+                           Foreground="{StaticResource HeadingTextBrush}"
                            FontSize="25"
                            FontWeight="Bold"
                            Text="LIVE trading can lose money"
@@ -166,13 +166,13 @@
 
             <StackPanel Grid.Row="1"
                         Margin="0,16,0,0">
-                <TextBlock Foreground="#CBD5E1"
+                <TextBlock Foreground="{StaticResource SecondaryTextBrush}"
                            FontSize="14"
                            LineHeight="21"
                            TextWrapping="Wrap"
                            Text="LIVE mode can submit real orders using funds in your Robinhood Agentic account. Prices can move before an order fills, automated decisions can be wrong, and losses may exceed expectations." />
                 <TextBlock Margin="0,16,0,0"
-                           Foreground="#94A3B8"
+                           Foreground="{StaticResource SubduedTextBrush}"
                            FontSize="13"
                            LineHeight="20"
                            TextWrapping="Wrap"

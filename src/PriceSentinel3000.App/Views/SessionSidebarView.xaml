@@ -1,0 +1,221 @@
+<UserControl x:Class="PriceSentinel3000.App.Views.SessionSidebarView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="338" />
+            <RowDefinition Height="12" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource CardStyle}">
+            <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource SectionLabelStyle}"
+                               Text="SESSION STATUS" />
+                    <Border Grid.Column="1"
+                            Padding="9,5"
+                            Background="{Binding SessionStateBackground}"
+                            BorderBrush="{Binding SessionStateBorder}"
+                            BorderThickness="1"
+                            CornerRadius="5">
+                        <TextBlock Foreground="{Binding SessionStateForeground}"
+                                   FontSize="9"
+                                   FontWeight="Bold"
+                                   Text="{Binding SessionStateLabel}" />
+                    </Border>
+                </Grid>
+
+                <Grid Margin="0,20,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Foreground="{StaticResource MutedTextBrush}"
+                               Text="Effective mode" />
+                    <TextBlock Grid.Column="1"
+                               Foreground="{StaticResource AccentBrush}"
+                               FontWeight="Bold"
+                               Text="{Binding EffectiveModeLabel}" />
+                </Grid>
+                <Grid Margin="0,11,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Foreground="{StaticResource MutedTextBrush}"
+                               Text="Buying power" />
+                    <TextBlock Grid.Column="1"
+                               Foreground="{StaticResource SecondaryTextBrush}"
+                               FontWeight="SemiBold"
+                               Text="{Binding BuyingPowerDisplay}" />
+                </Grid>
+                <Grid Margin="0,11,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Foreground="{StaticResource MutedTextBrush}"
+                               Text="{Binding SessionEquityCaption}" />
+                    <TextBlock Grid.Column="1"
+                               Foreground="{StaticResource SecondaryTextBrush}"
+                               FontWeight="SemiBold"
+                               Text="{Binding AccountEquityDisplay}" />
+                </Grid>
+                <Grid Margin="0,11,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Foreground="{StaticResource MutedTextBrush}"
+                               Text="Position" />
+                    <TextBlock Grid.Column="1"
+                               Foreground="{StaticResource SecondaryTextBrush}"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Text="{Binding PositionDisplay}" />
+                </Grid>
+                <Grid Margin="0,11,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Foreground="{StaticResource MutedTextBrush}"
+                               Text="P&amp;L (R / U)" />
+                    <TextBlock Grid.Column="1"
+                               Foreground="{StaticResource SecondaryTextBrush}"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Text="{Binding ProfitLossDisplay}" />
+                </Grid>
+                <Grid Margin="0,11,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Foreground="{StaticResource MutedTextBrush}"
+                               Text="Entries" />
+                    <TextBlock Grid.Column="1"
+                               Foreground="{StaticResource SecondaryTextBrush}"
+                               FontWeight="SemiBold"
+                               Text="{Binding EntriesDisplay}" />
+                </Grid>
+                <Grid Margin="0,11,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Foreground="{StaticResource MutedTextBrush}"
+                               Text="Broker execution" />
+                    <TextBlock Grid.Column="1"
+                               Foreground="{Binding BrokerExecutionForeground}"
+                               FontSize="11"
+                               FontWeight="Bold"
+                               Text="{Binding BrokerExecutionLabel}" />
+                </Grid>
+                <Grid Margin="0,11,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Foreground="{StaticResource MutedTextBrush}"
+                               Text="Market data" />
+                    <TextBlock Grid.Column="1"
+                               Foreground="{Binding MarketDataStatusForeground}"
+                               FontSize="11"
+                               FontWeight="Bold"
+                               Text="{Binding MarketDataStateLabel}" />
+                </Grid>
+                <Grid Margin="0,11,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Foreground="{StaticResource MutedTextBrush}"
+                               Text="Journal" />
+                    <TextBlock Grid.Column="1"
+                               Foreground="{StaticResource AccentBrush}"
+                               FontSize="11"
+                               FontWeight="Bold"
+                               Text="{Binding JournalStatus}" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="2"
+                Style="{StaticResource CardStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock VerticalAlignment="Center"
+                               Style="{StaticResource SectionLabelStyle}"
+                               Text="ACTIVITY JOURNAL" />
+                    <Button Grid.Column="1"
+                            MinWidth="58"
+                            Height="24"
+                            Padding="9,2"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource ModeButtonStyle}"
+                            FontSize="9"
+                            Command="{Binding ClearActivityLogCommand}"
+                            Content="CLEAR"
+                            ToolTip="Clear the on-screen activity list. Saved SQLite journal entries are not deleted." />
+                </Grid>
+                <ListBox Grid.Row="1"
+                         Margin="0,14,0,0"
+                         Padding="0"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ItemsSource="{Binding ActivityLog}">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="Margin" Value="0,0,0,9" />
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="Focusable" Value="False" />
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Border Padding="10"
+                                    Background="#101925"
+                                    BorderBrush="#243247"
+                                    BorderThickness="1"
+                                    CornerRadius="6">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="52" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Foreground="{StaticResource SubtleTextBrush}"
+                                               FontFamily="Consolas"
+                                               FontSize="10"
+                                               Text="{Binding Time}" />
+                                    <TextBlock Grid.Column="1"
+                                               Foreground="{StaticResource SupportingTextBrush}"
+                                               FontSize="11"
+                                               LineHeight="16"
+                                               Text="{Binding Message}"
+                                               TextWrapping="Wrap" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

@@ -1,0 +1,130 @@
+<UserControl x:Class="PriceSentinel3000.App.Views.DataTimingView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border Margin="0,12,0,0"
+            Style="{StaticResource CardStyle}">
+        <StackPanel>
+            <TextBlock Style="{StaticResource SectionLabelStyle}"
+                       Text="DATA TIMING" />
+            <Grid Margin="0,14,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="10" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Style="{StaticResource FieldLabelStyle}"
+                               Text="Buffer minutes" />
+                    <TextBox Style="{StaticResource InputTextBoxStyle}"
+                             ToolTip="Minutes of recent market data kept for charting and strategy analysis. Allowed range: 5-15 minutes."
+                             ToolTipService.ShowOnDisabled="True"
+                             Text="{Binding BufferMinutes, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                    <TextBlock Style="{StaticResource FieldLabelStyle}"
+                               Text="Quote poll (sec)" />
+                    <TextBox Style="{StaticResource InputTextBoxStyle}"
+                             ToolTip="How often PriceSentinel requests the latest quote. Lower values update faster but make more Robinhood requests. Allowed range: 1-60 seconds."
+                             ToolTipService.ShowOnDisabled="True"
+                             Text="{Binding QuotePollingSeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                </StackPanel>
+            </Grid>
+            <Grid Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="10" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Style="{StaticResource FieldLabelStyle}"
+                               Text="Reconcile (sec)" />
+                    <TextBox Style="{StaticResource InputTextBoxStyle}"
+                             ToolTip="How often PriceSentinel checks Robinhood price history to verify recent candles and fill gaps. Allowed range: 15-300 seconds."
+                             ToolTipService.ShowOnDisabled="True"
+                             Text="{Binding ReconciliationSeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                    <TextBlock Style="{StaticResource FieldLabelStyle}"
+                               Text="Lookback (sec)" />
+                    <TextBox Style="{StaticResource InputTextBoxStyle}"
+                             ToolTip="How far back each reconciliation check requests price history. A longer window can repair older gaps but transfers more data. Allowed range: 60-3600 seconds."
+                             ToolTipService.ShowOnDisabled="True"
+                             Text="{Binding ReconciliationLookbackSeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                </StackPanel>
+            </Grid>
+            <Grid Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="10" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Style="{StaticResource FieldLabelStyle}"
+                               Text="Completion delay (sec)" />
+                    <TextBox Style="{StaticResource InputTextBoxStyle}"
+                             ToolTip="Leaves this many seconds at the newest edge out of reconciliation so Robinhood has time to finalize candles. Allowed range: 0-300 seconds."
+                             ToolTipService.ShowOnDisabled="True"
+                             Text="{Binding ReconciliationCompletionDelaySeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                </StackPanel>
+            </Grid>
+            <Grid Margin="0,12,0,0">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsReplaySelected}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="10" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Style="{StaticResource FieldLabelStyle}"
+                               Text="Replay date (yyyy-MM-dd)" />
+                    <TextBox Style="{StaticResource InputTextBoxStyle}"
+                             Text="{Binding ReplayDate, UpdateSourceTrigger=LostFocus}" />
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                    <TextBlock Style="{StaticResource FieldLabelStyle}"
+                               Text="Replay speed (x)" />
+                    <TextBox Style="{StaticResource InputTextBoxStyle}"
+                             Text="{Binding ReplaySpeed, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                </StackPanel>
+            </Grid>
+            <Grid Margin="0,12,0,0">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsReplaySelected}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="10" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Style="{StaticResource FieldLabelStyle}"
+                               Text="Local start (HH:mm)" />
+                    <TextBox Style="{StaticResource InputTextBoxStyle}"
+                             Text="{Binding ReplayTime, UpdateSourceTrigger=LostFocus}" />
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                    <TextBlock Style="{StaticResource FieldLabelStyle}"
+                               Text="Local end (HH:mm)" />
+                    <TextBox Style="{StaticResource InputTextBoxStyle}"
+                             Text="{Binding ReplayEndTime, UpdateSourceTrigger=LostFocus}" />
+                </StackPanel>
+            </Grid>
+        </StackPanel>
+    </Border>
+</UserControl>

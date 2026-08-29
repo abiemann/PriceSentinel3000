@@ -16,7 +16,7 @@ public sealed record LiveTradeEvaluation(
 public sealed class LiveExecutionEngine
 {
     private static readonly TimeSpan ReentryCooldown = TimeSpan.FromSeconds(30);
-    private readonly PaperTraderSettings _settings;
+    private readonly TradingSessionSettings _settings;
     private readonly IPriceActionSignalEngine _strategy;
     private readonly HashSet<Guid> _observedTerminalOrders = [];
     private readonly decimal _sessionStartingEquity;
@@ -28,7 +28,7 @@ public sealed class LiveExecutionEngine
     private bool _riskLocked;
 
     public LiveExecutionEngine(
-        PaperTraderSettings settings,
+        TradingSessionSettings settings,
         decimal sessionStartingEquity,
         IPriceActionSignalEngine? strategy = null,
         int initialEntriesToday = 0,

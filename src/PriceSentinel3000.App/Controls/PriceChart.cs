@@ -5,6 +5,8 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using PriceSentinel3000.App.ViewModels;
+using PriceSentinel3000.Core.Charting;
+using PriceSentinel3000.Core.Indicators;
 
 namespace PriceSentinel3000.App.Controls;
 
@@ -152,22 +154,16 @@ public sealed class PriceChart : FrameworkElement
             return;
         }
 
-        TimeSpan candleInterval = TimeSpan.FromSeconds(
-            Math.Clamp(CandleIntervalSeconds, 1, 3600));
-        DateTimeOffset lastTimestamp = points[^1].TimestampUtc + candleInterval;
-        double windowMinutes = double.IsFinite(WindowMinutes)
-            ? Math.Clamp(WindowMinutes, 1d, 60d)
-            : 7d;
-        DateTimeOffset firstTimestamp = lastTimestamp.AddMinutes(-windowMinutes);
+        PriceChartTimeWindow timeWindow = PriceChartViewportCalculator.CreateTimeWindow(
+            points[^1].TimestampUtc,
+            CandleIntervalSeconds,
+            WindowMinutes);
+        TimeSpan candleInterval = timeWindow.CandleInterval;
+        DateTimeOffset firstTimestamp = timeWindow.FirstTimestamp;
+        DateTimeOffset lastTimestamp = timeWindow.LastTimestamp;
         PricePointViewModel[] visiblePoints =
         [
-            .. points.Where(point =>
-            {
-                DateTimeOffset centerTimestamp =
-                    point.TimestampUtc + candleInterval / 2d;
-                return centerTimestamp >= firstTimestamp &&
-                       centerTimestamp <= lastTimestamp;
-            }),
+            .. points.Where(point => timeWindow.ContainsCandle(point.TimestampUtc)),
         ];
 
         if (visiblePoints.Length == 0)
@@ -178,17 +174,13 @@ public sealed class PriceChart : FrameworkElement
         decimal observedMinimum = visiblePoints.Min(point => point.Low);
         decimal observedMaximum = visiblePoints.Max(point => point.High);
         decimal openingPrice = visiblePoints[0].Open;
-        decimal minimumRange = Math.Max(0.01m, Math.Abs(openingPrice) * 0.02m);
-        decimal halfMinimumRange = minimumRange / 2m;
-        decimal observedRange = observedMaximum - observedMinimum;
-        decimal expansionPadding = Math.Max(minimumRange * 0.08m, observedRange * 0.12m);
-        decimal minimum = Math.Min(
-            openingPrice - halfMinimumRange,
-            observedMinimum - expansionPadding);
-        decimal maximum = Math.Max(
-            openingPrice + halfMinimumRange,
-            observedMaximum + expansionPadding);
-        (minimum, maximum, decimal priceStep) = CreatePriceScale(minimum, maximum);
+        PriceChartScale automaticScale = PriceChartScaleCalculator.CreateAutomatic(
+            observedMinimum,
+            observedMaximum,
+            openingPrice);
+        decimal minimum = automaticScale.Minimum;
+        decimal maximum = automaticScale.Maximum;
+        decimal priceStep = automaticScale.Step;
 
         if (IsManualScale)
         {
@@ -451,23 +443,13 @@ public sealed class PriceChart : FrameworkElement
 
         decimal dragFraction = (decimal)(
             (pointer.Y - _scaleDragStart.Y) / plotBounds.Height);
-        decimal priceDelta = startingRange * dragFraction;
-        decimal minimumSpan = Math.Max(0.0001m, startingRange * 0.02m);
-        if (_scaleDragAdjustsMaximum)
-        {
-            _manualMinimum = _scaleDragMinimum;
-            _manualMaximum = Math.Max(
-                _scaleDragMaximum + priceDelta,
-                _scaleDragMinimum + minimumSpan);
-        }
-        else
-        {
-            _manualMinimum = Math.Clamp(
-                _scaleDragMinimum + priceDelta,
-                0m,
-                _scaleDragMaximum - minimumSpan);
-            _manualMaximum = _scaleDragMaximum;
-        }
+        PriceChartRange adjustedRange = PriceChartScaleCalculator.AdjustBoundary(
+            _scaleDragMinimum,
+            _scaleDragMaximum,
+            dragFraction,
+            _scaleDragAdjustsMaximum);
+        _manualMinimum = adjustedRange.Minimum;
+        _manualMaximum = adjustedRange.Maximum;
         InvalidateVisual();
     }
 
@@ -704,8 +686,18 @@ public sealed class PriceChart : FrameworkElement
         drawingContext.DrawLine(midlinePen, new(bounds.Left, y50), new(bounds.Right, y50));
         drawingContext.DrawLine(guidePen, new(bounds.Left, y30), new(bounds.Right, y30));
 
+        IReadOnlyList<decimal?> rsiValues = SimpleRsiCalculator.CalculateSeries(
+            points.Select(point => point.Close).ToArray());
         List<(DateTimeOffset Timestamp, decimal Value)> samples =
-            CalculateSimpleRsi(points, candleInterval);
+        [
+            .. points.Select((point, index) => new
+                {
+                    Timestamp = point.TimestampUtc + candleInterval / 2d,
+                    Value = rsiValues[index],
+                })
+                .Where(sample => sample.Value.HasValue)
+                .Select(sample => (sample.Timestamp, sample.Value!.Value)),
+        ];
         List<(DateTimeOffset Timestamp, decimal Value)> visibleSamples =
         [
             .. samples.Where(sample =>
@@ -765,45 +757,6 @@ public sealed class PriceChart : FrameworkElement
         DrawRsiAxisLabel(drawingContext, "70", y70, bounds.Right, labelTypeface, labelBrush, pixelsPerDip);
         DrawRsiAxisLabel(drawingContext, "50", y50, bounds.Right, labelTypeface, labelBrush, pixelsPerDip);
         DrawRsiAxisLabel(drawingContext, "30", y30, bounds.Right, labelTypeface, labelBrush, pixelsPerDip);
-    }
-
-    private static List<(DateTimeOffset Timestamp, decimal Value)> CalculateSimpleRsi(
-        IReadOnlyList<PricePointViewModel> points,
-        TimeSpan candleInterval)
-    {
-        const int period = 14;
-        var samples = new List<(DateTimeOffset Timestamp, decimal Value)>();
-
-        for (int index = period; index < points.Count; index++)
-        {
-            decimal totalGain = 0m;
-            decimal totalLoss = 0m;
-
-            for (int offset = index - period + 1; offset <= index; offset++)
-            {
-                decimal change = points[offset].Close - points[offset - 1].Close;
-
-                if (change > 0m)
-                {
-                    totalGain += change;
-                }
-                else
-                {
-                    totalLoss -= change;
-                }
-            }
-
-            decimal value = totalGain == 0m && totalLoss == 0m
-                ? 50m
-                : totalLoss == 0m
-                    ? 100m
-                    : totalGain == 0m
-                        ? 0m
-                        : 100m - 100m / (1m + totalGain / totalLoss);
-            samples.Add((points[index].TimestampUtc + candleInterval / 2d, value));
-        }
-
-        return samples;
     }
 
     private static double MapRsi(decimal value, double top, double height) =>
@@ -1127,39 +1080,6 @@ public sealed class PriceChart : FrameworkElement
         return plotTop + plotHeight * (1d - normalized);
     }
 
-    private static (decimal Minimum, decimal Maximum, decimal Step) CreatePriceScale(
-        decimal rawMinimum,
-        decimal rawMaximum)
-    {
-        decimal rawRange = Math.Max(0.0001m, rawMaximum - rawMinimum);
-        decimal step = NiceStep(rawRange / 4m);
-        decimal minimum = Math.Floor(rawMinimum / step) * step;
-        decimal maximum = Math.Ceiling(rawMaximum / step) * step;
-
-        if (maximum <= minimum)
-        {
-            maximum = minimum + step;
-        }
-
-        return (minimum, maximum, step);
-    }
-
-    private static decimal NiceStep(decimal rawStep)
-    {
-        double exponent = Math.Floor(Math.Log10((double)rawStep));
-        decimal magnitude = (decimal)Math.Pow(10d, exponent);
-        decimal fraction = rawStep / magnitude;
-        decimal niceFraction = fraction switch
-        {
-            <= 1m => 1m,
-            <= 2m => 2m,
-            <= 2.5m => 2.5m,
-            <= 5m => 5m,
-            _ => 10m,
-        };
-        return niceFraction * magnitude;
-    }
-
     private static string FormatPrice(decimal price) => price switch
     {
         < 1m => price.ToString("0.0000", CultureInfo.InvariantCulture),
@@ -1237,22 +1157,13 @@ public sealed class PriceChart : FrameworkElement
             return false;
         }
 
-        TimeSpan candleInterval = TimeSpan.FromSeconds(
-            Math.Clamp(CandleIntervalSeconds, 1, 3600));
-        DateTimeOffset lastTimestamp = points[^1].TimestampUtc + candleInterval;
-        double windowMinutes = double.IsFinite(WindowMinutes)
-            ? Math.Clamp(WindowMinutes, 1d, 60d)
-            : 7d;
-        DateTimeOffset firstTimestamp = lastTimestamp.AddMinutes(-windowMinutes);
+        PriceChartTimeWindow timeWindow = PriceChartViewportCalculator.CreateTimeWindow(
+            points[^1].TimestampUtc,
+            CandleIntervalSeconds,
+            WindowMinutes);
         PricePointViewModel[] visiblePoints =
         [
-            .. points.Where(point =>
-            {
-                DateTimeOffset centerTimestamp =
-                    point.TimestampUtc + candleInterval / 2d;
-                return centerTimestamp >= firstTimestamp &&
-                       centerTimestamp <= lastTimestamp;
-            }),
+            .. points.Where(point => timeWindow.ContainsCandle(point.TimestampUtc)),
         ];
 
         if (visiblePoints.Length == 0)
@@ -1262,20 +1173,12 @@ public sealed class PriceChart : FrameworkElement
 
         decimal observedMinimum = visiblePoints.Min(point => point.Low);
         decimal observedMaximum = visiblePoints.Max(point => point.High);
-        decimal observedRange = observedMaximum - observedMinimum;
-        decimal referencePrice = Math.Abs(visiblePoints[^1].Close);
-        decimal minimumPadding = Math.Max(0.0001m, referencePrice * 0.00005m);
-        decimal padding = observedRange > 0m
-            ? Math.Max(observedRange * 0.08m, minimumPadding)
-            : Math.Max(0.005m, referencePrice * 0.0005m);
-
-        _manualMinimum = Math.Max(0m, observedMinimum - padding);
-        _manualMaximum = observedMaximum + padding;
-
-        if (_manualMaximum <= _manualMinimum)
-        {
-            _manualMaximum = _manualMinimum + Math.Max(0.0001m, padding * 2m);
-        }
+        PriceChartRange fittedRange = PriceChartScaleCalculator.FitToObserved(
+            observedMinimum,
+            observedMaximum,
+            visiblePoints[^1].Close);
+        _manualMinimum = fittedRange.Minimum;
+        _manualMaximum = fittedRange.Maximum;
 
         return true;
     }

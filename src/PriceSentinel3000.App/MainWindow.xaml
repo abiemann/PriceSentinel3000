@@ -4,7 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        xmlns:controls="clr-namespace:PriceSentinel3000.App.Controls"
+        xmlns:views="clr-namespace:PriceSentinel3000.App.Views"
         mc:Ignorable="d"
         Title="PriceSentinel 3000"
         Width="1500"
@@ -33,8 +33,8 @@
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0"
-                Background="#0A1018"
-                BorderBrush="#243143"
+                Background="{StaticResource ChromeSurfaceBrush}"
+                BorderBrush="{StaticResource ChromeBorderBrush}"
                 BorderThickness="0,0,0,1">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -47,25 +47,26 @@
                     <Border Width="20"
                             Height="20"
                             VerticalAlignment="Center"
-                            Background="#123528"
-                            BorderBrush="#5EE6B1"
+                            Background="{StaticResource BrandSurfaceBrush}"
+                            BorderBrush="{StaticResource AccentBrush}"
                             BorderThickness="1"
                             CornerRadius="10">
                         <TextBlock HorizontalAlignment="Center"
                                    VerticalAlignment="Center"
-                                   Foreground="#5EE6B1"
+                                   Foreground="{StaticResource AccentBrush}"
                                    FontSize="11"
                                    FontWeight="Bold"
                                    Text="P" />
                     </Border>
                     <TextBlock Margin="9,0,0,0"
                                VerticalAlignment="Center"
-                               Foreground="#B8C5D4"
+                               Foreground="{StaticResource SupportingTextBrush}"
                                FontSize="11"
                                FontWeight="SemiBold"
                                Text="PriceSentinel 3000" />
                 </StackPanel>
-                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal">
                     <Button Style="{StaticResource TitleBarButtonStyle}"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True"
                             Click="MinimizeButton_Click"
@@ -86,65 +87,10 @@
             </Grid>
         </Border>
 
-        <Border Grid.Row="1"
-                Padding="24,0"
-                Background="#101721"
-                BorderBrush="#243143"
-                BorderThickness="0,0,0,1">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <StackPanel VerticalAlignment="Center">
-                    <TextBlock Foreground="{StaticResource AccentBrush}"
-                               FontSize="10"
-                               FontWeight="Bold"
-                               Text="MARKET MONITOR / PAPER TRADING LAB" />
-                    <TextBlock Margin="0,3,0,0"
-                               Foreground="{StaticResource PrimaryTextBrush}"
-                               FontSize="25"
-                               FontWeight="Bold"
-                               Text="PriceSentinel 3000" />
-                </StackPanel>
-                <StackPanel Grid.Column="1"
-                            VerticalAlignment="Center"
-                            Orientation="Horizontal">
-                    <StackPanel Margin="0,0,26,0">
-                        <TextBlock HorizontalAlignment="Right"
-                                   Style="{StaticResource SectionLabelStyle}"
-                                   Text="SYMBOL" />
-                        <TextBlock HorizontalAlignment="Right"
-                                   Foreground="{StaticResource PrimaryTextBrush}"
-                                   FontSize="18"
-                                   FontWeight="Bold"
-                                   Text="{Binding SymbolDisplay}" />
-                    </StackPanel>
-                    <StackPanel Margin="0,0,26,0">
-                        <TextBlock HorizontalAlignment="Right"
-                                   Style="{StaticResource SectionLabelStyle}"
-                                   Text="LAST PRICE" />
-                        <TextBlock HorizontalAlignment="Right"
-                                   Foreground="{StaticResource PrimaryTextBrush}"
-                                   FontSize="18"
-                                   FontWeight="Bold"
-                                   Text="{Binding CurrentPrice}" />
-                    </StackPanel>
-                    <Border Padding="12,7"
-                            Background="{Binding MarketDataStatusBackground}"
-                            BorderBrush="{Binding MarketDataStatusBorder}"
-                            BorderThickness="1"
-                            CornerRadius="6">
-                        <TextBlock Foreground="{Binding MarketDataStatusForeground}"
-                                   FontSize="10"
-                                   FontWeight="Bold"
-                                   Text="{Binding MarketDataStatus}" />
-                    </Border>
-                </StackPanel>
-            </Grid>
-        </Border>
+        <views:AppHeaderView Grid.Row="1" />
 
-        <Grid Grid.Row="2" Margin="12">
+        <Grid Grid.Row="2"
+              Margin="12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="340" />
                 <ColumnDefinition Width="10" />
@@ -152,19 +98,31 @@
                 <ColumnDefinition Width="10" />
                 <ColumnDefinition Width="330" />
             </Grid.ColumnDefinitions>
+
             <ScrollViewer Grid.Column="0"
-                          VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled">
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto">
                 <StackPanel>
-                    <Border Panel.ZIndex="2" Style="{StaticResource CardStyle}">
+                    <Border Panel.ZIndex="2"
+                            Style="{StaticResource CardStyle}">
                         <StackPanel>
                             <TextBlock Style="{StaticResource SectionLabelStyle}"
                                        Text="OPERATING MODE" />
-                            <Grid Height="240" Margin="0,10,0,0">
-                                <Canvas Width="294" Height="240">
-                                    <Grid Canvas.Left="91" Canvas.Top="60" Width="112" Height="112">
-                                        <Ellipse Fill="#0B1119" Stroke="#34465B" StrokeThickness="3" />
-                                        <Ellipse Margin="10" Fill="#182433" Stroke="#24384C" StrokeThickness="1" />
+                            <Grid Height="240"
+                                  Margin="0,10,0,0">
+                                <Canvas Width="294"
+                                        Height="240">
+                                    <Grid Canvas.Left="91"
+                                          Canvas.Top="60"
+                                          Width="112"
+                                          Height="112">
+                                        <Ellipse Fill="#0B1119"
+                                                 Stroke="#34465B"
+                                                 StrokeThickness="3" />
+                                        <Ellipse Margin="10"
+                                                 Fill="{StaticResource ToggleSurfaceBrush}"
+                                                 Stroke="#24384C"
+                                                 StrokeThickness="1" />
                                         <Grid RenderTransformOrigin="0.5,0.5">
                                             <Grid.RenderTransform>
                                                 <RotateTransform Angle="{Binding SelectedMode, Converter={StaticResource TradingModeToAngleConverter}}" />
@@ -183,57 +141,77 @@
                                                  Stroke="{StaticResource AccentBrush}"
                                                  StrokeThickness="2" />
                                     </Grid>
-                                    <Button Canvas.Left="0" Canvas.Top="100" Width="80"
-                                            Tag="Replay" Click="ModeButton_Click" Content="REPLAY">
+                                    <Button Canvas.Left="0"
+                                            Canvas.Top="100"
+                                            Width="80"
+                                            Tag="Replay"
+                                            Click="ModeButton_Click"
+                                            Content="REPLAY">
                                         <Button.Style>
-                                            <Style BasedOn="{StaticResource ModeButtonStyle}" TargetType="Button">
+                                            <Style BasedOn="{StaticResource ModeButtonStyle}"
+                                                   TargetType="Button">
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IsReplaySelected}" Value="True">
-                                                        <Setter Property="Background" Value="#153D32" />
-                                                        <Setter Property="BorderBrush" Value="#2BC48A" />
-                                                        <Setter Property="Foreground" Value="#77F0C1" />
+                                                        <Setter Property="Background" Value="{StaticResource SuccessSurfaceBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{StaticResource SuccessBorderBrush}" />
+                                                        <Setter Property="Foreground" Value="{StaticResource SuccessTextBrush}" />
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
                                         </Button.Style>
                                     </Button>
-                                    <Button Canvas.Left="92" Canvas.Top="4" Width="110"
-                                            Tag="PaperTrader" Click="ModeButton_Click" Content="PAPER TRADER">
+                                    <Button Canvas.Left="92"
+                                            Canvas.Top="4"
+                                            Width="110"
+                                            Tag="PaperTrader"
+                                            Click="ModeButton_Click"
+                                            Content="PAPER TRADER">
                                         <Button.Style>
-                                            <Style BasedOn="{StaticResource ModeButtonStyle}" TargetType="Button">
+                                            <Style BasedOn="{StaticResource ModeButtonStyle}"
+                                                   TargetType="Button">
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IsPaperTraderSelected}" Value="True">
-                                                        <Setter Property="Background" Value="#153D32" />
-                                                        <Setter Property="BorderBrush" Value="#2BC48A" />
-                                                        <Setter Property="Foreground" Value="#77F0C1" />
+                                                        <Setter Property="Background" Value="{StaticResource SuccessSurfaceBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{StaticResource SuccessBorderBrush}" />
+                                                        <Setter Property="Foreground" Value="{StaticResource SuccessTextBrush}" />
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
                                         </Button.Style>
                                     </Button>
-                                    <Button Canvas.Left="214" Canvas.Top="100" Width="80"
-                                            Tag="Live" Click="ModeButton_Click" Content="LIVE">
+                                    <Button Canvas.Left="214"
+                                            Canvas.Top="100"
+                                            Width="80"
+                                            Tag="Live"
+                                            Click="ModeButton_Click"
+                                            Content="LIVE">
                                         <Button.Style>
-                                            <Style BasedOn="{StaticResource ModeButtonStyle}" TargetType="Button">
+                                            <Style BasedOn="{StaticResource ModeButtonStyle}"
+                                                   TargetType="Button">
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IsLiveSelected}" Value="True">
                                                         <Setter Property="Background" Value="#3B211E" />
-                                                        <Setter Property="BorderBrush" Value="#B95145" />
+                                                        <Setter Property="BorderBrush" Value="{StaticResource DangerBorderBrush}" />
                                                         <Setter Property="Foreground" Value="#FF9B8C" />
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
                                         </Button.Style>
                                     </Button>
-                                    <Button Canvas.Left="107" Canvas.Top="200" Width="80"
-                                            Tag="Off" Click="ModeButton_Click" Content="OFF">
+                                    <Button Canvas.Left="107"
+                                            Canvas.Top="200"
+                                            Width="80"
+                                            Tag="Off"
+                                            Click="ModeButton_Click"
+                                            Content="OFF">
                                         <Button.Style>
-                                            <Style BasedOn="{StaticResource ModeButtonStyle}" TargetType="Button">
+                                            <Style BasedOn="{StaticResource ModeButtonStyle}"
+                                                   TargetType="Button">
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IsOffSelected}" Value="True">
-                                                        <Setter Property="Background" Value="#153D32" />
-                                                        <Setter Property="BorderBrush" Value="#2BC48A" />
-                                                        <Setter Property="Foreground" Value="#77F0C1" />
+                                                        <Setter Property="Background" Value="{StaticResource SuccessSurfaceBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{StaticResource SuccessBorderBrush}" />
+                                                        <Setter Property="Foreground" Value="{StaticResource SuccessTextBrush}" />
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -244,641 +222,14 @@
                         </StackPanel>
                     </Border>
 
-                    <Grid Panel.ZIndex="1"
-                          ClipToBounds="True"
-                          RenderTransformOrigin="0.5,0">
-                        <Grid.RenderTransform>
-                            <TranslateTransform Y="-28" />
-                        </Grid.RenderTransform>
-                        <Grid.Style>
-                            <Style TargetType="Grid">
-                                <Setter Property="MaxHeight" Value="0" />
-                                <Setter Property="Opacity" Value="0" />
-                                <Setter Property="IsEnabled" Value="False" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsConfigurationPanelExpanded}"
-                                                 Value="True">
-                                        <Setter Property="MaxHeight" Value="1600" />
-                                        <Setter Property="Opacity" Value="1" />
-                                        <Setter Property="IsEnabled" Value="True" />
-                                        <DataTrigger.EnterActions>
-                                            <BeginStoryboard HandoffBehavior="SnapshotAndReplace">
-                                                <Storyboard>
-                                                    <DoubleAnimation Storyboard.TargetProperty="MaxHeight"
-                                                                     From="0" To="1600"
-                                                                     Duration="0:0:0.38">
-                                                        <DoubleAnimation.EasingFunction>
-                                                            <CubicEase EasingMode="EaseOut" />
-                                                        </DoubleAnimation.EasingFunction>
-                                                    </DoubleAnimation>
-                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                                     From="0" To="1"
-                                                                     Duration="0:0:0.22" />
-                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
-                                                                     From="-28" To="0"
-                                                                     Duration="0:0:0.32">
-                                                        <DoubleAnimation.EasingFunction>
-                                                            <CubicEase EasingMode="EaseOut" />
-                                                        </DoubleAnimation.EasingFunction>
-                                                    </DoubleAnimation>
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </DataTrigger.EnterActions>
-                                        <DataTrigger.ExitActions>
-                                            <BeginStoryboard HandoffBehavior="SnapshotAndReplace">
-                                                <Storyboard>
-                                                    <DoubleAnimation Storyboard.TargetProperty="MaxHeight"
-                                                                     From="1600" To="0"
-                                                                     Duration="0:0:0.32">
-                                                        <DoubleAnimation.EasingFunction>
-                                                            <CubicEase EasingMode="EaseIn" />
-                                                        </DoubleAnimation.EasingFunction>
-                                                    </DoubleAnimation>
-                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                                     From="1" To="0"
-                                                                     Duration="0:0:0.18" />
-                                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
-                                                                     From="0" To="-28"
-                                                                     Duration="0:0:0.28">
-                                                        <DoubleAnimation.EasingFunction>
-                                                            <CubicEase EasingMode="EaseIn" />
-                                                        </DoubleAnimation.EasingFunction>
-                                                    </DoubleAnimation>
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </DataTrigger.ExitActions>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Grid.Style>
-                        <StackPanel>
-                    <Border Margin="0,12,0,0" Style="{StaticResource CardStyle}">
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource SectionLabelStyle}" Text="{Binding AccountPanelCaption}" />
-                            <Grid Margin="0,14,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="100" />
-                                    <ColumnDefinition Width="10" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Symbol" />
-                                    <TextBox Style="{StaticResource InputTextBoxStyle}" MaxLength="10"
-                                             CharacterCasing="Upper"
-                                             Text="{Binding Symbol, UpdateSourceTrigger=PropertyChanged}" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="{Binding AccountBalanceCaption}" />
-                                    <TextBox Style="{StaticResource InputTextBoxStyle}"
-                                             IsReadOnly="{Binding IsLiveEffective}"
-                                             Text="{Binding AccountBalanceValue, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
-                                </StackPanel>
-                            </Grid>
-                                <CheckBox Margin="0,12,0,0"
-                                          Content="Trades settle right away"
-                                          IsChecked="{Binding TradesSettleImmediately}"
-                                          ToolTip="Checked: paper-sale proceeds become buying power immediately. Unchecked: proceeds use simulated T+1 weekday settlement.">
-                                    <CheckBox.Style>
-                                        <Style TargetType="CheckBox"
-                                               BasedOn="{StaticResource PaperCheckBoxStyle}">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsLiveSelected}" Value="True">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </CheckBox.Style>
-                                </CheckBox>
-                        </StackPanel>
-                    </Border>
-                    <Border Margin="0,12,0,0" Style="{StaticResource CardStyle}">
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource SectionLabelStyle}" Text="RISK CONTROLS" />
-
-                            <TextBlock Margin="0,14,0,0"
-                                       Style="{StaticResource FieldLabelStyle}" Text="Position size" />
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="10" />
-                                    <ColumnDefinition Width="86" />
-                                </Grid.ColumnDefinitions>
-                                <ComboBox Style="{StaticResource InputComboBoxStyle}"
-                                          ItemsSource="{Binding PositionSizeOptions}"
-                                          DisplayMemberPath="Label" SelectedValuePath="Value"
-                                          SelectedValue="{Binding PositionSizeBasis}" />
-                                <TextBox Grid.Column="2" Style="{StaticResource InputTextBoxStyle}"
-                                         Text="{Binding PositionSizeValue, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
-                            </Grid>
-
-                            <TextBlock Margin="0,14,0,0"
-                                       Style="{StaticResource FieldLabelStyle}" Text="Trading quantity" />
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="10" />
-                                    <ColumnDefinition Width="86" />
-                                </Grid.ColumnDefinitions>
-                                <ComboBox Style="{StaticResource InputComboBoxStyle}"
-                                          ItemsSource="{Binding QuantityLimitOptions}"
-                                          DisplayMemberPath="Label" SelectedValuePath="Value"
-                                          SelectedValue="{Binding QuantityLimitMode}" />
-                                <TextBox Grid.Column="2" Style="{StaticResource InputTextBoxStyle}"
-                                         IsEnabled="{Binding IsQuantityLimited}"
-                                         Text="{Binding MaximumQuantity, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
-                            </Grid>
-
-                            <TextBlock Margin="0,14,0,0"
-                                       Style="{StaticResource FieldLabelStyle}"
-                                       Text="Maximum entries per day" />
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="10" />
-                                    <ColumnDefinition Width="86" />
-                                </Grid.ColumnDefinitions>
-                                <ComboBox Style="{StaticResource InputComboBoxStyle}"
-                                          ItemsSource="{Binding EntryLimitOptions}"
-                                          DisplayMemberPath="Label" SelectedValuePath="Value"
-                                          SelectedValue="{Binding UnlimitedEntries}" />
-                                <TextBox Grid.Column="2" Style="{StaticResource InputTextBoxStyle}"
-                                         IsEnabled="{Binding IsEntryLimited}"
-                                         Text="{Binding MaximumEntriesPerDay, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
-                            </Grid>
-
-                            <TextBlock Margin="0,14,0,0"
-                                       Style="{StaticResource FieldLabelStyle}" Text="Maximum daily loss" />
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="10" />
-                                    <ColumnDefinition Width="86" />
-                                </Grid.ColumnDefinitions>
-                                <ComboBox Style="{StaticResource InputComboBoxStyle}"
-                                          ItemsSource="{Binding DailyLossOptions}"
-                                          DisplayMemberPath="Label" SelectedValuePath="Value"
-                                          SelectedValue="{Binding MaximumDailyLossBasis}" />
-                                <TextBox Grid.Column="2" Style="{StaticResource InputTextBoxStyle}"
-                                         Text="{Binding MaximumDailyLossValue, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
-                            </Grid>
-
-                            <TextBlock Margin="0,14,0,0"
-                                       Style="{StaticResource FieldLabelStyle}" Text="Stop loss" />
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="10" />
-                                    <ColumnDefinition Width="86" />
-                                </Grid.ColumnDefinitions>
-                                <ComboBox Style="{StaticResource InputComboBoxStyle}"
-                                          ItemsSource="{Binding StopLossOptions}"
-                                          DisplayMemberPath="Label" SelectedValuePath="Value"
-                                          SelectedValue="{Binding StopLossBasis}" />
-                                <TextBox Grid.Column="2" Style="{StaticResource InputTextBoxStyle}"
-                                         Text="{Binding StopLossValue, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-                    <Border Margin="0,12,0,0" Style="{StaticResource CardStyle}">
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource SectionLabelStyle}" Text="DATA TIMING" />
-                            <Grid Margin="0,14,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="10" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Buffer minutes" />
-                                    <TextBox Style="{StaticResource InputTextBoxStyle}"
-                                             ToolTip="Minutes of recent market data kept for charting and strategy analysis. Allowed range: 5-15 minutes."
-                                             ToolTipService.ShowOnDisabled="True"
-                                             Text="{Binding BufferMinutes, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Quote poll (sec)" />
-                                    <TextBox Style="{StaticResource InputTextBoxStyle}"
-                                             ToolTip="How often PriceSentinel requests the latest quote. Lower values update faster but make more Robinhood requests. Allowed range: 1-60 seconds."
-                                             ToolTipService.ShowOnDisabled="True"
-                                             Text="{Binding QuotePollingSeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
-                                </StackPanel>
-                            </Grid>
-                            <Grid Margin="0,12,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="10" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Reconcile (sec)" />
-                                    <TextBox Style="{StaticResource InputTextBoxStyle}"
-                                             ToolTip="How often PriceSentinel checks Robinhood price history to verify recent candles and fill gaps. Allowed range: 15-300 seconds."
-                                             ToolTipService.ShowOnDisabled="True"
-                                             Text="{Binding ReconciliationSeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Lookback (sec)" />
-                                    <TextBox Style="{StaticResource InputTextBoxStyle}"
-                                             ToolTip="How far back each reconciliation check requests price history. A longer window can repair older gaps but transfers more data. Allowed range: 60-3600 seconds."
-                                             ToolTipService.ShowOnDisabled="True"
-                                             Text="{Binding ReconciliationLookbackSeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
-                                </StackPanel>
-                            </Grid>
-                            <Grid Margin="0,12,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="10" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Completion delay (sec)" />
-                                    <TextBox Style="{StaticResource InputTextBoxStyle}"
-                                             ToolTip="Leaves this many seconds at the newest edge out of reconciliation so Robinhood has time to finalize candles. Allowed range: 0-300 seconds."
-                                             ToolTipService.ShowOnDisabled="True"
-                                             Text="{Binding ReconciliationCompletionDelaySeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
-                                </StackPanel>
-                            </Grid>
-                            <Grid Margin="0,12,0,0">
-                                <Grid.Style>
-                                    <Style TargetType="Grid">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsReplaySelected}" Value="True">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Grid.Style>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="10" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Replay date (yyyy-MM-dd)" />
-                                    <TextBox Style="{StaticResource InputTextBoxStyle}"
-                                             Text="{Binding ReplayDate, UpdateSourceTrigger=LostFocus}" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Replay speed (x)" />
-                                    <TextBox Style="{StaticResource InputTextBoxStyle}"
-                                             Text="{Binding ReplaySpeed, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
-                                </StackPanel>
-                            </Grid>
-                            <Grid Margin="0,12,0,0">
-                                <Grid.Style>
-                                    <Style TargetType="Grid">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsReplaySelected}" Value="True">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Grid.Style>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="10" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel>
-                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Local start (HH:mm)" />
-                                    <TextBox Style="{StaticResource InputTextBoxStyle}"
-                                             Text="{Binding ReplayTime, UpdateSourceTrigger=LostFocus}" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Local end (HH:mm)" />
-                                    <TextBox Style="{StaticResource InputTextBoxStyle}"
-                                             Text="{Binding ReplayEndTime, UpdateSourceTrigger=LostFocus}" />
-                                </StackPanel>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-
-                    <Grid Margin="0,14,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="10" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Button Style="{StaticResource PrimaryButtonStyle}"
-                                Command="{Binding StartSessionCommand}"
-                                Content="{Binding PrimaryActionLabel}" />
-                        <Button Grid.Column="2" Style="{StaticResource SecondaryButtonStyle}"
-                                Command="{Binding StopSessionCommand}"
-                                Content="{Binding SecondaryActionLabel}" />
-                    </Grid>
-                        </StackPanel>
-                    </Grid>
+                    <views:TradingConfigurationPanel Panel.ZIndex="1" />
                 </StackPanel>
             </ScrollViewer>
-            <Grid Grid.Column="2">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="8" />
-                    <RowDefinition Height="120" />
-                </Grid.RowDefinitions>
 
-                <Border Padding="12" Style="{StaticResource CardStyle}">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock VerticalAlignment="Center"
-                                       Foreground="{StaticResource PrimaryTextBrush}"
-                                       FontSize="20" FontWeight="Bold"
-                                       Text="{Binding SymbolDisplay}" />
-                            <ComboBox Grid.Column="1"
-                                      MinWidth="78" Height="26"
-                                      Margin="12,0,0,0" Padding="8,3"
-                                      VerticalAlignment="Center"
-                                      FontSize="9" FontWeight="SemiBold"
-                                      Style="{StaticResource InputComboBoxStyle}"
-                                      ItemsSource="{Binding ChartCandleIntervalOptions}"
-                                      DisplayMemberPath="Label"
-                                      SelectedValuePath="Value"
-                                      SelectedValue="{Binding ChartCandleIntervalSeconds, Mode=TwoWay}"
-                                      ToolTip="Choose the candle duration shown on the chart. Strategy evaluation and quote polling are unchanged." />
-                            <ToggleButton x:Name="RsiToggle"
-                                           Grid.Column="3" Margin="0,0,14,0"
-                                           VerticalAlignment="Center"
-                                          Style="{StaticResource ChartScaleToggleStyle}"
-                                           IsChecked="{Binding ShowRsi, Mode=TwoWay}"
-                                           Content="{Binding RsiToggleLabel}"
-                                           ToolTip="Show or hide the 14-period simple-average RSI panel." />
-                            <ToggleButton x:Name="ChartScaleToggle"
-                                          Grid.Column="4" Margin="0,0,14,0"
-                                          VerticalAlignment="Center"
-                                           Style="{StaticResource ChartScaleToggleStyle}"
-                                           IsChecked="{Binding IsChartManualScale, Mode=TwoWay}"
-                                           Content="{Binding ChartScaleLabel}"
-                                           ToolTip="Auto fits incoming prices. In Manual, left-drag the upper half of the price chart to adjust its top Y value, or the lower half to adjust its bottom Y value." />
-                            <TextBlock Grid.Column="5" VerticalAlignment="Center"
-                                       Style="{StaticResource SectionLabelStyle}"
-                                       Text="BID / ASK" />
-                            <TextBlock Grid.Column="6" Margin="10,0,0,0"
-                                       VerticalAlignment="Center"
-                                       Foreground="#CBD5E1" FontSize="16"
-                                       Text="{Binding BidAskDisplay}" />
-                        </Grid>
-                        <Border Grid.Row="1" Margin="0,8,0,0"
-                                Background="#0C131C" BorderBrush="#253447"
-                                BorderThickness="1" CornerRadius="8">
-                            <Grid>
-                                 <controls:PriceChart Margin="1"
-                                                      CandleIntervalSeconds="{Binding ChartCandleIntervalSeconds}"
-                                                      IsManualScale="{Binding IsChecked, ElementName=ChartScaleToggle}"
-                                                      Points="{Binding ChartPoints}"
-                                                      ScaleResetVersion="{Binding ChartScaleResetVersion}"
-                                                      ShowRsi="{Binding IsChecked, ElementName=RsiToggle}"
-                                                      WindowMinutes="{Binding BufferMinutes}" />
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <StackPanel.Style>
-                                        <Style TargetType="StackPanel">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding HasMarketData}" Value="True">
-                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </StackPanel.Style>
-                                    <TextBlock HorizontalAlignment="Center" Foreground="#5F728A"
-                                               FontSize="12" FontWeight="Bold"
-                                               Text="WAITING FOR MARKET DATA" />
-                                    <TextBlock Margin="0,7,0,0" Foreground="#41536A" FontSize="11"
-                                               Text="Start Paper Trader or Replay to activate the chart." />
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-                    </Grid>
-                </Border>
-                <Border Grid.Row="2" Style="{StaticResource CardStyle}">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Style="{StaticResource SectionLabelStyle}" Text="STRATEGY ENGINE" />
-                            <TextBlock Margin="0,6,0,0" Foreground="#CBD5E1" FontSize="14"
-                                       TextTrimming="CharacterEllipsis" Text="{Binding StrategyMessage}" />
-                            <TextBlock Margin="0,6,0,0" Foreground="#71859C" FontFamily="Consolas"
-                                       FontSize="10" Text="{Binding StrategyMetrics}" />
-                        </StackPanel>
-                        <Border Grid.Column="1" Padding="12,7" VerticalAlignment="Center"
-                                Background="#202B39" BorderBrush="#3A4B61"
-                                BorderThickness="1" CornerRadius="6">
-                            <TextBlock Foreground="#8EA0B7" FontSize="10"
-                                       FontWeight="Bold" Text="{Binding StrategyStateLabel}" />
-                        </Border>
-                    </Grid>
-                </Border>
-            </Grid>
-            <Grid Grid.Column="4">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="338" />
-                    <RowDefinition Height="12" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-                <Border Style="{StaticResource CardStyle}">
-                    <StackPanel>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Style="{StaticResource SectionLabelStyle}" Text="SESSION STATUS" />
-                            <Border Grid.Column="1" Padding="9,5"
-                                    Background="{Binding SessionStateBackground}"
-                                    BorderBrush="{Binding SessionStateBorder}"
-                                    BorderThickness="1" CornerRadius="5">
-                                <TextBlock Foreground="{Binding SessionStateForeground}" FontSize="9"
-                                           FontWeight="Bold" Text="{Binding SessionStateLabel}" />
-                            </Border>
-                        </Grid>
-
-                        <Grid Margin="0,20,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Effective mode" />
-                            <TextBlock Grid.Column="1" Foreground="{StaticResource AccentBrush}"
-                                       FontWeight="Bold" Text="{Binding EffectiveModeLabel}" />
-                        </Grid>
-                        <Grid Margin="0,11,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Buying power" />
-                            <TextBlock Grid.Column="1" Foreground="#CBD5E1"
-                                       FontWeight="SemiBold" Text="{Binding BuyingPowerDisplay}" />
-                        </Grid>
-                        <Grid Margin="0,11,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="{Binding SessionEquityCaption}" />
-                            <TextBlock Grid.Column="1" Foreground="#CBD5E1"
-                                       FontWeight="SemiBold" Text="{Binding AccountEquityDisplay}" />
-                        </Grid>
-                        <Grid Margin="0,11,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Position" />
-                            <TextBlock Grid.Column="1" Foreground="#CBD5E1" FontSize="11"
-                                       FontWeight="SemiBold" Text="{Binding PositionDisplay}" />
-                        </Grid>
-                        <Grid Margin="0,11,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="P&amp;L (R / U)" />
-                            <TextBlock Grid.Column="1" Foreground="#CBD5E1" FontSize="11"
-                                       FontWeight="SemiBold" Text="{Binding ProfitLossDisplay}" />
-                        </Grid>
-                        <Grid Margin="0,11,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Entries" />
-                            <TextBlock Grid.Column="1" Foreground="#CBD5E1"
-                                       FontWeight="SemiBold" Text="{Binding EntriesDisplay}" />
-                        </Grid>
-                        <Grid Margin="0,11,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Broker execution" />
-                            <TextBlock Grid.Column="1" Foreground="{Binding BrokerExecutionForeground}" FontSize="11"
-                                       FontWeight="Bold" Text="{Binding BrokerExecutionLabel}" />
-                        </Grid>
-                        <Grid Margin="0,11,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Market data" />
-                            <TextBlock Grid.Column="1"
-                                       Foreground="{Binding MarketDataStatusForeground}"
-                                       FontSize="11" FontWeight="Bold"
-                                       Text="{Binding MarketDataStateLabel}" />
-                        </Grid>
-                        <Grid Margin="0,11,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Foreground="{StaticResource MutedTextBrush}" Text="Journal" />
-                            <TextBlock Grid.Column="1" Foreground="#5EE6B1" FontSize="11"
-                                       FontWeight="Bold" Text="{Binding JournalStatus}" />
-                        </Grid>
-                    </StackPanel>
-                </Border>
-                <Border Grid.Row="2" Style="{StaticResource CardStyle}">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock VerticalAlignment="Center"
-                                       Style="{StaticResource SectionLabelStyle}"
-                                       Text="ACTIVITY JOURNAL" />
-                            <Button Grid.Column="1"
-                                    MinWidth="58" Height="24" Padding="9,2"
-                                    VerticalAlignment="Center"
-                                    Style="{StaticResource ModeButtonStyle}"
-                                    FontSize="9"
-                                    Command="{Binding ClearActivityLogCommand}"
-                                    Content="CLEAR"
-                                    ToolTip="Clear the on-screen activity list. Saved SQLite journal entries are not deleted." />
-                        </Grid>
-                        <ListBox Grid.Row="1" Margin="0,14,0,0" Padding="0"
-                                 Background="Transparent" BorderThickness="0"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                 ItemsSource="{Binding ActivityLog}">
-                            <ListBox.ItemContainerStyle>
-                                <Style TargetType="ListBoxItem">
-                                    <Setter Property="Padding" Value="0" />
-                                    <Setter Property="Margin" Value="0,0,0,9" />
-                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                    <Setter Property="Focusable" Value="False" />
-                                </Style>
-                            </ListBox.ItemContainerStyle>
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Padding="10" Background="#101925"
-                                            BorderBrush="#243247" BorderThickness="1" CornerRadius="6">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="52" />
-                                                <ColumnDefinition Width="*" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Foreground="#5F728A" FontFamily="Consolas"
-                                                       FontSize="10" Text="{Binding Time}" />
-                                            <TextBlock Grid.Column="1" Foreground="#B8C5D4" FontSize="11"
-                                                       LineHeight="16" TextWrapping="Wrap"
-                                                       Text="{Binding Message}" />
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                    </Grid>
-                </Border>
-            </Grid>
+            <views:ChartWorkspaceView Grid.Column="2" />
+            <views:SessionSidebarView Grid.Column="4" />
         </Grid>
 
-        <Border Grid.Row="3"
-                Padding="18,0"
-                Background="#101721"
-                BorderBrush="#243143"
-                BorderThickness="0,1,0,0">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <Ellipse Width="8" Height="8" VerticalAlignment="Center" Fill="#F4B45E" />
-                <TextBlock Grid.Column="1"
-                           Margin="10,0,0,0"
-                           VerticalAlignment="Center"
-                           Foreground="#91A2B7"
-                           FontSize="11"
-                           Text="{Binding StatusMessage}" />
-                <TextBlock Grid.Column="2"
-                           VerticalAlignment="Center"
-                           Foreground="#53657B"
-                           FontSize="10"
-                           FontWeight="SemiBold"
-                           Text="{Binding VersionDisplay}" />
-            </Grid>
-        </Border>
+        <views:AppStatusBarView Grid.Row="3" />
     </Grid>
 </Window>

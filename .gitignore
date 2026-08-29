@@ -1,9 +1,11 @@
 # Visual Studio
 .vs/
+.idea/
 *.suo
 *.user
 *.userosscache
 *.sln.docstates
+*.DotSettings.user
 
 # .NET build output
 [Bb]in/
@@ -12,6 +14,9 @@
 [Ll]ogs/
 artifacts/
 TestResults/
+[Pp]ublish/
+coverage*.json
+coverage*.xml
 
 # Local configuration and secrets
 appsettings.Local.json
@@ -20,8 +25,19 @@ appsettings.*.local.json
 .env.*
 !.env.example
 secrets.json
+*.pfx
+*.p12
+*.pem
+*.key
+
+# PriceSentinel local state (normally stored under %LOCALAPPDATA%)
+journal.db
+journal.db-shm
+journal.db-wal
+preferences.json
+robinhood-tokens.dat
+robinhood-client.dat
 
 # OS files
 .DS_Store
 Thumbs.db
-

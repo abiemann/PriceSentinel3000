@@ -1,17 +1,26 @@
 using System.Windows;
 using PriceSentinel3000.App.Dialogs;
 using PriceSentinel3000.App.ViewModels;
+using PriceSentinel3000.Infrastructure.MarketData;
+using PriceSentinel3000.Infrastructure.Storage;
 
 namespace PriceSentinel3000.App;
 
-public partial class App : Application
+public partial class App : System.Windows.Application
 {
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-        var viewModel = new MainViewModel();
+        RobinhoodMcpGateway robinhoodGateway = RobinhoodMcpGateway.CreateDefault();
+        var viewModel = new MainViewModel(
+            robinhoodGateway,
+            robinhoodGateway,
+            robinhoodGateway,
+            new SqliteTradingJournal(AppDataPaths.JournalDatabase),
+            new JsonUserPreferencesStore(AppDataPaths.UserPreferences),
+            TimeProvider.System);
         using var restoreCancellation =
             new CancellationTokenSource(TimeSpan.FromSeconds(15));
         bool restored = await viewModel.TryRestoreRobinhoodAtStartupAsync(
@@ -24,7 +33,7 @@ public partial class App : Application
 
             if (welcome.ShowDialog() is not true)
             {
-                viewModel.Dispose();
+                await viewModel.ShutdownAsync();
                 Shutdown();
                 return;
             }

@@ -8,7 +8,7 @@
         ResizeMode="NoResize"
         WindowStyle="None"
         WindowStartupLocation="CenterScreen"
-        Background="#0C1118">
+        Background="{StaticResource WindowBrush}">
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="36"
                             CornerRadius="8"
@@ -23,12 +23,12 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Border Grid.RowSpan="2"
-                BorderBrush="#2A394B"
+                BorderBrush="{StaticResource SubtleBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="8"
                 IsHitTestVisible="False" />
-        <Border Background="#0A1018"
-                BorderBrush="#243143"
+        <Border Background="{StaticResource ChromeSurfaceBrush}"
+                BorderBrush="{StaticResource ChromeBorderBrush}"
                 BorderThickness="1,1,1,0"
                 CornerRadius="8,8,0,0">
             <Grid>
@@ -38,7 +38,7 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock Margin="14,0,0,0"
                            VerticalAlignment="Center"
-                           Foreground="#B8C5D4"
+                           Foreground="{StaticResource SupportingTextBrush}"
                            FontSize="11"
                            FontWeight="SemiBold"
                            Text="WELCOME TO PRICESENTINEL 3000" />
@@ -63,32 +63,32 @@
             <Border Width="54"
                     Height="54"
                     HorizontalAlignment="Left"
-                    Background="#123528"
-                    BorderBrush="#5EE6B1"
+                    Background="{StaticResource BrandSurfaceBrush}"
+                    BorderBrush="{StaticResource AccentBrush}"
                     BorderThickness="1"
                     CornerRadius="27">
                 <TextBlock HorizontalAlignment="Center"
                            VerticalAlignment="Center"
-                           Foreground="#5EE6B1"
+                           Foreground="{StaticResource AccentBrush}"
                            FontSize="25"
                            FontWeight="Bold"
                            Text="P" />
             </Border>
             <TextBlock Margin="0,18,0,0"
-                       Foreground="#F8FAFC"
+                       Foreground="{StaticResource HeadingTextBrush}"
                        FontSize="25"
                        FontWeight="Bold"
                        Text="Welcome to PriceSentinel 3000" />
         </StackPanel>
 
         <StackPanel Grid.Row="1" Margin="0,18,0,0">
-            <TextBlock Foreground="#CBD5E1"
+            <TextBlock Foreground="{StaticResource SecondaryTextBrush}"
                        FontSize="14"
                        LineHeight="21"
                        TextWrapping="Wrap"
                        Text="PriceSentinel needs a Robinhood Agentic Trading connection for real-time Paper Trader prices and historical Replay data. Without that connection, the app cannot monitor or replay prices." />
             <TextBlock Margin="0,15,0,0"
-                       Foreground="#94A3B8"
+                       Foreground="{StaticResource SubduedTextBrush}"
                        FontSize="13"
                        LineHeight="20"
                        TextWrapping="Wrap"
@@ -114,11 +114,11 @@
                                  Margin="0,0,12,0"
                                  VerticalAlignment="Center"
                                  IsIndeterminate="True"
-                                 Foreground="#5EE6B1" />
+                                 Foreground="{StaticResource AccentBrush}" />
                     <TextBlock x:Name="StatusText"
                                Grid.Column="1"
                                VerticalAlignment="Center"
-                               Foreground="#CBD5E1"
+                               Foreground="{StaticResource SecondaryTextBrush}"
                                FontSize="12"
                                TextWrapping="Wrap" />
                 </Grid>
@@ -131,7 +131,7 @@
                     CornerRadius="7"
                     Visibility="Collapsed">
                 <TextBlock x:Name="ErrorText"
-                           Foreground="#FB8B7B"
+                           Foreground="{StaticResource DangerHighlightBrush}"
                            FontSize="12"
                            LineHeight="18"
                            TextWrapping="Wrap" />

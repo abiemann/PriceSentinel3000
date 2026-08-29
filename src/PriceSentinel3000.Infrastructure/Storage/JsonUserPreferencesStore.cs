@@ -1,9 +1,10 @@
 using System.Text.Json;
+using PriceSentinel3000.Application.Configuration;
 using PriceSentinel3000.Core.Configuration;
 
 namespace PriceSentinel3000.Infrastructure.Storage;
 
-public sealed class JsonUserPreferencesStore
+public sealed class JsonUserPreferencesStore : IUserPreferencesStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -19,7 +20,7 @@ public sealed class JsonUserPreferencesStore
         _path = path;
     }
 
-    public PaperTraderSettings? Load()
+    public TradingSessionSettings? Load()
     {
         lock (_gate)
         {
@@ -31,8 +32,8 @@ public sealed class JsonUserPreferencesStore
                 }
 
                 byte[] json = File.ReadAllBytes(_path);
-                PaperTraderSettings? settings =
-                    JsonSerializer.Deserialize<PaperTraderSettings>(json, JsonOptions);
+                TradingSessionSettings? settings =
+                    JsonSerializer.Deserialize<TradingSessionSettings>(json, JsonOptions);
 
                 if (settings is null)
                 {
@@ -69,7 +70,7 @@ public sealed class JsonUserPreferencesStore
         }
     }
 
-    public bool Save(PaperTraderSettings settings)
+    public bool Save(TradingSessionSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
 

@@ -1,0 +1,48 @@
+<UserControl x:Class="PriceSentinel3000.App.Views.AccountConfigurationView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border Margin="0,12,0,0"
+            Style="{StaticResource CardStyle}">
+        <StackPanel>
+            <TextBlock Style="{StaticResource SectionLabelStyle}"
+                       Text="{Binding AccountPanelCaption}" />
+            <Grid Margin="0,14,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="100" />
+                    <ColumnDefinition Width="10" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Style="{StaticResource FieldLabelStyle}"
+                               Text="Symbol" />
+                    <TextBox MaxLength="10"
+                             CharacterCasing="Upper"
+                             Style="{StaticResource InputTextBoxStyle}"
+                             Text="{Binding Symbol, UpdateSourceTrigger=PropertyChanged}" />
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                    <TextBlock Style="{StaticResource FieldLabelStyle}"
+                               Text="{Binding AccountBalanceCaption}" />
+                    <TextBox IsReadOnly="{Binding IsLiveEffective}"
+                             Style="{StaticResource InputTextBoxStyle}"
+                             Text="{Binding AccountBalanceValue, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                </StackPanel>
+            </Grid>
+            <CheckBox Margin="0,12,0,0"
+                      Content="Trades settle right away"
+                      IsChecked="{Binding TradesSettleImmediately}"
+                      ToolTip="Checked: paper-sale proceeds become buying power immediately. Unchecked: proceeds use simulated T+1 weekday settlement.">
+                <CheckBox.Style>
+                    <Style TargetType="CheckBox"
+                           BasedOn="{StaticResource PaperCheckBoxStyle}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsLiveSelected}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </CheckBox.Style>
+            </CheckBox>
+        </StackPanel>
+    </Border>
+</UserControl>

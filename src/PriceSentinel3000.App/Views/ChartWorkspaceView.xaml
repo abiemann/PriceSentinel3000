@@ -1,0 +1,152 @@
+<UserControl x:Class="PriceSentinel3000.App.Views.ChartWorkspaceView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:PriceSentinel3000.App.Controls">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="8" />
+            <RowDefinition Height="120" />
+        </Grid.RowDefinitions>
+
+        <Border Padding="12"
+                Style="{StaticResource CardStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock VerticalAlignment="Center"
+                               Foreground="{StaticResource PrimaryTextBrush}"
+                               FontSize="20"
+                               FontWeight="Bold"
+                               Text="{Binding SymbolDisplay}" />
+                    <ComboBox Grid.Column="1"
+                              MinWidth="78"
+                              Height="26"
+                              Margin="12,0,0,0"
+                              Padding="8,3"
+                              VerticalAlignment="Center"
+                              FontSize="9"
+                              FontWeight="SemiBold"
+                              Style="{StaticResource InputComboBoxStyle}"
+                              ItemsSource="{Binding ChartCandleIntervalOptions}"
+                              DisplayMemberPath="Label"
+                              SelectedValuePath="Value"
+                              SelectedValue="{Binding ChartCandleIntervalSeconds, Mode=TwoWay}"
+                              ToolTip="Choose the candle duration shown on the chart. Strategy evaluation and quote polling are unchanged." />
+                    <ToggleButton x:Name="RsiToggle"
+                                  Grid.Column="3"
+                                  Margin="0,0,14,0"
+                                  VerticalAlignment="Center"
+                                  Style="{StaticResource ChartScaleToggleStyle}"
+                                  IsChecked="{Binding ShowRsi, Mode=TwoWay}"
+                                  Content="{Binding RsiToggleLabel}"
+                                  ToolTip="Show or hide the 14-period simple-average RSI panel." />
+                    <ToggleButton x:Name="ChartScaleToggle"
+                                  Grid.Column="4"
+                                  Margin="0,0,14,0"
+                                  VerticalAlignment="Center"
+                                  Style="{StaticResource ChartScaleToggleStyle}"
+                                  IsChecked="{Binding IsChartManualScale, Mode=TwoWay}"
+                                  Content="{Binding ChartScaleLabel}"
+                                  ToolTip="Auto fits incoming prices. In Manual, left-drag the upper half of the price chart to adjust its top Y value, or the lower half to adjust its bottom Y value." />
+                    <TextBlock Grid.Column="5"
+                               VerticalAlignment="Center"
+                               Style="{StaticResource SectionLabelStyle}"
+                               Text="BID / ASK" />
+                    <TextBlock Grid.Column="6"
+                               Margin="10,0,0,0"
+                               VerticalAlignment="Center"
+                               Foreground="{StaticResource SecondaryTextBrush}"
+                               FontSize="16"
+                               Text="{Binding BidAskDisplay}" />
+                </Grid>
+                <Border Grid.Row="1"
+                        Margin="0,8,0,0"
+                        Background="#0C131C"
+                        BorderBrush="#253447"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                    <Grid>
+                        <controls:PriceChart Margin="1"
+                                             CandleIntervalSeconds="{Binding ChartCandleIntervalSeconds}"
+                                             IsManualScale="{Binding IsChecked, ElementName=ChartScaleToggle}"
+                                             Points="{Binding ChartPoints}"
+                                             ScaleResetVersion="{Binding ChartScaleResetVersion}"
+                                             ShowRsi="{Binding IsChecked, ElementName=RsiToggle}"
+                                             WindowMinutes="{Binding BufferMinutes}" />
+                        <StackPanel HorizontalAlignment="Center"
+                                    VerticalAlignment="Center">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasMarketData}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock HorizontalAlignment="Center"
+                                       Foreground="{StaticResource SubtleTextBrush}"
+                                       FontSize="12"
+                                       FontWeight="Bold"
+                                       Text="WAITING FOR MARKET DATA" />
+                            <TextBlock Margin="0,7,0,0"
+                                       Foreground="#41536A"
+                                       FontSize="11"
+                                       Text="Start Paper Trader or Replay to activate the chart." />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="2"
+                Style="{StaticResource CardStyle}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Style="{StaticResource SectionLabelStyle}"
+                               Text="STRATEGY ENGINE" />
+                    <TextBlock Margin="0,6,0,0"
+                               Foreground="{StaticResource SecondaryTextBrush}"
+                               FontSize="14"
+                               Text="{Binding StrategyMessage}"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock Margin="0,6,0,0"
+                               Foreground="#71859C"
+                               FontFamily="Consolas"
+                               FontSize="10"
+                               Text="{Binding StrategyMetrics}" />
+                </StackPanel>
+                <Border Grid.Column="1"
+                        Padding="12,7"
+                        VerticalAlignment="Center"
+                        Background="{StaticResource SecondaryControlSurfaceBrush}"
+                        BorderBrush="{StaticResource SecondaryControlBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6">
+                    <TextBlock Foreground="{StaticResource MutedTextBrush}"
+                               FontSize="10"
+                               FontWeight="Bold"
+                               Text="{Binding StrategyStateLabel}" />
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

@@ -1,0 +1,60 @@
+<UserControl x:Class="PriceSentinel3000.App.Views.AppHeaderView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border Padding="24,0"
+            Background="{StaticResource HeaderSurfaceBrush}"
+            BorderBrush="{StaticResource ChromeBorderBrush}"
+            BorderThickness="0,0,0,1">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Foreground="{StaticResource AccentBrush}"
+                           FontSize="10"
+                           FontWeight="Bold"
+                           Text="MARKET MONITOR / PAPER TRADING LAB" />
+                <TextBlock Margin="0,3,0,0"
+                           Foreground="{StaticResource PrimaryTextBrush}"
+                           FontSize="25"
+                           FontWeight="Bold"
+                           Text="PriceSentinel 3000" />
+            </StackPanel>
+            <StackPanel Grid.Column="1"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal">
+                <StackPanel Margin="0,0,26,0">
+                    <TextBlock HorizontalAlignment="Right"
+                               Style="{StaticResource SectionLabelStyle}"
+                               Text="SYMBOL" />
+                    <TextBlock HorizontalAlignment="Right"
+                               Foreground="{StaticResource PrimaryTextBrush}"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Text="{Binding SymbolDisplay}" />
+                </StackPanel>
+                <StackPanel Margin="0,0,26,0">
+                    <TextBlock HorizontalAlignment="Right"
+                               Style="{StaticResource SectionLabelStyle}"
+                               Text="LAST PRICE" />
+                    <TextBlock HorizontalAlignment="Right"
+                               Foreground="{StaticResource PrimaryTextBrush}"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Text="{Binding CurrentPrice}" />
+                </StackPanel>
+                <Border Padding="12,7"
+                        Background="{Binding MarketDataStatusBackground}"
+                        BorderBrush="{Binding MarketDataStatusBorder}"
+                        BorderThickness="1"
+                        CornerRadius="6">
+                    <TextBlock Foreground="{Binding MarketDataStatusForeground}"
+                               FontSize="10"
+                               FontWeight="Bold"
+                               Text="{Binding MarketDataStatus}" />
+                </Border>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

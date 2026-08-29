@@ -10,11 +10,8 @@ namespace PriceSentinel3000.App;
 public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
-
-    public MainWindow()
-        : this(new MainViewModel())
-    {
-    }
+    private bool _closeAfterShutdown;
+    private bool _shutdownInProgress;
 
     internal MainWindow(MainViewModel viewModel)
     {
@@ -53,7 +50,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        _viewModel.RequestModeSelection(requestedMode);
+        if (!_viewModel.RequestModeSelection(requestedMode))
+        {
+            return;
+        }
 
         if (requestedMode is not TradingMode.Live)
         {
@@ -77,20 +77,70 @@ public partial class MainWindow : Window
         await _viewModel.AcknowledgeLiveRiskAsync();
     }
 
-    protected override void OnClosed(EventArgs e)
+    protected override async void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
-        _viewModel.Dispose();
-        base.OnClosed(e);
-    }
-
-    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
-    {
-        if (Keyboard.FocusedElement is TextBox textBox)
+        if (_closeAfterShutdown)
         {
-            textBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
+            base.OnClosing(e);
+            return;
         }
 
-        _viewModel.SavePreferences();
+        e.Cancel = true;
         base.OnClosing(e);
+        e.Cancel = true;
+        if (_shutdownInProgress)
+        {
+            return;
+        }
+
+        _shutdownInProgress = true;
+        try
+        {
+            if (Keyboard.FocusedElement is TextBox textBox)
+            {
+                textBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
+            }
+        }
+        catch (Exception exception)
+        {
+            System.Diagnostics.Trace.TraceError(
+                "Could not commit the focused input during shutdown: {0}",
+                exception.Message);
+        }
+
+        try
+        {
+            bool safeToClose = await _viewModel.PrepareForShutdownAsync();
+            if (!safeToClose)
+            {
+                MessageBoxResult choice = MessageBox.Show(
+                    this,
+                    "PriceSentinel could not confirm that the active LIVE order reached a final state. The order may still fill after this application closes.\n\nOpen Robinhood now and verify or cancel the order. Exit anyway?",
+                    "Unresolved LIVE order",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning,
+                    MessageBoxResult.No);
+                if (choice is not MessageBoxResult.Yes)
+                {
+                    _shutdownInProgress = false;
+                    return;
+                }
+            }
+
+            await _viewModel.ShutdownAsync(
+                forceUnresolvedLiveOrder: !safeToClose);
+            _closeAfterShutdown = true;
+            Close();
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                this,
+                $"PriceSentinel could not shut down cleanly: {exception.Message}",
+                "Shutdown error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            _shutdownInProgress = false;
+        }
     }
 }

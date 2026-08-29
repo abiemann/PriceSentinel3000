@@ -1,3 +1,4 @@
+using PriceSentinel3000.Core.Indicators;
 using PriceSentinel3000.Core.MarketData;
 
 namespace PriceSentinel3000.Core.Strategy;
@@ -25,7 +26,7 @@ public interface IPriceActionSignalEngine
 
 public sealed class PriceActionSignalEngine : IPriceActionSignalEngine
 {
-    public const int RsiPeriod = 14;
+    public const int RsiPeriod = SimpleRsiCalculator.DefaultPeriod;
     private const decimal TouchTolerancePercent = 0.06m;
     private const decimal MinimumSwingPercent = 0.10m;
     private const decimal MinimumConfirmationPercent = 0.025m;
@@ -74,8 +75,8 @@ public sealed class PriceActionSignalEngine : IPriceActionSignalEngine
                 $"Need {RsiPeriod + 1 - ordered.Length} more observations for RSI({RsiPeriod}).");
         }
 
-        decimal? rsi = CalculateSimpleRsi(ordered.Select(quote => quote.Last).ToArray());
-        decimal? priorRsi = CalculateSimpleRsi(
+        decimal? rsi = CalculateRsi(ordered.Select(quote => quote.Last).ToArray());
+        decimal? priorRsi = CalculateRsi(
             ordered[..^1].Select(quote => quote.Last).ToArray());
         decimal latest = ordered[^1].Last;
         decimal momentum = PercentChange(PriceNear(ordered, evaluatedAt.AddSeconds(-20)), latest);
@@ -89,42 +90,10 @@ public sealed class PriceActionSignalEngine : IPriceActionSignalEngine
             : EvaluateEntry(ordered, rsi, priorRsi, momentum, blocks);
     }
 
-    public static decimal? CalculateSimpleRsi(IReadOnlyList<decimal> prices)
+    private static decimal? CalculateRsi(IReadOnlyList<decimal> prices)
     {
-        ArgumentNullException.ThrowIfNull(prices);
-
-        if (prices.Count < RsiPeriod + 1)
-        {
-            return null;
-        }
-
-        decimal gains = 0m;
-        decimal losses = 0m;
-
-        for (int index = prices.Count - RsiPeriod; index < prices.Count; index++)
-        {
-            decimal change = prices[index] - prices[index - 1];
-
-            if (change > 0m)
-            {
-                gains += change;
-            }
-            else
-            {
-                losses -= change;
-            }
-        }
-
-        decimal averageGain = gains / RsiPeriod;
-        decimal averageLoss = losses / RsiPeriod;
-
-        if (averageLoss == 0m)
-        {
-            return averageGain == 0m ? 50m : 100m;
-        }
-
-        decimal relativeStrength = averageGain / averageLoss;
-        return Math.Round(100m - 100m / (1m + relativeStrength), 2);
+        decimal? value = SimpleRsiCalculator.Calculate(prices, RsiPeriod);
+        return value.HasValue ? Math.Round(value.Value, 2) : null;
     }
 
     private static StrategyDecision EvaluateEntry(

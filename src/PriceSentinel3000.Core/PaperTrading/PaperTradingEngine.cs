@@ -54,7 +54,7 @@ public sealed class PaperTradingEngine
     private static readonly TimeSpan ReentryCooldown = TimeSpan.FromSeconds(30);
     private static readonly TimeOnly SettlementReleaseTime = new(9, 30);
     private static readonly TimeZoneInfo EasternTimeZone = ResolveEasternTimeZone();
-    private readonly PaperTraderSettings _settings;
+    private readonly TradingSessionSettings _settings;
     private readonly IPriceActionSignalEngine _strategy;
     private readonly List<PendingSettlement> _pendingSettlements = [];
     private decimal _cash;
@@ -70,7 +70,7 @@ public sealed class PaperTradingEngine
 
     public PaperTradingEngine(
         Instrument instrument,
-        PaperTraderSettings settings,
+        TradingSessionSettings settings,
         IPriceActionSignalEngine? strategy = null)
     {
         ArgumentNullException.ThrowIfNull(instrument);

@@ -1,0 +1,46 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Surfaces -->
+    <SolidColorBrush x:Key="WindowBrush" Color="#0C1118" />
+    <SolidColorBrush x:Key="ChromeSurfaceBrush" Color="#0A1018" />
+    <SolidColorBrush x:Key="HeaderSurfaceBrush" Color="#101721" />
+    <SolidColorBrush x:Key="CardBrush" Color="#141D28" />
+    <SolidColorBrush x:Key="ControlSurfaceBrush" Color="#0F1722" />
+    <SolidColorBrush x:Key="SecondaryControlSurfaceBrush" Color="#202B39" />
+    <SolidColorBrush x:Key="ToggleSurfaceBrush" Color="#182433" />
+    <SolidColorBrush x:Key="ControlHoverSurfaceBrush" Color="#121D2A" />
+    <SolidColorBrush x:Key="BrandSurfaceBrush" Color="#123528" />
+    <SolidColorBrush x:Key="SuccessSurfaceBrush" Color="#153D32" />
+    <SolidColorBrush x:Key="DangerPanelBrush" Color="#3A201D" />
+
+    <!-- Borders -->
+    <SolidColorBrush x:Key="CardBorderBrush" Color="#263445" />
+    <SolidColorBrush x:Key="ChromeBorderBrush" Color="#243143" />
+    <SolidColorBrush x:Key="ControlBorderBrush" Color="#34445A" />
+    <SolidColorBrush x:Key="StrongControlBorderBrush" Color="#40546C" />
+    <SolidColorBrush x:Key="SecondaryControlBorderBrush" Color="#3A4B61" />
+    <SolidColorBrush x:Key="SubtleBorderBrush" Color="#2A394B" />
+    <SolidColorBrush x:Key="InteractiveHoverBorderBrush" Color="#8AA2BC" />
+    <SolidColorBrush x:Key="SuccessBorderBrush" Color="#2BC48A" />
+    <SolidColorBrush x:Key="DangerBorderBrush" Color="#B95145" />
+
+    <!-- Text and status -->
+    <SolidColorBrush x:Key="PrimaryTextBrush" Color="#F1F5F9" />
+    <SolidColorBrush x:Key="HeadingTextBrush" Color="#F8FAFC" />
+    <SolidColorBrush x:Key="SecondaryTextBrush" Color="#CBD5E1" />
+    <SolidColorBrush x:Key="SupportingTextBrush" Color="#B8C5D4" />
+    <SolidColorBrush x:Key="MutedTextBrush" Color="#8EA0B7" />
+    <SolidColorBrush x:Key="SubtleTextBrush" Color="#5F728A" />
+    <SolidColorBrush x:Key="SubduedTextBrush" Color="#94A3B8" />
+    <SolidColorBrush x:Key="InactiveControlTextBrush" Color="#A8B6C7" />
+    <SolidColorBrush x:Key="InteractiveTextBrush" Color="#E2E8F0" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#5EE6B1" />
+    <SolidColorBrush x:Key="SuccessTextBrush" Color="#77F0C1" />
+    <SolidColorBrush x:Key="DangerBrush" Color="#F97360" />
+    <SolidColorBrush x:Key="DangerHighlightBrush" Color="#FB8B7B" />
+
+    <!-- Scroll bars -->
+    <SolidColorBrush x:Key="ScrollTrackBrush" Color="#2A394B" />
+    <SolidColorBrush x:Key="ScrollThumbBrush" Color="#6A7F96" />
+    <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="#8AA2BC" />
+</ResourceDictionary>

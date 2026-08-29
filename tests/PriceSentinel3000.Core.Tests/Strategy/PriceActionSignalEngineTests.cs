@@ -10,18 +10,6 @@ public sealed class PriceActionSignalEngineTests
         new(2026, 8, 1, 16, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public void SimpleRsi_UsesFourteenSimplePriceChanges()
-    {
-        decimal? rising = PriceActionSignalEngine.CalculateSimpleRsi(
-            Enumerable.Range(1, 15).Select(value => (decimal)value).ToArray());
-        decimal? flat = PriceActionSignalEngine.CalculateSimpleRsi(
-            Enumerable.Repeat(10m, 15).ToArray());
-
-        Assert.Equal(100m, rising);
-        Assert.Equal(50m, flat);
-    }
-
-    [Fact]
     public void Evaluate_ConfirmsLingeringBottomAfterPositiveTurn()
     {
         decimal[] prices =

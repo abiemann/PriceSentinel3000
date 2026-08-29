@@ -1,0 +1,22 @@
+* text=auto
+
+# Windows/.NET source files use their conventional line endings.
+*.cs text eol=crlf
+*.csproj text eol=crlf
+*.props text eol=crlf
+*.targets text eol=crlf
+*.sln text eol=crlf
+*.xaml text eol=crlf
+
+# Repository metadata renders consistently on every platform.
+*.json text eol=lf
+*.md text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+
+# Image assets must never be normalized as text.
+*.gif binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.png binary

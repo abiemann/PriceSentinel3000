@@ -231,7 +231,7 @@ public sealed class LiveExecutionEngineTests
         Assert.Contains("average purchase price", result.Decision.Reasons[0]);
     }
 
-    private static PaperTraderSettings Settings() => PaperTraderSettings.Default with
+    private static TradingSessionSettings Settings() => TradingSessionSettings.Default with
     {
         Symbol = "SOFI",
         PositionSizeBasis = AmountBasis.FixedAmount,

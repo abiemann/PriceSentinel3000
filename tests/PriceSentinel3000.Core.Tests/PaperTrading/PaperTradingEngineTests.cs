@@ -12,7 +12,7 @@ public sealed class PaperTradingEngineTests
     public void Engine_BuysAtAskHonorsQuantityLimitAndStopsAtBid()
     {
         var instrument = new Instrument("SOFI");
-        PaperTraderSettings settings = PaperTraderSettings.Default with
+        TradingSessionSettings settings = TradingSessionSettings.Default with
         {
             PositionSizeBasis = AmountBasis.FixedAmount,
             PositionSizeValue = 1_000m,
@@ -83,7 +83,7 @@ public sealed class PaperTradingEngineTests
     {
         var engine = new PaperTradingEngine(
             new("SOFI"),
-            PaperTraderSettings.Default);
+            TradingSessionSettings.Default);
         IReadOnlyList<MarketQuote> quotes = PriceActionSignalEngineTests.Quotes(
             Enumerable.Repeat(100m, 15).ToArray());
 
@@ -100,7 +100,7 @@ public sealed class PaperTradingEngineTests
         var instrument = new Instrument("USO");
         var engine = new PaperTradingEngine(
             instrument,
-            PaperTraderSettings.Default,
+            TradingSessionSettings.Default,
             new ScriptedStrategy(StrategySignalKind.Buy));
         DateTimeOffset timestamp = new(2026, 7, 31, 20, 52, 0, TimeSpan.Zero);
         var replayBar = new MarketQuote(
@@ -123,7 +123,7 @@ public sealed class PaperTradingEngineTests
     public void Engine_LocksFurtherBuysAtMaximumEntryCount()
     {
         var instrument = new Instrument("SOFI");
-        PaperTraderSettings settings = PaperTraderSettings.Default with
+        TradingSessionSettings settings = TradingSessionSettings.Default with
         {
             PositionSizeBasis = AmountBasis.FixedAmount,
             PositionSizeValue = 100m,
@@ -166,7 +166,7 @@ public sealed class PaperTradingEngineTests
             StrategySignalKind.Buy);
         var engine = new PaperTradingEngine(
             instrument,
-            PaperTraderSettings.Default,
+            TradingSessionSettings.Default,
             strategy);
         DateTimeOffset start = new(2026, 8, 1, 16, 0, 0, TimeSpan.Zero);
         var quotes = new List<MarketQuote>
@@ -198,7 +198,7 @@ public sealed class PaperTradingEngineTests
     public void Engine_DelayedSettlementExcludesSaleProceedsFromBuyingPowerUntilTPlusOne()
     {
         var instrument = new Instrument("SOFI");
-        PaperTraderSettings settings = PaperTraderSettings.Default with
+        TradingSessionSettings settings = TradingSessionSettings.Default with
         {
             StartingBalance = 100m,
             TradesSettleImmediately = false,
@@ -252,7 +252,7 @@ public sealed class PaperTradingEngineTests
     public void Engine_ImmediateSettlementRestoresBuyingPowerOnSell()
     {
         var instrument = new Instrument("SOFI");
-        PaperTraderSettings settings = PaperTraderSettings.Default with
+        TradingSessionSettings settings = TradingSessionSettings.Default with
         {
             StartingBalance = 100m,
             TradesSettleImmediately = true,
@@ -285,7 +285,7 @@ public sealed class PaperTradingEngineTests
     public void Engine_TotalPositionLossUsesCombinedDollarLoss()
     {
         var instrument = new Instrument("SOFI");
-        PaperTraderSettings settings = PaperTraderSettings.Default with
+        TradingSessionSettings settings = TradingSessionSettings.Default with
         {
             PositionSizeBasis = AmountBasis.FixedAmount,
             PositionSizeValue = 100m,
@@ -328,7 +328,7 @@ public sealed class PaperTradingEngineTests
     public void Engine_DailyLossLiquidatesAndLocksAccount()
     {
         var instrument = new Instrument("SOFI");
-        PaperTraderSettings settings = PaperTraderSettings.Default with
+        TradingSessionSettings settings = TradingSessionSettings.Default with
         {
             PositionSizeBasis = AmountBasis.FixedAmount,
             PositionSizeValue = 1_000m,
