@@ -6,7 +6,7 @@ A Windows desktop application that connects to Robinhood Agentic Trading for
 real-time price monitoring, historical playback, paper-first strategy research,
 and guarded live execution of a user-selected stock or ETF.
 
-![PriceSentinel 3000 showing a paused historical Replay with candlesticks, RSI, trade markers, risk controls, and an activity journal](docs/images/pricesentinel3000-replay.png)
+![PriceSentinel 3000 showing a running historical Replay with candlesticks, RSI, trade markers, risk controls, and an activity journal](docs/images/pricesentinel3000-replay.png)
 
 *Historical Replay mode using Robinhood price history and simulated paper fills.*
 
@@ -31,10 +31,6 @@ credentials. For a quick code review:
 5. Review the WPF `Views`, `Styles`, and `Themes` folders for the modular desktop
    presentation, then run the three boundary-specific test projects for executable
    safety examples.
-
-The screenshot above is from an earlier build and still shows the retired buffer
-summary. The current layout gives that vertical space to the chart. Planned work
-is tracked in the [roadmap](TODO.md).
 
 > [!WARNING]
 > This project is experimental software, not financial advice. Trading involves
@@ -91,9 +87,11 @@ execution path to the authenticated Robinhood data foundation:
 - LIVE enters disarmed, then **Start Live Trader** reconciles the agentic account,
   buying power, position, symbol tradability, existing orders, daily loss baseline,
   and daily entry count before it can arm
-- Every LIVE intent is reviewed by Robinhood; missing/malformed review data, any
-  non-empty broker alert, stale prices, excessive review-price drift, ambiguous
-  acknowledgements, and duplicate/open orders fail closed
+- A LIVE strategy decision must first pass local risk, arming, regular-hours,
+  tradability, and fractional-share gates before its order intent reaches
+  Robinhood review; missing/malformed review data, any non-empty broker alert,
+  stale prices, excessive review-price drift, ambiguous acknowledgements, and
+  duplicate/open orders fail closed
 - LIVE uses regular-hours GFD market orders with a stable idempotency reference;
   STOP disarms immediately, requests cancellation, and briefly polls the broker
   because cancellation is asynchronous; closing the app with unresolved order
@@ -152,8 +150,10 @@ and
    silently restore the encrypted saved session and open the workspace directly.
 2. Select **Paper Trader**, enter a stock or ETF symbol and paper starting balance,
    configure the risk and timing settings, then click **Start Paper Trader**.
-3. The app loads up to four minutes of real 15-second history, obtains the current
-   quote, and then polls the current quote at the configured interval.
+3. When available, the app requests 33–43 minutes of real 15-second warm-start
+   history: the configured 5–15 minute buffer plus 28 minutes needed to warm
+   RSI(14) for the longest selectable candle interval. It then obtains the current
+   quote and polls it at the configured interval.
 4. At each reconciliation interval, the app requests the configured lookback
    window ending behind real time by the completion delay. This avoids treating a
    still-forming historical bar as final. Matching timestamps are verified,
@@ -177,9 +177,11 @@ is unavailable, the session stops and reports the failure.
    fetches the account from Robinhood instead of using the paper starting balance.
 4. LIVE arms only after account, balance, buying power, tradability, position,
    open-order, daily-entry, and daily-loss reconciliation succeeds.
-5. A strategy signal creates an intent. Robinhood reviews the exact order first;
-   the app records and displays the market-data disclosure and blocks every
-   non-empty pre-trade alert before placement.
+5. A strategy signal must pass the app's local risk gates before it can create an
+   intent. That intent must also pass arming, regular-hours, tradability, and
+   fractional-share gates before Robinhood reviews the exact order. The app records
+   and displays the market-data disclosure and blocks every non-empty pre-trade
+   alert before placement.
 6. After submission, the app polls the broker order, blocks duplicate signals,
    records state transitions and fills, and refreshes the authoritative position.
 7. **STOP** disarms the session and requests cancellation of a PriceSentinel order.
@@ -216,7 +218,7 @@ them later; they are not a promise that the labeled regions can be captured live
    local date (`yyyy-MM-dd`), local start/end times (`HH:mm`), and playback
    speed, then click **Start Replay**.
 2. One bounded request loads actual 15-second Robinhood bars for precisely that
-   start/end window, using extended-hours bounds.
+   start/end window, using Robinhood's `24_5` historical bounds.
 3. The returned observations are replayed in source-time order. Each historical
    price enters the normal ring buffer as a newly observed event, with delays
    compressed by the selected speed.
@@ -240,10 +242,11 @@ browser is open, the disabled LOGIN button reads
 **WAITING FOR APPROVAL**; EXIT cancels the attempt. If authorization times out,
 LOGIN becomes available for a clean retry.
 
-At startup, a saved token is tried without permitting an interactive browser
-redirect. A valid access token or refresh token opens the main window directly.
-If the cache is missing, invalid, revoked, corrupt, or cannot be verified, the
-welcome dialog appears and offers LOGIN or EXIT.
+At startup, a cached access token and dynamic client registration are tried without
+permitting an interactive browser redirect. When present, a cached refresh token
+can assist that reconnection. A verified cached connection opens the main window
+directly. If the cache is missing, invalid, revoked, corrupt, or cannot be verified,
+the welcome dialog appears and offers LOGIN or EXIT.
 
 The OAuth client cache format was updated with the MCP C# SDK 2.0 migration. The
 first run after upgrading re-registers PriceSentinel once; this does not modify
