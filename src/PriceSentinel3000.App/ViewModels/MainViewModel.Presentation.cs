@@ -1,4 +1,5 @@
 using System.Globalization;
+using PriceSentinel3000.Core.Charting;
 using PriceSentinel3000.Core.MarketData;
 using PriceSentinel3000.Core.Modes;
 using PriceSentinel3000.Core.Strategy;
@@ -21,8 +22,12 @@ public sealed partial class MainViewModel
             return;
         }
 
-        IReadOnlyList<MarketQuote> chartSnapshot =
+        IReadOnlyList<MarketQuote> retainedChartSnapshot =
             _chartRingBuffer?.Snapshot() ?? snapshot;
+        IReadOnlyList<MarketQuote> chartSnapshot = SelectChartHistory(
+            retainedChartSnapshot,
+            BufferMinutes,
+            ChartCandleIntervalSeconds);
         IReadOnlyList<PriceCandle> candles = PriceCandleAggregator.Aggregate(
             chartSnapshot,
             TimeSpan.FromSeconds(ChartCandleIntervalSeconds));
@@ -63,6 +68,29 @@ public sealed partial class MainViewModel
         OnPropertyChanged(nameof(MarketDataStatusBorder));
         OnPropertyChanged(nameof(MarketDataStatusForeground));
 
+    }
+
+    private static IReadOnlyList<MarketQuote> SelectChartHistory(
+        IReadOnlyList<MarketQuote> snapshot,
+        int bufferMinutes,
+        int candleIntervalSeconds)
+    {
+        TimeSpan historyDuration = TimeSpan.FromMinutes(bufferMinutes) +
+            PriceChartHistoryCalculator.GetRsiLookback(candleIntervalSeconds);
+        DateTimeOffset cutoff = snapshot[^1].SourceTimestampUtc - historyDuration;
+        return
+        [
+            .. snapshot.Where(quote => quote.SourceTimestampUtc >= cutoff),
+        ];
+    }
+
+    private TimeSpan GetMaximumChartHistoryDuration(int bufferMinutes)
+    {
+        int maximumCandleIntervalSeconds =
+            ChartCandleIntervalOptions.Max(option => option.Value);
+        return TimeSpan.FromMinutes(bufferMinutes) +
+            PriceChartHistoryCalculator.GetRsiLookback(
+                maximumCandleIntervalSeconds);
     }
 
     private void SynchronizeChartPoints(

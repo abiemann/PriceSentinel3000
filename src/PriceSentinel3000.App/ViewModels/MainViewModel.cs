@@ -16,8 +16,6 @@ namespace PriceSentinel3000.App.ViewModels;
 
 public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDisposable
 {
-    private static readonly TimeSpan MaximumWarmStart = TimeSpan.FromMinutes(4);
-
     private readonly IMarketDataSource _marketDataSource;
     private readonly ICachedAuthenticationMarketDataSource _cachedAuthentication;
     private readonly ILiveBrokerGateway _liveBrokerGateway;

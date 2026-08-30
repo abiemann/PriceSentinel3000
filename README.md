@@ -49,8 +49,9 @@ execution path to the authenticated Robinhood data foundation:
 - OFF / Replay / Paper Trader / LIVE rotary mode selection, with OFF at startup
 - Paper Trader polls real Robinhood quotes at the configured interval, evaluates
   a deterministic reactionary strategy, and can never submit a real order
-- Up to four minutes of warm-start history and configurable delayed-lookback
-  reconciliation use real 15-second Robinhood equity bars
+- Warm-start history covers the chart window plus the RSI(14) lookback required
+  by every selectable candle interval; configurable delayed-lookback
+  reconciliation uses real 15-second Robinhood equity bars
 - Replay accepts a ticker plus an exact local date/time and emits that historical
   15-second window as though each observation has just arrived; it can be paused,
   resumed, or stopped without losing the captured chart and paper-account state

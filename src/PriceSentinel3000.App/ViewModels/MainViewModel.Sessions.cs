@@ -200,8 +200,8 @@ public sealed partial class MainViewModel
             AddActivity(
                 $"LIVE execution armed for agentic account {_liveAccount!.MaskedNumber}; buying power {initialBroker.Portfolio.BuyingPower:C2}. No order exists at startup.");
         }
-        TimeSpan warmStart = TimeSpan.FromMinutes(
-            Math.Min(settings.BufferMinutes, (int)MaximumWarmStart.TotalMinutes));
+        TimeSpan warmStart = GetMaximumChartHistoryDuration(
+            settings.BufferMinutes);
         _marketDataRequest = new(
             instrument,
             TimeSpan.FromSeconds(settings.QuotePollingSeconds),
@@ -358,7 +358,7 @@ public sealed partial class MainViewModel
         _ringBuffer = new(instrument, TimeSpan.FromMinutes(settings.BufferMinutes));
         _chartRingBuffer = new(
             instrument,
-            TimeSpan.FromMinutes(settings.BufferMinutes) + MaximumWarmStart);
+            GetMaximumChartHistoryDuration(settings.BufferMinutes));
         _paperTradingEngine = mode is TradingMode.Live
             ? null
             : new(instrument, settings);
