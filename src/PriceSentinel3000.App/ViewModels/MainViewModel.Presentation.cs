@@ -67,6 +67,7 @@ public sealed partial class MainViewModel
         OnPropertyChanged(nameof(MarketDataStatusBackground));
         OnPropertyChanged(nameof(MarketDataStatusBorder));
         OnPropertyChanged(nameof(MarketDataStatusForeground));
+        RefreshTradableNowState();
 
     }
 
@@ -122,6 +123,7 @@ public sealed partial class MainViewModel
         string stateLabel,
         bool isConnected = true)
     {
+        bool connectionChanged = _isMarketDataConnected != isConnected;
         _marketDataStatus = headerStatus;
         _marketDataStateLabel = stateLabel;
         _isMarketDataConnected = isConnected;
@@ -131,6 +133,32 @@ public sealed partial class MainViewModel
         OnPropertyChanged(nameof(MarketDataStatusBackground));
         OnPropertyChanged(nameof(MarketDataStatusBorder));
         OnPropertyChanged(nameof(MarketDataStatusForeground));
+
+        if (!isConnected)
+        {
+            CancelSymbolTradabilityRefresh();
+            _tradabilityAccount = null;
+            ClearSymbolTradability();
+            return;
+        }
+
+        if (!connectionChanged)
+        {
+            return;
+        }
+
+        if (_symbolTradability is null ||
+            !string.Equals(
+                _symbolTradability.Symbol,
+                Symbol.Trim(),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            ScheduleSymbolTradabilityRefresh();
+        }
+        else
+        {
+            RefreshTradableNowState();
+        }
     }
 
     private void SetQuoteMarketState(MarketQuote quote)

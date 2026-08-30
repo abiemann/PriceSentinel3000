@@ -84,6 +84,55 @@ public sealed class RobinhoodBrokerParserTests
     }
 
     [Fact]
+    public void ParseTradability_UsesConfirmedSessionCapabilityFields()
+    {
+        EquityTradability tradability = RobinhoodBrokerParser.ParseTradability(Json(
+            """
+            {"data":{"results":[{"symbol":"AMD","state":"active","tradeable":true,"all_day_tradability":"all_day_tradability_tradable","twenty_four_seven_tradability":"twenty_four_seven_tradability_tradable"}]}}
+            """), "AMD", "individual");
+
+        Assert.True(tradability.ExtendedHoursTradeable);
+        Assert.True(tradability.OvernightTradeable);
+    }
+
+    [Fact]
+    public void ParseTradability_RequiresExactSessionCapabilitySentinels()
+    {
+        EquityTradability tradability = RobinhoodBrokerParser.ParseTradability(Json(
+            """
+            {"data":{"results":[{"symbol":"AMD","state":"active","tradeable":true,"all_day_tradability":"tradable","twenty_four_seven_tradability":"tradable"}]}}
+            """), "AMD", "individual");
+
+        Assert.False(tradability.ExtendedHoursTradeable);
+        Assert.False(tradability.OvernightTradeable);
+    }
+
+    [Fact]
+    public void ParseTradability_DoesNotTreatExtendedHoursFieldAsOvernightEligibility()
+    {
+        EquityTradability tradability = RobinhoodBrokerParser.ParseTradability(Json(
+            """
+            {"data":{"results":[{"symbol":"AMD","state":"active","tradeable":true,"all_day_tradability":"all_day_tradability_tradable"}]}}
+            """), "AMD", "individual");
+
+        Assert.True(tradability.ExtendedHoursTradeable);
+        Assert.False(tradability.OvernightTradeable);
+    }
+
+    [Fact]
+    public void ParseTradability_PreservesCapabilitiesWhenHeadlineIsNotTradeable()
+    {
+        EquityTradability tradability = RobinhoodBrokerParser.ParseTradability(Json(
+            """
+            {"data":{"results":[{"symbol":"AMD","state":"active","tradeable":false,"all_day_tradability":"all_day_tradability_tradable","twenty_four_seven_tradability":"twenty_four_seven_tradability_tradable"}]}}
+            """), "AMD", "individual");
+
+        Assert.False(tradability.Tradeable);
+        Assert.True(tradability.ExtendedHoursTradeable);
+        Assert.True(tradability.OvernightTradeable);
+    }
+
+    [Fact]
     public void ParseReview_FailsClosedWhenCanPlaceIsFalse()
     {
         BrokerOrderIntent intent = Intent();

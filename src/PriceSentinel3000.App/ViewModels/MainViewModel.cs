@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Windows.Threading;
 using PriceSentinel3000.Application.Configuration;
 using PriceSentinel3000.Application.LiveTrading;
 using PriceSentinel3000.Application.Sessions;
@@ -22,6 +23,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
     private readonly ITradingJournal _journal;
     private readonly IUserPreferencesStore _preferencesStore;
     private readonly TimeProvider _timeProvider;
+    private readonly EquityMarketSessionEvaluator _marketSessionEvaluator;
+    private readonly DispatcherTimer _tradabilityRefreshTimer = new();
     private readonly TradingSessionCoordinator _sessionCoordinator = new();
     private readonly RealtimeSessionRunner _realtimeSessionRunner;
     private readonly ReplaySessionRunner _replaySessionRunner;
@@ -83,6 +86,11 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
     private LiveExecutionEngine? _liveExecutionEngine;
     private BrokerAccount? _liveAccount;
     private EquityTradability? _liveTradability;
+    private BrokerAccount? _tradabilityAccount;
+    private EquityTradability? _symbolTradability;
+    private CancellationTokenSource? _symbolTradabilityCancellation;
+    private bool _isTwentyFourHourEligible;
+    private bool _isTradableNow;
     private readonly Dictionary<DateTimeOffset, ChartTradeMarker> _tradeMarkers = [];
     private Task? _shutdownTask;
     private bool _disposed;
@@ -105,6 +113,10 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
         _preferencesStore = preferencesStore ??
             throw new ArgumentNullException(nameof(preferencesStore));
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _marketSessionEvaluator = new(_timeProvider);
+        _tradabilityRefreshTimer.Interval = TimeSpan.FromMinutes(1);
+        _tradabilityRefreshTimer.Tick += HandleTradabilityRefreshTimerTick;
+        _tradabilityRefreshTimer.Start();
         _realtimeSessionRunner = new(_marketDataSource, _timeProvider);
         _replaySessionRunner = new(_timeProvider);
         _liveOrderCoordinator = new(_liveBrokerGateway, _journal, _timeProvider);
@@ -266,6 +278,12 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
     public string MarketDataStateLabel => _marketDataStateLabel;
     public string CurrentPrice => _currentPrice;
     public string BidAskDisplay => _bidAskDisplay;
+    public bool IsTwentyFourHourEligible => _isTwentyFourHourEligible;
+    public bool HasTradabilityResult => _symbolTradability is not null;
+    public bool IsTradableNow => _isTradableNow;
+    public string TradableNowText => !HasTradabilityResult
+        ? "--"
+        : IsTradableNow ? "YES" : "NO";
     public bool ShowRsi
     {
         get => _showRsi;
@@ -376,6 +394,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
             if (SetPreferenceField(ref _symbol, normalized))
             {
                 OnPropertyChanged(nameof(SymbolDisplay));
+                ScheduleSymbolTradabilityRefresh();
             }
         }
     }
@@ -837,6 +856,10 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
             throw new InvalidOperationException(
                 "A LIVE order remains unresolved. Verify Robinhood or explicitly confirm that the application should exit anyway.");
         }
+
+        _tradabilityRefreshTimer.Stop();
+        _tradabilityRefreshTimer.Tick -= HandleTradabilityRefreshTimerTick;
+        CancelSymbolTradabilityRefresh();
 
         _disposed = true;
         var failures = new List<Exception>();

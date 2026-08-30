@@ -44,6 +44,29 @@
                                FontWeight="Bold"
                                Text="{Binding CurrentPrice}" />
                 </StackPanel>
+                <Border Margin="0,0,26,0"
+                        Padding="9,5"
+                        VerticalAlignment="Center"
+                        Background="#342A14"
+                        BorderBrush="#8A6A22"
+                        BorderThickness="1"
+                        CornerRadius="5"
+                        ToolTip="Robinhood identifies this symbol as eligible for its overnight 24/5 market.">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsTwentyFourHourEligible}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Foreground="#F4C15D"
+                               FontSize="10"
+                               FontWeight="Bold"
+                               Text="24HR" />
+                </Border>
                 <Border Padding="12,7"
                         Background="{Binding MarketDataStatusBackground}"
                         BorderBrush="{Binding MarketDataStatusBorder}"

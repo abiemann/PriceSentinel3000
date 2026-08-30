@@ -11,6 +11,7 @@ public sealed partial class MainViewModel
         Instrument instrument,
         CancellationToken cancellationToken)
     {
+        CancelSymbolTradabilityRefresh();
         ILiveBrokerGateway gateway = _liveBrokerGateway ??
             throw new InvalidOperationException("LIVE broker execution is unavailable.");
         _liveAccount = await gateway.GetAgenticAccountAsync(cancellationToken);
@@ -26,6 +27,8 @@ public sealed partial class MainViewModel
             _liveAccount.AccountType,
             instrument,
             cancellationToken);
+        _tradabilityAccount = _liveAccount;
+        SetSymbolTradability(_liveTradability);
         IReadOnlyList<BrokerOrderSnapshot> orders = await gateway.GetOpenOrdersAsync(
             _liveAccount.AccountNumber,
             instrument,

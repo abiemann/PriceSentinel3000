@@ -154,6 +154,14 @@ internal static class RobinhoodBrokerParser
                     fractional,
                     "fractional_tradability_tradable",
                     StringComparison.OrdinalIgnoreCase);
+            bool overnightTradeable = string.Equals(
+                String(result, "twenty_four_seven_tradability"),
+                "twenty_four_seven_tradability_tradable",
+                StringComparison.Ordinal);
+            bool extendedHoursTradeable = string.Equals(
+                String(result, "all_day_tradability"),
+                "all_day_tradability_tradable",
+                StringComparison.Ordinal);
             string? reason = FirstNonEmpty(
                 String(result, "reason"),
                 String(result, "halt_reason"),
@@ -161,7 +169,14 @@ internal static class RobinhoodBrokerParser
                     ? $"Robinhood reports {symbol} as '{accountTypeStatus}' for account type '{accountType}'."
                     : null,
                 tradeable ? null : $"Robinhood reports {symbol} in state '{state}'.");
-            return new(symbol.ToUpperInvariant(), tradeable, fractionalTradeable, state, reason);
+            return new(
+                symbol.ToUpperInvariant(),
+                tradeable,
+                fractionalTradeable,
+                state,
+                reason,
+                overnightTradeable,
+                extendedHoursTradeable);
         }
 
         throw new InvalidOperationException(

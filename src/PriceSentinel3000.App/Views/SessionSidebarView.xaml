@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="338" />
+            <RowDefinition Height="365" />
             <RowDefinition Height="12" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
@@ -129,6 +129,34 @@
                                FontSize="11"
                                FontWeight="Bold"
                                Text="{Binding MarketDataStateLabel}" />
+                </Grid>
+                <Grid Margin="0,11,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Foreground="{StaticResource MutedTextBrush}"
+                               Text="Tradable now"
+                               ToolTip="Current Robinhood session availability based on symbol eligibility and the published weekly schedule. Holidays, trading halts, or account restrictions can still prevent an order." />
+                    <TextBlock Grid.Column="1"
+                               FontSize="11"
+                               FontWeight="Bold"
+                               Text="{Binding TradableNowText}"
+                               ToolTip="Current Robinhood session availability based on symbol eligibility and the published weekly schedule. Holidays, trading halts, or account restrictions can still prevent an order.">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{StaticResource SubtleTextBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasTradabilityResult}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsTradableNow}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource SuccessTextBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
                 </Grid>
                 <Grid Margin="0,11,0,0">
                     <Grid.ColumnDefinitions>

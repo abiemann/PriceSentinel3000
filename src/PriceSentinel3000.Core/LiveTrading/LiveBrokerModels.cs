@@ -63,7 +63,9 @@ public sealed record EquityTradability(
     bool Tradeable,
     bool FractionalTradeable,
     string State,
-    string? Reason);
+    string? Reason,
+    bool OvernightTradeable = false,
+    bool ExtendedHoursTradeable = false);
 
 public sealed record BrokerOrderIntent(
     Guid ClientReferenceId,
