@@ -346,7 +346,8 @@ public sealed partial class MainViewModel
         AddActivity($"Historical Replay completed after {summary.QuoteCount} real observations.");
         StopActiveSession(
             "COMPLETED",
-            $"Replay completed for {instrument.Symbol}. The chart remains available for inspection.");
+            $"Replay completed for {instrument.Symbol}. The chart remains available for inspection.",
+            keepRobinhoodConnected: true);
     }
 
     private void PrepareDataSession(
@@ -468,7 +469,8 @@ public sealed partial class MainViewModel
                     ? "LIVE session stopped, but order cancellation was not confirmed. Verify Robinhood immediately."
                     : wasLive
                         ? "LIVE Trader stopped and disarmed; no active PriceSentinel order was found."
-                        : "Data session stopped.");
+                        : "Data session stopped.",
+            keepRobinhoodConnected: _isMarketDataConnected);
     }
 
     private async Task<bool> CancelCoordinatedLiveOrderAsync()
@@ -488,7 +490,10 @@ public sealed partial class MainViewModel
         return cancellation.Handled;
     }
 
-    private void StopActiveSession(string outcome, string statusMessage)
+    private void StopActiveSession(
+        string outcome,
+        string statusMessage,
+        bool keepRobinhoodConnected = false)
     {
         _sessionCoordinator.Cancel();
         ReleaseReplayPause();
@@ -510,7 +515,14 @@ public sealed partial class MainViewModel
             NotifyModeProperties();
         }
 
-        SetMarketDataState("ADAPTER OFFLINE", "OFFLINE", isConnected: false);
+        if (keepRobinhoodConnected)
+        {
+            SetMarketDataState("ROBINHOOD READY", "CONNECTED");
+        }
+        else
+        {
+            SetMarketDataState("ADAPTER OFFLINE", "OFFLINE", isConnected: false);
+        }
         _strategyStateLabel = "IDLE";
         _strategyMessage = ChartPoints.Count > 0
             ? "The captured chart remains visible; start another session when ready."
