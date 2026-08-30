@@ -183,6 +183,42 @@ internal static class RobinhoodBrokerParser
             $"Robinhood returned no tradability result for {symbol}.");
     }
 
+    public static bool HasExplicitOvernightTradability(
+        JsonElement root,
+        string symbol)
+    {
+        JsonElement data = Data(root);
+        if (!data.TryGetProperty("results", out JsonElement results) ||
+            results.ValueKind is not JsonValueKind.Array)
+        {
+            return false;
+        }
+
+        foreach (JsonElement result in results.EnumerateArray())
+        {
+            if (!string.Equals(
+                    String(result, "symbol"),
+                    symbol,
+                    StringComparison.OrdinalIgnoreCase) ||
+                !result.TryGetProperty(
+                    "twenty_four_seven_tradability",
+                    out JsonElement value))
+            {
+                continue;
+            }
+
+            return value.ValueKind switch
+            {
+                JsonValueKind.String =>
+                    !string.IsNullOrWhiteSpace(value.GetString()),
+                JsonValueKind.True or JsonValueKind.False => true,
+                _ => false,
+            };
+        }
+
+        return false;
+    }
+
     public static BrokerOrderReview ParseReview(
         JsonElement root,
         BrokerOrderIntent intent)

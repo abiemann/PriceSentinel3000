@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 using ModelContextProtocol.Authentication;
@@ -16,6 +17,7 @@ public sealed class RobinhoodMcpGateway :
     IInstrumentSearchSource,
     ILiveBrokerGateway
 {
+    private const string TwentyFourHourMarketWatchlistName = "24 Hour Market";
     private static readonly Uri Endpoint =
         new("https://agent.robinhood.com/mcp/trading");
     internal const string RobinhoodProtocolVersion = "2025-11-25";
@@ -25,7 +27,9 @@ public sealed class RobinhoodMcpGateway :
     internal static TimeSpan CachedAuthorizationTimeout { get; } =
         TimeSpan.FromSeconds(15);
     private readonly SemaphoreSlim _connectionGate = new(1, 1);
+    private readonly SemaphoreSlim _twentyFourHourEligibilityGate = new(1, 1);
     private readonly ProtectedRobinhoodAuthStore _authStore;
+    private volatile IReadOnlySet<string>? _twentyFourHourEligibleSymbols;
     private McpClient? _client;
 
     public RobinhoodMcpGateway(
@@ -320,10 +324,82 @@ public sealed class RobinhoodMcpGateway :
                 ["symbols"] = new[] { instrument.Symbol },
             },
             cancellationToken).ConfigureAwait(false);
-        return RobinhoodBrokerParser.ParseTradability(
+        EquityTradability tradability = RobinhoodBrokerParser.ParseTradability(
             root,
             instrument.Symbol,
             accountType);
+
+        if (!tradability.OvernightTradeable &&
+            !RobinhoodBrokerParser.HasExplicitOvernightTradability(
+                root,
+                instrument.Symbol) &&
+            await IsTwentyFourHourEligibleAsync(
+                instrument.Symbol,
+                cancellationToken).ConfigureAwait(false))
+        {
+            tradability = tradability with
+            {
+                OvernightTradeable = true,
+            };
+        }
+
+        return tradability;
+    }
+
+    private async Task<bool> IsTwentyFourHourEligibleAsync(
+        string symbol,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlySet<string>? symbols = _twentyFourHourEligibleSymbols;
+        if (symbols is not null)
+        {
+            return symbols.Contains(symbol);
+        }
+
+        await _twentyFourHourEligibilityGate.WaitAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        try
+        {
+            symbols = _twentyFourHourEligibleSymbols;
+            if (symbols is null)
+            {
+                JsonElement lists = await CallStructuredToolAsync(
+                    "get_popular_watchlists",
+                    new Dictionary<string, object?>(),
+                    cancellationToken).ConfigureAwait(false);
+                string listId = RobinhoodWatchlistParser.ParseListId(
+                    lists,
+                    TwentyFourHourMarketWatchlistName);
+                JsonElement items = await CallStructuredToolAsync(
+                    "get_watchlist_items",
+                    new Dictionary<string, object?>
+                    {
+                        ["list_id"] = listId,
+                    },
+                    cancellationToken).ConfigureAwait(false);
+                symbols = RobinhoodWatchlistParser.ParseInstrumentSymbols(items);
+                _twentyFourHourEligibleSymbols = symbols;
+            }
+
+            return symbols.Contains(symbol);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            Trace.TraceWarning(
+                "Robinhood 24 Hour Market eligibility lookup failed for {0}: {1}",
+                symbol,
+                exception.Message);
+            return false;
+        }
+        finally
+        {
+            _twentyFourHourEligibilityGate.Release();
+        }
     }
 
     public async Task<IReadOnlyList<BrokerOrderSnapshot>> GetOpenOrdersAsync(

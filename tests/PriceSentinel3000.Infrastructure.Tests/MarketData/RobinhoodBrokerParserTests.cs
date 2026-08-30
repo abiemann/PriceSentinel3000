@@ -132,6 +132,27 @@ public sealed class RobinhoodBrokerParserTests
         Assert.True(tradability.OvernightTradeable);
     }
 
+    [Theory]
+    [InlineData("", false)]
+    [InlineData("\"twenty_four_seven_tradability\": null,", false)]
+    [InlineData("\"twenty_four_seven_tradability\": \"\",", false)]
+    [InlineData("\"twenty_four_seven_tradability\": \"untradable\",", true)]
+    [InlineData("\"twenty_four_seven_tradability\": false,", true)]
+    public void HasExplicitOvernightTradability_DistinguishesMissingFromDenial(
+        string property,
+        bool expected)
+    {
+        JsonElement root = Json(
+            "{\"data\":{\"results\":[{" + property +
+            "\"symbol\":\"INTC\",\"state\":\"active\",\"tradeable\":true}]}}");
+
+        bool actual = RobinhoodBrokerParser.HasExplicitOvernightTradability(
+            root,
+            "INTC");
+
+        Assert.Equal(expected, actual);
+    }
+
     [Fact]
     public void ParseReview_FailsClosedWhenCanPlaceIsFalse()
     {
