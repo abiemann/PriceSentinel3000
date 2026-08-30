@@ -45,8 +45,7 @@
                                Text="{Binding CurrentPrice}" />
                 </StackPanel>
                 <Border Margin="0,0,26,0"
-                        Padding="9,5"
-                        VerticalAlignment="Center"
+                        Padding="7,2"
                         Background="#342A14"
                         BorderBrush="#8A6A22"
                         BorderThickness="1"
@@ -62,10 +61,18 @@
                             </Style.Triggers>
                         </Style>
                     </Border.Style>
-                    <TextBlock Foreground="#F4C15D"
-                               FontSize="10"
+                    <TextBlock HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Foreground="#F4C15D"
+                               FontSize="9"
                                FontWeight="Bold"
-                               Text="24HR" />
+                               LineHeight="10"
+                               LineStackingStrategy="BlockLineHeight"
+                               TextAlignment="Center">
+                        <Run Text="24" />
+                        <LineBreak />
+                        <Run Text="HR" />
+                    </TextBlock>
                 </Border>
                 <Border Padding="12,7"
                         Background="{Binding MarketDataStatusBackground}"
