@@ -48,13 +48,18 @@ view model remains the overall workspace and mode orchestrator:
   implementation remains in Infrastructure.
 
 `MainViewModel` remains responsible for bindable state and commands as well as
-mode selection, validation, Replay loading, broker preflight queries, paper/LIVE
-account projection, journaling coordination, and chart projection. Its
-implementation is grouped into session, LIVE, paper, and presentation partials so
-those responsibilities remain navigable without adding artificial service layers.
-Window shutdown awaits `MainViewModel.ShutdownAsync`, cancelling the active data
-session and awaiting its command task before disposing broker/storage adapters.
-Any retained LIVE order context is then cancelled or reconciled without
+mode selection, validation, Replay loading, broker preflight queries, symbol
+search, tradability projection, paper/LIVE account projection, journaling
+coordination, and chart projection. Its implementation is grouped into session,
+LIVE, paper, presentation, symbol-search, and tradability partials so those
+responsibilities remain navigable without adding artificial service layers.
+
+Window shutdown is a two-phase workflow. `MainWindow` first awaits
+`MainViewModel.PrepareForShutdownAsync`, which cancels the active data session,
+awaits its command task, and attempts to cancel or reconcile retained LIVE order
+context. If a terminal broker state cannot be confirmed, closing pauses behind an
+explicit warning. After resolution or deliberate exit confirmation,
+`MainViewModel.ShutdownAsync` disposes the broker and storage adapters without
 synchronously blocking the WPF UI thread.
 
 ## Runtime data flow
@@ -70,6 +75,7 @@ flowchart TD
     Decision --> Live[LiveOrderCoordinator]
     Live --> Review[Robinhood review and execution]
     Observation --> Chart[WPF chart projection]
+    Observation --> Journal[SQLite journal]
     Decision --> Journal[SQLite journal]
     Paper --> Journal
     Review --> Journal
@@ -88,6 +94,11 @@ Paper Trader and LIVE share the real-time ingestion path, but not execution:
   position, tradability, and open-order state.
 - Replay reads a bounded historical window and always uses simulated fills.
 
+Symbol entry uses the `IInstrumentSearchSource` port for autocomplete suggestions.
+Robinhood tradability capabilities and the Core `EquityMarketSessionEvaluator`
+feed the `24HR` eligibility badge and the current `Tradable now` projection. Those
+presentation states do not expand the broker-execution window described below.
+
 ## LIVE safety invariants
 
 LIVE is intentionally fail-closed:
@@ -95,19 +106,28 @@ LIVE is intentionally fail-closed:
 1. The application always starts in OFF, and selecting LIVE leaves execution
    disarmed.
 2. The user must acknowledge the loss warning and explicitly start LIVE.
-3. Account, buying power, symbol tradability, positions, open orders, daily loss,
-   and entry count are reconciled before arming.
-4. Robinhood must review the exact intent before placement. Missing or malformed
+3. Account value, buying power, symbol tradability, the selected symbol's position,
+   and its open orders are queried before arming. An existing position or open
+   order for that symbol blocks LIVE startup because v1 starts from a flat state.
+4. Entry count is reconstructed from filled agentic BUY orders created since New
+   York midnight. The daily-loss baseline comes from the first journaled LIVE
+   starting balance for that trading day, falling back to the current portfolio
+   value; it is not a separate broker daily-P&L query.
+5. LIVE broker orders are limited to weekdays from 9:30 AM through 4:00 PM New
+   York time and are submitted as `regular_hours` orders. A `24HR` eligibility
+   badge or a positive `Tradable now` display does not widen that execution window.
+6. Robinhood must review the exact intent before placement. Missing or malformed
    review data, any broker alert, stale pricing, or excessive review-price drift
    blocks the order.
-5. Stable idempotency references and active-order reconciliation prevent duplicate
+7. Stable idempotency references and active-order reconciliation prevent duplicate
    placement while a submission result is uncertain.
-6. STOP and application shutdown cancel the data session first. When an
-   acknowledged open PriceSentinel order exists, they request cancellation and
-   briefly poll broker state. If application shutdown cannot confirm a terminal
-   broker state, closing pauses behind an explicit warning so the user can verify
-   Robinhood or deliberately choose to exit anyway.
-7. Replay and Paper Trader cannot submit a real broker order.
+8. STOP and application shutdown cancel the data session first. When retained or
+   unresolved LIVE order context exists, including a submission with an uncertain
+   placement response, they recover by stable client reference when necessary,
+   request cancellation, and briefly poll broker state. If application shutdown
+   cannot confirm a terminal broker state, closing pauses behind an explicit
+   warning so the user can verify Robinhood or deliberately choose to exit anyway.
+9. Replay and Paper Trader cannot submit a real broker order.
 
 These rules span deterministic Core gates, the Application order coordinator, and
 the view-model workflow below the visual controls; changing a button's visual
@@ -120,7 +140,8 @@ All mutable application data lives under `%LOCALAPPDATA%\PriceSentinel3000`:
 - OAuth tokens and dynamic client registration are encrypted with Windows DPAPI
   for the current user.
 - The SQLite WAL journal records observations, decisions, simulated and LIVE order
-  events, fills, and position snapshots.
+  events and fills, plus paper-account position snapshots. LIVE broker position
+  state is queried from Robinhood rather than persisted as a position snapshot.
 - `SqliteJournalSchema` isolates schema creation and migrations from the journal's
   read/write operations.
 - JSON preferences contain ordinary UI and research settings only.
