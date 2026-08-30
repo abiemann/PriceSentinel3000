@@ -51,8 +51,9 @@ view model remains the overall workspace and mode orchestrator:
 mode selection, validation, Replay loading, broker preflight queries, symbol
 search, tradability projection, paper/LIVE account projection, journaling
 coordination, and chart projection. Its implementation is grouped into session,
-LIVE, paper, presentation, symbol-search, and tradability partials so those
-responsibilities remain navigable without adding artificial service layers.
+LIVE, existing-position recovery, paper, presentation, symbol-search, and
+tradability partials so those responsibilities remain navigable without adding
+artificial service layers.
 
 Window shutdown is a two-phase workflow. `MainWindow` first awaits
 `MainViewModel.PrepareForShutdownAsync`, which cancels the active data session,
@@ -107,27 +108,38 @@ LIVE is intentionally fail-closed:
    disarmed.
 2. The user must acknowledge the loss warning and explicitly start LIVE.
 3. Account value, buying power, symbol tradability, the selected symbol's position,
-   and its open orders are queried before arming. An existing position or open
-   order for that symbol blocks LIVE startup because v1 starts from a flat state.
-4. Entry count is reconstructed from filled agentic BUY orders created since New
+   and its open orders are queried before arming. An open order for that symbol
+   blocks LIVE startup.
+4. An existing long position requires an explicit user choice: request an immediate
+   reviewed sale, adopt it for profitable-exit monitoring, or cancel without an
+   order. Quantity, average cost, available shares, and a fresh estimated sell price
+   are shown before the choice. Broker state and price are refreshed afterward;
+   changes fail closed. Adoption is blocked if the configured stop loss or daily
+   loss would immediately liquidate the position, and shorts, missing cost basis,
+   partially unavailable holdings, or quantities beyond broker order precision are
+   not adopted. An inherited-position latch blocks every new entry until the app's
+   matching SELL fully fills and a fresh broker snapshot confirms both a flat
+   position and no open order. Rejection, partial fill, unexpected position changes,
+   or an unresolved order keep execution stopped or disarmed for manual review.
+5. Entry count is reconstructed from filled agentic BUY orders created since New
    York midnight. The daily-loss baseline comes from the first journaled LIVE
    starting balance for that trading day, falling back to the current portfolio
    value; it is not a separate broker daily-P&L query.
-5. LIVE broker orders are limited to weekdays from 9:30 AM through 4:00 PM New
+6. LIVE broker orders are limited to weekdays from 9:30 AM through 4:00 PM New
    York time and are submitted as `regular_hours` orders. A `24HR` eligibility
    badge or a positive `Tradable now` display does not widen that execution window.
-6. Robinhood must review the exact intent before placement. Missing or malformed
+7. Robinhood must review the exact intent before placement. Missing or malformed
    review data, any broker alert, stale pricing, or excessive review-price drift
    blocks the order.
-7. Stable idempotency references and active-order reconciliation prevent duplicate
+8. Stable idempotency references and active-order reconciliation prevent duplicate
    placement while a submission result is uncertain.
-8. STOP and application shutdown cancel the data session first. When retained or
+9. STOP and application shutdown cancel the data session first. When retained or
    unresolved LIVE order context exists, including a submission with an uncertain
    placement response, they recover by stable client reference when necessary,
    request cancellation, and briefly poll broker state. If application shutdown
    cannot confirm a terminal broker state, closing pauses behind an explicit
    warning so the user can verify Robinhood or deliberately choose to exit anyway.
-9. Replay and Paper Trader cannot submit a real broker order.
+10. Replay and Paper Trader cannot submit a real broker order.
 
 These rules span deterministic Core gates, the Application order coordinator, and
 the view-model workflow below the visual controls; changing a button's visual

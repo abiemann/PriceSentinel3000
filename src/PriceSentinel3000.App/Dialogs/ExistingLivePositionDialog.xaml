@@ -1,0 +1,240 @@
+<Window x:Class="PriceSentinel3000.App.Dialogs.ExistingLivePositionDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="Existing LIVE position"
+        Width="650"
+        Height="600"
+        ResizeMode="NoResize"
+        WindowStyle="None"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Background="#10151D">
+    <Window.Resources>
+        <Style x:Key="RecoveryActionButtonStyle"
+               TargetType="Button">
+            <Setter Property="Height" Value="48" />
+            <Setter Property="Padding" Value="16,8" />
+            <Setter Property="Background" Value="{StaticResource SecondaryControlSurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource SecondaryControlBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder"
+                                        Property="BorderBrush"
+                                        Value="{StaticResource InteractiveHoverBorderBrush}" />
+                                <Setter TargetName="ButtonBorder"
+                                        Property="BorderThickness"
+                                        Value="2" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="ButtonBorder"
+                                        Property="BorderBrush"
+                                        Value="{StaticResource InteractiveHoverBorderBrush}" />
+                                <Setter TargetName="ButtonBorder"
+                                        Property="BorderThickness"
+                                        Value="2" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder"
+                                        Property="Opacity"
+                                        Value="0.72" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ButtonBorder"
+                                        Property="Opacity"
+                                        Value="0.35" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="36"
+                            CornerRadius="8"
+                            GlassFrameThickness="0"
+                            ResizeBorderThickness="0"
+                            UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="36" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.RowSpan="2"
+                BorderBrush="#4A3532"
+                BorderThickness="1"
+                CornerRadius="8"
+                IsHitTestVisible="False" />
+        <Border Background="{StaticResource ChromeSurfaceBrush}"
+                BorderBrush="#3F302E"
+                BorderThickness="1,1,1,0"
+                CornerRadius="8,8,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Margin="14,0,0,0"
+                           VerticalAlignment="Center"
+                           Foreground="#D7C3BE"
+                           FontSize="11"
+                           FontWeight="SemiBold"
+                           Text="EXISTING LIVE POSITION" />
+                <Button Grid.Column="1"
+                        Style="{StaticResource CloseTitleBarButtonStyle}"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                        Click="CloseButton_Click"
+                        Content="&#xE8BB;"
+                        ToolTip="Cancel LIVE startup" />
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1" Margin="32,26,32,28">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <StackPanel>
+                <TextBlock Foreground="{StaticResource HeadingTextBrush}"
+                           FontSize="24"
+                           FontWeight="Bold"
+                           TextWrapping="Wrap">
+                    <Run Text="Robinhood already holds " />
+                    <Run Text="{Binding Symbol}" />
+                </TextBlock>
+                <TextBlock Margin="0,8,0,0"
+                           Foreground="{StaticResource SecondaryTextBrush}"
+                           FontSize="13"
+                           LineHeight="20"
+                           TextWrapping="Wrap"
+                           Text="Choose how PriceSentinel should handle this position. No action is taken until you choose an option below." />
+            </StackPanel>
+
+            <Border Grid.Row="1"
+                    Margin="0,20,0,0"
+                    Padding="18,14"
+                    Background="{StaticResource ControlSurfaceBrush}"
+                    BorderBrush="{StaticResource CardBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="7">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel>
+                        <TextBlock Foreground="{StaticResource MutedTextBrush}"
+                                   FontSize="10"
+                                   Text="SHARES OWNED" />
+                        <TextBlock Margin="0,5,0,0"
+                                   Foreground="{StaticResource PrimaryTextBrush}"
+                                   FontSize="17"
+                                   FontWeight="SemiBold"
+                                   Text="{Binding Quantity, StringFormat={}{0:0.######}}" />
+                        <TextBlock Margin="0,2,0,0"
+                                   Foreground="{StaticResource SubtleTextBrush}"
+                                   FontSize="9"
+                                   Text="{Binding SharesAvailableForSale, StringFormat={}{0:0.######} available to sell}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Foreground="{StaticResource MutedTextBrush}"
+                                   FontSize="10"
+                                   Text="AVERAGE BUY PRICE" />
+                        <TextBlock Margin="0,5,0,0"
+                                   Foreground="{StaticResource PrimaryTextBrush}"
+                                   FontSize="17"
+                                   FontWeight="SemiBold"
+                                   Text="{Binding AverageBuyPrice, StringFormat={}{0:C2}}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Foreground="{StaticResource MutedTextBrush}"
+                                   FontSize="10"
+                                   Text="ESTIMATED SELL PRICE" />
+                        <TextBlock Margin="0,5,0,0"
+                                   Foreground="{StaticResource SuccessTextBrush}"
+                                   FontSize="17"
+                                   FontWeight="SemiBold"
+                                   Text="{Binding EstimatedSellPrice, StringFormat={}{0:C2}}" />
+                        <TextBlock Margin="0,2,0,0"
+                                   Foreground="{StaticResource SubtleTextBrush}"
+                                   FontSize="9"
+                                   Text="{Binding EstimatedPriceSource}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <ScrollViewer Grid.Row="2"
+                          Margin="0,16,0,0"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock x:Name="GeneralWarningText"
+                               Foreground="{StaticResource SubduedTextBrush}"
+                               FontSize="11"
+                               TextWrapping="Wrap"
+                               Text="The displayed price is an estimate; a reviewed market order can fill at a different price. Profit monitoring uses Robinhood's average cost and keeps the configured stop-loss and daily-loss protections active." />
+                    <TextBlock x:Name="ActionBlockWarningText"
+                               Margin="0,8,0,0"
+                               Foreground="{StaticResource DangerHighlightBrush}"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               TextWrapping="Wrap"
+                               Visibility="Collapsed" />
+                </StackPanel>
+            </ScrollViewer>
+
+            <StackPanel Grid.Row="3"
+                        Margin="0,18,0,0"
+                        VerticalAlignment="Bottom">
+                <Button x:Name="SellNowButton"
+                        Style="{StaticResource RecoveryActionButtonStyle}"
+                        Background="{StaticResource DangerPanelBrush}"
+                        BorderBrush="{StaticResource DangerBorderBrush}"
+                        Foreground="#FFE9E5"
+                        ToolTipService.ShowOnDisabled="True"
+                        Click="SellNow_Click" />
+                <Button x:Name="MonitorButton"
+                        Margin="0,10,0,0"
+                        Style="{StaticResource RecoveryActionButtonStyle}"
+                        Background="{StaticResource SuccessSurfaceBrush}"
+                        BorderBrush="{StaticResource SuccessBorderBrush}"
+                        Foreground="{StaticResource SuccessTextBrush}"
+                        ToolTipService.ShowOnDisabled="True"
+                        Click="Monitor_Click"
+                        Content="WAIT FOR THE NEXT PROFITABLE EXIT" />
+                <Button Margin="0,10,0,0"
+                        Style="{StaticResource RecoveryActionButtonStyle}"
+                        Click="Cancel_Click"
+                        IsCancel="True"
+                        Content="CANCEL LIVE START" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

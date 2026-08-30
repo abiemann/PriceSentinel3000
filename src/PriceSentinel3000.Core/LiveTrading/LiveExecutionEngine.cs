@@ -26,6 +26,7 @@ public sealed class LiveExecutionEngine
     private DateTimeOffset? _positionOpenedAtUtc;
     private int _entriesToday;
     private bool _riskLocked;
+    private bool _requiresInheritedPositionExit;
 
     public LiveExecutionEngine(
         TradingSessionSettings settings,
@@ -33,7 +34,8 @@ public sealed class LiveExecutionEngine
         IPriceActionSignalEngine? strategy = null,
         int initialEntriesToday = 0,
         DateTimeOffset? initialLastExitUtc = null,
-        decimal? initialLastExitPrice = null)
+        decimal? initialLastExitPrice = null,
+        bool requireInheritedPositionExit = false)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
@@ -59,6 +61,7 @@ public sealed class LiveExecutionEngine
         _entriesToday = initialEntriesToday;
         _lastExitUtc = initialLastExitUtc;
         _lastExitPrice = initialLastExitPrice;
+        _requiresInheritedPositionExit = requireInheritedPositionExit;
         _strategy = strategy ?? new PriceActionSignalEngine(settings.BufferMinutes);
     }
 
@@ -91,6 +94,14 @@ public sealed class LiveExecutionEngine
         if (brokerBlock is not null)
         {
             return Hold(latest.SourceTimestampUtc, "BROKER BLOCKED", brokerBlock);
+        }
+
+        if (_requiresInheritedPositionExit && !broker.Position.HasPosition)
+        {
+            return Hold(
+                latest.SourceTimestampUtc,
+                "INHERITED POSITION CHECK",
+                "The inherited Robinhood position is no longer present, but PriceSentinel has not confirmed its own completed exit; new entries remain blocked.");
         }
 
         decimal exitMark = latest.HasTwoSidedMarket ? latest.Bid : latest.Last;
@@ -174,6 +185,9 @@ public sealed class LiveExecutionEngine
         return new(decision, null, _riskLocked);
     }
 
+    public void ConfirmInheritedPositionClosed() =>
+        _requiresInheritedPositionExit = false;
+
     public void ObserveTerminalOrder(BrokerOrderSnapshot order)
     {
         ArgumentNullException.ThrowIfNull(order);
@@ -234,17 +248,12 @@ public sealed class LiveExecutionEngine
             return null;
         }
 
-        decimal unrealizedLoss = Math.Max(
-            0m,
-            (broker.Position.AverageBuyPrice - mark) * broker.Position.Quantity);
-        decimal stopLimit = _settings.StopLossBasis switch
-        {
-            StopLossBasis.TotalPositionLossAmount => _settings.StopLossValue,
-            _ => broker.Position.AverageBuyPrice * broker.Position.Quantity *
-                 _settings.StopLossValue / 100m,
-        };
+        PositionStopLossAssessment stopLoss = PositionStopLossCalculator.Evaluate(
+            _settings,
+            broker.Position,
+            mark);
 
-        if (unrealizedLoss < stopLimit)
+        if (!stopLoss.IsTriggered)
         {
             return null;
         }
@@ -255,8 +264,8 @@ public sealed class LiveExecutionEngine
             "STOP LOSS",
             1m,
             [_settings.StopLossBasis is StopLossBasis.TotalPositionLossAmount
-                ? $"Position loss ${unrealizedLoss:0.00} reached the ${stopLimit:0.00} stop."
-                : $"Price decline {Math.Max(0m, (broker.Position.AverageBuyPrice - mark) / broker.Position.AverageBuyPrice * 100m):0.00}% reached the {_settings.StopLossValue:0.00}% purchase-price stop."],
+                ? $"Position loss ${stopLoss.UnrealizedLoss:0.00} reached the ${stopLoss.LossLimit:0.00} stop."
+                : $"Price decline {stopLoss.DeclinePercentage:0.00}% reached the {_settings.StopLossValue:0.00}% purchase-price stop."],
             null,
             0m,
             (mark - broker.Position.AverageBuyPrice) /

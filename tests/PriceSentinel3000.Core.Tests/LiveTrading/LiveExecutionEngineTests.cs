@@ -231,6 +231,63 @@ public sealed class LiveExecutionEngineTests
         Assert.Contains("average purchase price", result.Decision.Reasons[0]);
     }
 
+    [Fact]
+    public void Evaluate_AdoptedPositionStartsInExitContextAndCannotBuyAgain()
+    {
+        var strategy = new ScriptedStrategy(StrategySignalKind.Buy);
+        var engine = new LiveExecutionEngine(
+            Settings(),
+            10_000m,
+            strategy);
+        MarketQuote quote = Quote(10.10m);
+        BrokerPosition position = new("SOFI", 4m, 10m, 4m, 0m);
+
+        LiveTradeEvaluation result = engine.Evaluate(
+            [quote],
+            Snapshot(position: position));
+
+        Assert.NotNull(strategy.LastPosition);
+        Assert.Equal(4m, strategy.LastPosition.Quantity);
+        Assert.Equal(10m, strategy.LastPosition.AveragePrice);
+        Assert.Equal(quote.SourceTimestampUtc, strategy.LastPosition.OpenedAtUtc);
+        Assert.Null(result.Intent);
+        Assert.Equal("RISK BLOCKED", result.Decision.State);
+        Assert.Contains("open position", result.Decision.Reasons[0]);
+    }
+
+    [Fact]
+    public void Evaluate_AdoptedPositionStaysExitFirstUntilClosureIsConfirmed()
+    {
+        var strategy = new ScriptedStrategy(
+            StrategySignalKind.Buy,
+            StrategySignalKind.Buy);
+        var engine = new LiveExecutionEngine(
+            Settings(),
+            10_000m,
+            strategy,
+            requireInheritedPositionExit: true);
+        BrokerPosition inherited = new("SOFI", 4m, 10m, 4m, 0m);
+
+        LiveTradeEvaluation whileHeld = engine.Evaluate(
+            [Quote(10.10m)],
+            Snapshot(position: inherited));
+        LiveTradeEvaluation disappeared = engine.Evaluate(
+            [Quote(10.11m, secondsOffset: 5)],
+            Snapshot());
+
+        Assert.Null(whileHeld.Intent);
+        Assert.Null(disappeared.Intent);
+        Assert.Equal("INHERITED POSITION CHECK", disappeared.Decision.State);
+
+        engine.ConfirmInheritedPositionClosed();
+        LiveTradeEvaluation released = engine.Evaluate(
+            [Quote(10.12m, secondsOffset: 10)],
+            Snapshot());
+
+        Assert.NotNull(released.Intent);
+        Assert.Equal(BrokerOrderSide.Buy, released.Intent.Side);
+    }
+
     private static TradingSessionSettings Settings() => TradingSessionSettings.Default with
     {
         Symbol = "SOFI",
@@ -289,10 +346,13 @@ public sealed class LiveExecutionEngineTests
     {
         private readonly Queue<StrategySignalKind> _signals = new(signals);
 
+        public StrategyPositionContext? LastPosition { get; private set; }
+
         public StrategyDecision Evaluate(
             IReadOnlyList<MarketQuote> quotes,
             StrategyPositionContext position)
         {
+            LastPosition = position;
             StrategySignalKind signal = _signals.Count > 0
                 ? _signals.Dequeue()
                 : StrategySignalKind.Hold;

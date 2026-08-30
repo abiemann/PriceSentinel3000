@@ -102,6 +102,19 @@ public sealed partial class MainViewModel
         catch (Exception exception)
         {
             AddActivity($"Data engine error: {exception.Message}", "ERROR");
+            if (_liveOrderCoordinator.HasActiveContext)
+            {
+                await CancelCoordinatedLiveOrderAsync();
+                if (_liveOrderCoordinator.HasActiveContext)
+                {
+                    const string unresolvedMessage =
+                        "LIVE execution is disarmed, but Robinhood order state remains unresolved. Use STOP to retry cancellation and verify the order in Robinhood.";
+                    DisarmLiveExecution(unresolvedMessage);
+                    AddActivity(unresolvedMessage, "ERROR");
+                    return;
+                }
+            }
+
             StopActiveSession("ERROR", $"Data engine stopped: {exception.Message}");
         }
         finally
@@ -123,6 +136,7 @@ public sealed partial class MainViewModel
         await _marketDataSource.ConnectAsync(token);
         TradingSessionSettings sessionSettings = settings;
         LiveBrokerSnapshot? initialBroker = null;
+        ExistingLivePositionRecovery? positionRecovery = null;
 
         if (isLive)
         {
@@ -139,14 +153,39 @@ public sealed partial class MainViewModel
                     "An open Robinhood order already exists for this symbol. Resolve it before starting LIVE Trader.");
             }
 
-            if (initialBroker.Position.HasPosition)
-            {
-                throw new InvalidOperationException(
-                    $"Robinhood already holds {initialBroker.Position.Quantity:0.######} {instrument.Symbol} shares. This v1 starts LIVE only from a flat position; manage the existing position in Robinhood first.");
-            }
-
             DateTimeOffset tradingDayStartUtc = GetEasternTradingDayStartUtc(
                 _timeProvider.GetUtcNow());
+            decimal dailyStartingEquity =
+                _journal.GetLiveStartingBalanceSince(tradingDayStartUtc) ??
+                initialBroker.Portfolio.TotalValue;
+            if (dailyStartingEquity <= 0m)
+            {
+                throw new InvalidOperationException("The saved LIVE daily-equity baseline is invalid; execution remains disarmed.");
+            }
+
+            if (initialBroker.Position.HasPosition)
+            {
+                positionRecovery = await ResolveExistingPositionAsync(
+                    instrument,
+                    settings,
+                    initialBroker,
+                    dailyStartingEquity,
+                    token);
+                if (positionRecovery is null)
+                {
+                    return;
+                }
+
+                initialBroker = positionRecovery.Broker;
+                sessionSettings = settings with
+                {
+                    StartingBalance = initialBroker.Portfolio.TotalValue,
+                };
+                dailyStartingEquity =
+                    _journal.GetLiveStartingBalanceSince(tradingDayStartUtc) ??
+                    initialBroker.Portfolio.TotalValue;
+            }
+
             IReadOnlyList<BrokerOrderSnapshot> ordersToday =
                 await _liveBrokerGateway.GetOrdersCreatedSinceAsync(
                     _liveAccount!.AccountNumber,
@@ -174,9 +213,6 @@ public sealed partial class MainViewModel
                 throw new InvalidOperationException(
                     "The most recent LIVE sell has no usable fill price, so the re-entry price gate cannot be restored; execution remains disarmed.");
             }
-            decimal dailyStartingEquity =
-                _journal.GetLiveStartingBalanceSince(tradingDayStartUtc) ??
-                initialBroker.Portfolio.TotalValue;
             if (dailyStartingEquity <= 0m)
             {
                 throw new InvalidOperationException("The saved LIVE daily-equity baseline is invalid; execution remains disarmed.");
@@ -187,18 +223,45 @@ public sealed partial class MainViewModel
                 dailyStartingEquity,
                 initialEntriesToday: initialEntriesToday,
                 initialLastExitUtc: latestSell?.UpdatedAtUtc,
-                initialLastExitPrice: latestSell?.EffectiveAveragePrice);
+                initialLastExitPrice: latestSell?.EffectiveAveragePrice,
+                requireInheritedPositionExit: positionRecovery is not null);
         }
 
         PrepareDataSession(instrument, sessionSettings, mode);
 
+        if (positionRecovery is not null)
+        {
+            BeginInheritedPositionRecovery(positionRecovery.Broker.Position);
+        }
+
         if (initialBroker is not null)
         {
-            UpdateLiveAccount(initialBroker, 0m);
+            UpdateLiveAccount(
+                initialBroker,
+                positionRecovery is null
+                    ? 0m
+                    : EstimatedSellPrice(positionRecovery.Quote));
             _modeState = _modeState.ArmLive();
             NotifyModeProperties();
-            AddActivity(
-                $"LIVE execution armed for agentic account {_liveAccount!.MaskedNumber}; buying power {initialBroker.Portfolio.BuyingPower:C2}. No order exists at startup.");
+            if (positionRecovery is null)
+            {
+                AddActivity(
+                    $"LIVE execution armed for agentic account {_liveAccount!.MaskedNumber}; buying power {initialBroker.Portfolio.BuyingPower:C2}. No order exists at startup.");
+            }
+            else if (positionRecovery.Choice is ExistingLivePositionChoice.MonitorForProfit)
+            {
+                AddActivity(
+                    $"LIVE execution adopted the existing {initialBroker.Position.Quantity:0.######} {instrument.Symbol} position at Robinhood average cost {initialBroker.Position.AverageBuyPrice:C2}. PriceSentinel will seek a profitable exit before any new entry.",
+                    "WARNING");
+            }
+            else if (!await SellExistingPositionNowAsync(
+                         instrument,
+                         sessionSettings,
+                         positionRecovery,
+                         token))
+            {
+                return;
+            }
         }
         TimeSpan warmStart = GetMaximumChartHistoryDuration(
             settings.BufferMinutes);
@@ -261,6 +324,24 @@ public sealed partial class MainViewModel
             }
 
             isFirstUpdate = false;
+            if (isLive && !LiveArmed)
+            {
+                AddActivity(
+                    "The LIVE data session started, but broker execution remains disarmed; no new order can be submitted.",
+                    "WARNING");
+                continue;
+            }
+
+            if (isLive && _liveOrderCoordinator.HasActiveContext)
+            {
+                StatusMessage =
+                    $"LIVE Trader is reconciling the inherited {instrument.Symbol} exit; all new orders remain blocked.";
+                AddActivity(
+                    $"LIVE Trader started while the inherited {instrument.Symbol} exit is still active at Robinhood; no new entry can be submitted until the account is confirmed flat.",
+                    "WARNING");
+                continue;
+            }
+
             StatusMessage = isLive
                 ? $"LIVE Trader is armed and watching real {instrument.Symbol} prices every {settings.QuotePollingSeconds} seconds."
                 : $"Paper Trader is watching real {instrument.Symbol} prices every {settings.QuotePollingSeconds} seconds; order execution is paper-only.";
@@ -461,6 +542,15 @@ public sealed partial class MainViewModel
         }
 
         bool orderStopHandled = await CancelCoordinatedLiveOrderAsync();
+        if (wasLive && _liveOrderCoordinator.HasActiveContext)
+        {
+            const string unresolvedMessage =
+                "LIVE execution is disarmed, but the Robinhood order is still unresolved. STOP can be used again to retry cancellation; verify Robinhood immediately.";
+            DisarmLiveExecution(unresolvedMessage);
+            AddActivity(unresolvedMessage, "ERROR");
+            return;
+        }
+
         StopActiveSession(
             "STOPPED_BY_USER",
             orderStopHandled
@@ -509,6 +599,7 @@ public sealed partial class MainViewModel
         }
 
         IsSessionRunning = false;
+        ClearInheritedPositionRecovery();
         if (EffectiveMode is TradingMode.Live && SelectedMode is TradingMode.Live)
         {
             _modeState = _modeState.ActivateLiveDisarmed();
@@ -526,7 +617,7 @@ public sealed partial class MainViewModel
         _strategyStateLabel = "IDLE";
         _strategyMessage = ChartPoints.Count > 0
             ? "The captured chart remains visible; start another session when ready."
-            : "Select Paper Trader or Replay to start the data engine.";
+            : "Select Replay, Paper Trader, or LIVE to start the data engine.";
         NotifyStrategyProperties();
         StatusMessage = statusMessage;
     }

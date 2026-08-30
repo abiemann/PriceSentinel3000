@@ -111,6 +111,10 @@ public sealed partial class MainViewModel
                 _ringBuffer.Instrument,
                 trigger.Last,
                 cancellationToken);
+            await HandleInheritedPositionOrderResultAsync(
+                reconciliation,
+                _ringBuffer.Instrument,
+                cancellationToken);
             return;
         }
 
@@ -128,6 +132,11 @@ public sealed partial class MainViewModel
             _ringBuffer.Instrument,
             cancellationToken);
         UpdateLiveAccount(broker, trigger.Last);
+        if (!ValidateInheritedPositionSnapshot(broker))
+        {
+            return;
+        }
+
         LiveTradeEvaluation evaluation = _liveExecutionEngine.Evaluate(
             _ringBuffer.Snapshot(),
             broker);
@@ -169,6 +178,11 @@ public sealed partial class MainViewModel
             return;
         }
 
+        if (!RegisterInheritedPositionExitIntent(intent))
+        {
+            return;
+        }
+
         LiveOrderOperationResult execution =
             await _liveOrderCoordinator.ExecuteAsync(
                 _liveAccount,
@@ -181,6 +195,10 @@ public sealed partial class MainViewModel
             execution,
             _ringBuffer.Instrument,
             trigger.Last,
+            cancellationToken);
+        await HandleInheritedPositionOrderResultAsync(
+            execution,
+            _ringBuffer.Instrument,
             cancellationToken);
     }
 

@@ -87,6 +87,12 @@ execution path to the authenticated Robinhood data foundation:
 - LIVE enters disarmed, then **Start Live Trader** reconciles the agentic account,
   buying power, position, symbol tradability, existing orders, daily loss baseline,
   and daily entry count before it can arm
+- If Robinhood already holds the selected symbol, LIVE shows the quantity, average
+  purchase price, and current estimated sell price before doing anything. The user
+  can request an immediate reviewed market sale, adopt the position and wait for a
+  profitable strategy exit, or cancel startup without changing the position. New
+  BUY orders remain locked out until a PriceSentinel SELL is fully filled and
+  Robinhood independently confirms the symbol is flat with no open order
 - A LIVE strategy decision must first pass local risk, arming, regular-hours,
   tradability, and fractional-share gates before its order intent reaches
   Robinhood review; missing/malformed review data, any non-empty broker alert,
@@ -169,22 +175,35 @@ is unavailable, the session stops and reports the failure.
 
 ## LIVE workflow
 
-1. Confirm the selected symbol has no existing position or open order in the
-   agentic account. This v1 intentionally starts only from a flat position.
+1. Resolve any existing open order for the selected symbol; an open order blocks
+   startup. An existing long position instead opens a confirmation dialog showing
+   Robinhood quantity, average cost, and the current estimated sell-side price.
 2. Select **LIVE**, read the loss warning, and choose **I AGREE**. This enters LIVE
    mode but does not arm execution or submit an order.
 3. Configure conservative risk limits, then choose **Start Live Trader**. The app
    fetches the account from Robinhood instead of using the paper starting balance.
-4. LIVE arms only after account, balance, buying power, tradability, position,
-   open-order, daily-entry, and daily-loss reconciliation succeeds.
-5. A strategy signal must pass the app's local risk gates before it can create an
+4. For an existing position, choose **Sell Now**, **Wait for the next profitable
+   exit**, or **Cancel Live Start**. Immediate sale still goes through Robinhood
+   review, idempotent placement, polling, and reconciliation. Monitoring treats
+   the position as newly adopted and enters exit logic before any new BUY. It is
+   blocked when the configured stop loss or daily-loss limit would liquidate the
+   position immediately. Cancel submits nothing and leaves LIVE disarmed. If an
+   exit remains pending, is only partially filled, or ends unsuccessfully, entry
+   stays blocked and LIVE stops or remains disarmed for manual review. A completed
+   exit releases the entry lock only after Robinhood also reports no remaining
+   position and no open order.
+5. LIVE arms only after account, balance, buying power, tradability, position,
+   open-order, daily-entry, daily-loss, and any existing-position recovery checks
+   succeed. Broker state and the quote are refreshed after the dialog so a changed
+   position cannot be acted upon using stale confirmation.
+6. A strategy signal must pass the app's local risk gates before it can create an
    intent. That intent must also pass arming, regular-hours, tradability, and
    fractional-share gates before Robinhood reviews the exact order. The app records
    and displays the market-data disclosure and blocks every non-empty pre-trade
    alert before placement.
-6. After submission, the app polls the broker order, blocks duplicate signals,
+7. After submission, the app polls the broker order, blocks duplicate signals,
    records state transitions and fills, and refreshes the authoritative position.
-7. **STOP** disarms the session and requests cancellation of a PriceSentinel order.
+8. **STOP** disarms the session and requests cancellation of a PriceSentinel order.
    Robinhood cancellation is asynchronous, so always confirm the final order and
    position in Robinhood. An order can fill while cancellation is in flight. If
    shutdown cannot confirm a terminal state, the app pauses closing and requires

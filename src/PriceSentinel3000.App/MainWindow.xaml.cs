@@ -16,9 +16,31 @@ public partial class MainWindow : Window
     internal MainWindow(MainViewModel viewModel)
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+        _viewModel.ExistingLivePositionPrompt = ShowExistingLivePositionDialog;
+        _viewModel.ExistingLivePositionWarning = ShowExistingLivePositionWarning;
         InitializeComponent();
         DataContext = _viewModel;
     }
+
+    private ExistingLivePositionChoice ShowExistingLivePositionDialog(
+        ExistingLivePositionPrompt prompt)
+    {
+        var dialog = new ExistingLivePositionDialog(prompt)
+        {
+            Owner = this,
+        };
+        return dialog.ShowDialog() is true
+            ? dialog.Choice
+            : ExistingLivePositionChoice.Cancel;
+    }
+
+    private void ShowExistingLivePositionWarning(string message) =>
+        MessageBox.Show(
+            this,
+            message,
+            "LIVE startup stopped",
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
 
     private void MinimizeButton_Click(object sender, RoutedEventArgs e) =>
         WindowState = WindowState.Minimized;
