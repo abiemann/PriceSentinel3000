@@ -137,6 +137,8 @@ public sealed partial class MainViewModel
         if (!isConnected)
         {
             CancelSymbolTradabilityRefresh();
+            CancelSymbolSuggestionRefresh();
+            ClearSymbolSuggestions();
             _tradabilityAccount = null;
             ClearSymbolTradability();
             return;

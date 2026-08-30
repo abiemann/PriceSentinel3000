@@ -13,6 +13,7 @@ namespace PriceSentinel3000.Infrastructure.MarketData;
 public sealed class RobinhoodMcpGateway :
     IMarketDataSource,
     ICachedAuthenticationMarketDataSource,
+    IInstrumentSearchSource,
     ILiveBrokerGateway
 {
     private static readonly Uri Endpoint =
@@ -205,6 +206,21 @@ public sealed class RobinhoodMcpGateway :
             root,
             request.Instrument,
             observedAtUtc);
+    }
+
+    public async Task<IReadOnlyList<InstrumentSearchResult>> SearchAsync(
+        string query,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(query);
+        JsonElement root = await CallStructuredToolAsync(
+            "search",
+            new Dictionary<string, object?>
+            {
+                ["query"] = query.Trim(),
+            },
+            cancellationToken).ConfigureAwait(false);
+        return RobinhoodInstrumentSearchParser.Parse(root);
     }
 
     public async Task<IReadOnlyList<MarketQuote>> GetReplayHistoryAsync(

@@ -20,6 +20,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
     private readonly IMarketDataSource _marketDataSource;
     private readonly ICachedAuthenticationMarketDataSource _cachedAuthentication;
     private readonly ILiveBrokerGateway _liveBrokerGateway;
+    private readonly IInstrumentSearchSource _instrumentSearchSource;
     private readonly ITradingJournal _journal;
     private readonly IUserPreferencesStore _preferencesStore;
     private readonly TimeProvider _timeProvider;
@@ -99,6 +100,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
         IMarketDataSource marketDataSource,
         ICachedAuthenticationMarketDataSource cachedAuthentication,
         ILiveBrokerGateway liveBrokerGateway,
+        IInstrumentSearchSource instrumentSearchSource,
         ITradingJournal journal,
         IUserPreferencesStore preferencesStore,
         TimeProvider? timeProvider = null)
@@ -109,6 +111,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
             throw new ArgumentNullException(nameof(cachedAuthentication));
         _liveBrokerGateway = liveBrokerGateway ??
             throw new ArgumentNullException(nameof(liveBrokerGateway));
+        _instrumentSearchSource = instrumentSearchSource ??
+            throw new ArgumentNullException(nameof(instrumentSearchSource));
         _journal = journal ?? throw new ArgumentNullException(nameof(journal));
         _preferencesStore = preferencesStore ??
             throw new ArgumentNullException(nameof(preferencesStore));
@@ -860,6 +864,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
         _tradabilityRefreshTimer.Stop();
         _tradabilityRefreshTimer.Tick -= HandleTradabilityRefreshTimerTick;
         CancelSymbolTradabilityRefresh();
+        CancelSymbolSuggestionRefresh();
 
         _disposed = true;
         var failures = new List<Exception>();

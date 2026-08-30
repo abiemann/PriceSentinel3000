@@ -18,6 +18,7 @@ public partial class App : System.Windows.Application
             robinhoodGateway,
             robinhoodGateway,
             robinhoodGateway,
+            robinhoodGateway,
             new SqliteTradingJournal(AppDataPaths.JournalDatabase),
             new JsonUserPreferencesStore(AppDataPaths.UserPreferences),
             TimeProvider.System);
