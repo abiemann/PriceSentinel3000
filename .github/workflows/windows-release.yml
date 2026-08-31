@@ -202,21 +202,33 @@ jobs:
           DISPLAY_VERSION: ${{ steps.version.outputs.display_version }}
           WINDOWS_VERSION: ${{ steps.version.outputs.windows_version }}
         run: |
-          $iscc = (Get-Command ISCC.exe -ErrorAction SilentlyContinue |
+          $commandPath = (Get-Command ISCC.exe -ErrorAction SilentlyContinue |
             Select-Object -First 1 -ExpandProperty Source)
-          if (-not $iscc) {
-            $candidate = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-            if (Test-Path -LiteralPath $candidate) {
-              $iscc = $candidate
+
+          $candidates = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+            $commandPath
+          ) | Where-Object { $_ } | Select-Object -Unique
+
+          $iscc = $null
+          $innoVersion = $null
+          $detected = @()
+          foreach ($candidate in $candidates) {
+            if (-not (Test-Path -LiteralPath $candidate)) { continue }
+
+            $candidateVersion = (Get-Item -LiteralPath $candidate).VersionInfo.ProductVersion
+            $detected += "$candidate ($candidateVersion)"
+            if ($candidateVersion -like '6.7.1*') {
+              $iscc = (Resolve-Path -LiteralPath $candidate).Path
+              $innoVersion = $candidateVersion
+              break
             }
           }
-          if (-not $iscc) {
-            throw 'Inno Setup compiler ISCC.exe is not installed on the runner.'
-          }
 
-          $innoVersion = (Get-Item -LiteralPath $iscc).VersionInfo.ProductVersion
-          if ($innoVersion -notlike '6.7.1*') {
-            throw "Expected Inno Setup 6.7.1, but found $innoVersion at $iscc."
+          if (-not $iscc) {
+            $details = if ($detected.Count -gt 0) { $detected -join '; ' } else { 'none' }
+            throw "Expected Inno Setup 6.7.1. Detected candidates: $details."
           }
 
           $sourceDirectory = (Resolve-Path 'artifacts\publish').Path
