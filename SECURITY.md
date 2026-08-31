@@ -6,8 +6,9 @@ testing that could affect an account you do not own.
 
 ## Supported versions
 
-Until formal releases are published, only the latest code on the `main` branch is
-actively supported. Older commits, local forks, and unofficial binaries may not
+The latest published release and the latest code on the `main` branch are
+actively supported. Security fixes can reach `main` before the next packaged
+release. Older releases, commits, local forks, and unofficial binaries may not
 contain current safety or security fixes.
 
 ## Reporting a vulnerability

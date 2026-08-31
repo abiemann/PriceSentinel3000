@@ -1,0 +1,363 @@
+name: Windows Release
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing numeric release tag to package (for example, 1.0)
+        required: true
+        type: string
+      replace_existing_assets:
+        description: Replace release assets with the same names
+        required: true
+        default: false
+        type: boolean
+
+permissions: {}
+
+concurrency:
+  group: windows-release-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_NOLOGO: true
+
+jobs:
+  build:
+    name: Build and package tagged source
+    runs-on: windows-2025
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      artifact_name: ${{ steps.version.outputs.artifact_name }}
+      display_version: ${{ steps.version.outputs.display_version }}
+      release_tag: ${{ steps.version.outputs.tag }}
+
+    steps:
+      - name: Check out immutable packaging tools
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: tooling
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Validate tag and derive versions
+        id: version
+        shell: pwsh
+        env:
+          RELEASE_TAG_INPUT: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          $tag = $env:RELEASE_TAG_INPUT.Trim()
+          $match = [regex]::Match(
+            $tag,
+            '^v?(?<major>0|[1-9]\d*)\.(?<minor>0|[1-9]\d*)(?:\.(?<patch>0|[1-9]\d*))?(?<suffix>-[0-9A-Za-z][0-9A-Za-z.-]*)?$')
+
+          if (-not $match.Success) {
+            throw "Release tag '$tag' must be a numeric version such as 1.0, v1.0.1, or 1.1.0-beta.1."
+          }
+
+          $major = $match.Groups['major'].Value
+          $minor = $match.Groups['minor'].Value
+          $patch = if ($match.Groups['patch'].Success) { $match.Groups['patch'].Value } else { '0' }
+          $suffix = $match.Groups['suffix'].Value
+          $displayVersion = $tag -replace '^v', ''
+          $packageVersion = "$major.$minor.$patch$suffix"
+          $windowsVersion = "$major.$minor.$patch.0"
+          $artifactName = "PriceSentinel3000-$displayVersion-windows-release"
+
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "display_version=$displayVersion" >> $env:GITHUB_OUTPUT
+          "package_version=$packageVersion" >> $env:GITHUB_OUTPUT
+          "windows_version=$windowsVersion" >> $env:GITHUB_OUTPUT
+          "artifact_name=$artifactName" >> $env:GITHUB_OUTPUT
+
+      - name: Verify the GitHub release exists
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY
+
+      - name: Check out exact release tag
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: refs/tags/${{ steps.version.outputs.tag }}
+          path: source
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Verify source and tooling commits
+        id: commits
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          $tagRef = "refs/tags/$env:RELEASE_TAG"
+          $tagCommit = (git -C source rev-parse "${tagRef}^{commit}").Trim()
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not peel $tagRef to a commit."
+          }
+
+          $sourceCommit = (git -C source rev-parse HEAD).Trim()
+          $toolingCommit = (git -C tooling rev-parse HEAD).Trim()
+
+          if ($sourceCommit -ne $tagCommit) {
+            throw "Source checkout $sourceCommit does not match peeled tag commit $tagCommit."
+          }
+
+          if ($toolingCommit -ne $env:WORKFLOW_SHA) {
+            throw "Tooling checkout $toolingCommit does not match workflow commit $env:WORKFLOW_SHA."
+          }
+
+          "source_commit=$sourceCommit" >> $env:GITHUB_OUTPUT
+          "tooling_commit=$toolingCommit" >> $env:GITHUB_OUTPUT
+
+      - name: Install exact .NET SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          dotnet-version: 10.0.302
+
+      - name: Select exact .NET SDK
+        shell: pwsh
+        run: |
+          @{
+            sdk = @{
+              version = '10.0.302'
+              rollForward = 'disable'
+              allowPrerelease = $false
+            }
+          } | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath global.json -Encoding utf8
+
+          $actualVersion = (dotnet --version).Trim()
+          if ($actualVersion -ne '10.0.302') {
+            throw "Expected .NET SDK 10.0.302, but dotnet selected $actualVersion."
+          }
+
+      - name: Restore, build, and test
+        shell: pwsh
+        run: |
+          dotnet restore source\PriceSentinel3000.sln
+          if ($LASTEXITCODE -ne 0) { throw 'Solution restore failed.' }
+
+          dotnet build source\PriceSentinel3000.sln --configuration Release --no-restore --warnaserror
+          if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
+
+          dotnet test source\PriceSentinel3000.sln --configuration Release --no-build `
+            --logger trx --results-directory artifacts\test-results
+          if ($LASTEXITCODE -ne 0) { throw 'Tests failed.' }
+
+      - name: Restore and publish Windows x64
+        shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
+          WINDOWS_VERSION: ${{ steps.version.outputs.windows_version }}
+          DISPLAY_VERSION: ${{ steps.version.outputs.display_version }}
+        run: |
+          $project = 'source\src\PriceSentinel3000.App\PriceSentinel3000.App.csproj'
+          $releaseProps = (Resolve-Path 'tooling\installer\PriceSentinel3000.Release.props').Path
+          $appIcon = (Resolve-Path 'tooling\src\PriceSentinel3000.App\Assets\PriceSentinel3000.ico').Path
+
+          dotnet restore $project --runtime win-x64
+          if ($LASTEXITCODE -ne 0) { throw 'Windows x64 restore failed.' }
+
+          dotnet publish $project `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --no-restore `
+            --output artifacts\publish `
+            -p:PublishSingleFile=false `
+            -p:PublishTrimmed=false `
+            -p:PublishReadyToRun=false `
+            -p:DebugType=None `
+            -p:DebugSymbols=false `
+            -p:CustomAfterMicrosoftCommonProps=$releaseProps `
+            -p:PriceSentinelPackagingIcon=$appIcon `
+            -p:PriceSentinelPackageVersion=$env:PACKAGE_VERSION `
+            -p:PriceSentinelWindowsVersion=$env:WINDOWS_VERSION `
+            -p:PriceSentinelDisplayVersion=$env:DISPLAY_VERSION
+
+          if ($LASTEXITCODE -ne 0) { throw 'Windows x64 publish failed.' }
+          if (-not (Test-Path -LiteralPath 'artifacts\publish\PriceSentinel3000.exe')) {
+            throw 'Published executable was not created.'
+          }
+
+          $sqliteNative = @(Get-ChildItem -LiteralPath 'artifacts\publish' -Recurse -Filter 'e_sqlite3.dll')
+          if ($sqliteNative.Count -eq 0) {
+            throw 'The native SQLite library e_sqlite3.dll is missing from the publish output.'
+          }
+
+      - name: Compile installer with pinned Inno Setup
+        id: installer
+        shell: pwsh
+        env:
+          DISPLAY_VERSION: ${{ steps.version.outputs.display_version }}
+          WINDOWS_VERSION: ${{ steps.version.outputs.windows_version }}
+        run: |
+          $iscc = (Get-Command ISCC.exe -ErrorAction SilentlyContinue |
+            Select-Object -First 1 -ExpandProperty Source)
+          if (-not $iscc) {
+            $candidate = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+            if (Test-Path -LiteralPath $candidate) {
+              $iscc = $candidate
+            }
+          }
+          if (-not $iscc) {
+            throw 'Inno Setup compiler ISCC.exe is not installed on the runner.'
+          }
+
+          $innoVersion = (Get-Item -LiteralPath $iscc).VersionInfo.ProductVersion
+          if ($innoVersion -notlike '6.7.1*') {
+            throw "Expected Inno Setup 6.7.1, but found $innoVersion at $iscc."
+          }
+
+          $sourceDirectory = (Resolve-Path 'artifacts\publish').Path
+          $outputDirectory = (New-Item -ItemType Directory -Path 'artifacts\installer' -Force).FullName
+          $appIcon = (Resolve-Path 'tooling\src\PriceSentinel3000.App\Assets\PriceSentinel3000.ico').Path
+          $license = (Resolve-Path 'source\LICENSE').Path
+          $script = (Resolve-Path 'tooling\installer\PriceSentinel3000.iss').Path
+
+          $arguments = @(
+            '/Qp',
+            "/DMyAppVersion=$env:WINDOWS_VERSION",
+            "/DMyAppDisplayVersion=$env:DISPLAY_VERSION",
+            "/DSourceDir=$sourceDirectory",
+            "/DOutputDir=$outputDirectory",
+            "/DAppIcon=$appIcon",
+            "/DLicenseFile=$license"
+          )
+
+          & $iscc @arguments $script
+          if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup compilation failed with exit code $LASTEXITCODE."
+          }
+
+          $setupFiles = @(Get-ChildItem -LiteralPath $outputDirectory -Filter '*.exe')
+          if ($setupFiles.Count -ne 1) {
+            throw "Expected one setup executable, found $($setupFiles.Count)."
+          }
+
+          "setup_path=$($setupFiles[0].FullName)" >> $env:GITHUB_OUTPUT
+          "inno_version=$innoVersion" >> $env:GITHUB_OUTPUT
+
+      - name: Create checksums and build provenance
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          DISPLAY_VERSION: ${{ steps.version.outputs.display_version }}
+          PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
+          WINDOWS_VERSION: ${{ steps.version.outputs.windows_version }}
+          SOURCE_COMMIT: ${{ steps.commits.outputs.source_commit }}
+          TOOLING_COMMIT: ${{ steps.commits.outputs.tooling_commit }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          INNO_VERSION: ${{ steps.installer.outputs.inno_version }}
+          SETUP_PATH: ${{ steps.installer.outputs.setup_path }}
+        run: |
+          $releaseDirectory = (New-Item -ItemType Directory -Path 'artifacts\release-assets' -Force).FullName
+          $setup = Get-Item -LiteralPath $env:SETUP_PATH
+          Copy-Item -LiteralPath $setup.FullName -Destination $releaseDirectory
+
+          $provenanceName = "PriceSentinel3000-$env:DISPLAY_VERSION-win-x64-build-provenance.txt"
+          $provenancePath = Join-Path $releaseDirectory $provenanceName
+          $dotnetVersion = (dotnet --version).Trim()
+          @(
+            'format_version=1',
+            "release_tag=$env:RELEASE_TAG",
+            "display_version=$env:DISPLAY_VERSION",
+            "package_version=$env:PACKAGE_VERSION",
+            "windows_file_version=$env:WINDOWS_VERSION",
+            "source_commit=$env:SOURCE_COMMIT",
+            "tooling_commit=$env:TOOLING_COMMIT",
+            "workflow_commit=$env:WORKFLOW_SHA",
+            'runtime_identifier=win-x64',
+            'self_contained=true',
+            'publish_single_file=false',
+            "dotnet_sdk=$dotnetVersion",
+            "inno_setup=$env:INNO_VERSION",
+            "generated_utc=$([DateTime]::UtcNow.ToString('o'))"
+          ) | Set-Content -LiteralPath $provenancePath -Encoding ascii
+
+          $checksumName = "PriceSentinel3000-$env:DISPLAY_VERSION-win-x64-SHA256SUMS.txt"
+          $checksumPath = Join-Path $releaseDirectory $checksumName
+          $hashLines = Get-ChildItem -LiteralPath $releaseDirectory -File |
+            Sort-Object Name |
+            ForEach-Object {
+              $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+              "$hash  $($_.Name)"
+            }
+          $hashLines | Set-Content -LiteralPath $checksumPath -Encoding ascii
+
+      - name: Upload packaged release artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ steps.version.outputs.artifact_name }}
+          path: artifacts/release-assets/*
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload test results when the build fails
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-test-results-${{ steps.version.outputs.display_version }}
+          path: artifacts/test-results/**/*.trx
+          if-no-files-found: ignore
+          retention-days: 7
+
+  publish:
+    name: Attach verified assets to GitHub release
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download packaged release artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ${{ needs.build.outputs.artifact_name }}
+          path: release-assets
+
+      - name: Verify checksums and upload release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
+          REPLACE_EXISTING: ${{ github.event_name == 'workflow_dispatch' && inputs.replace_existing_assets || false }}
+        run: |
+          set -euo pipefail
+          cd release-assets
+
+          checksum_file="PriceSentinel3000-${{ needs.build.outputs.display_version }}-win-x64-SHA256SUMS.txt"
+          sha256sum --check "$checksum_file"
+
+          mapfile -t files < <(find . -maxdepth 1 -type f -printf '%f\n' | sort)
+          existing_assets="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+
+          if [[ "$REPLACE_EXISTING" != "true" ]]; then
+            for file in "${files[@]}"; do
+              if grep -Fqx "$file" <<< "$existing_assets"; then
+                echo "::error::Release asset '$file' already exists. Re-run manually with replacement enabled only if intentional."
+                exit 1
+              fi
+            done
+          fi
+
+          upload_args=(release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY")
+          for file in "${files[@]}"; do
+            upload_args+=("$file")
+          done
+          if [[ "$REPLACE_EXISTING" == "true" ]]; then
+            upload_args+=(--clobber)
+          fi
+
+          gh "${upload_args[@]}"

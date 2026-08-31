@@ -1,0 +1,30 @@
+<Project>
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'PriceSentinel3000.App'">
+    <AssemblyName>PriceSentinel3000</AssemblyName>
+    <ApplicationIcon>$(PriceSentinelPackagingIcon)</ApplicationIcon>
+    <Product>PriceSentinel 3000</Product>
+    <AssemblyTitle>PriceSentinel 3000</AssemblyTitle>
+    <Authors>Alexander R. Biemann</Authors>
+    <Company>Alexander R. Biemann</Company>
+    <Description>A guarded Windows workspace for market monitoring, replay, paper trading, and experimental live execution.</Description>
+    <Copyright>Copyright (c) 2026 Alexander R. Biemann</Copyright>
+    <Version>$(PriceSentinelPackageVersion)</Version>
+    <AssemblyVersion>$(PriceSentinelWindowsVersion)</AssemblyVersion>
+    <FileVersion>$(PriceSentinelWindowsVersion)</FileVersion>
+    <InformationalVersion>$(PriceSentinelDisplayVersion)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <Target Name="ValidatePriceSentinelReleaseProperties"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(MSBuildProjectName)' == 'PriceSentinel3000.App'">
+    <Error Condition="'$(PriceSentinelPackagingIcon)' == '' or !Exists('$(PriceSentinelPackagingIcon)')"
+           Text="PriceSentinelPackagingIcon must identify the release ICO file." />
+    <Error Condition="'$(PriceSentinelPackageVersion)' == ''"
+           Text="PriceSentinelPackageVersion is required." />
+    <Error Condition="'$(PriceSentinelWindowsVersion)' == ''"
+           Text="PriceSentinelWindowsVersion is required." />
+    <Error Condition="'$(PriceSentinelDisplayVersion)' == ''"
+           Text="PriceSentinelDisplayVersion is required." />
+  </Target>
+</Project>

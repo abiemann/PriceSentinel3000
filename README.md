@@ -37,6 +37,26 @@ credentials. For a quick code review:
 > substantial risk of loss. Validate every strategy in Paper Trader and Replay
 > before considering live execution.
 
+## Install on Windows
+
+Download the `PriceSentinel3000-<version>-win-x64-setup.exe` asset from the
+[latest GitHub release](https://github.com/abiemann/PriceSentinel3000/releases/latest).
+The installer is self-contained for Windows x64, so it does not require a
+separate .NET installation. It installs for the current Windows user without an
+administrator prompt and creates a Start menu shortcut; a desktop shortcut is
+optional.
+
+Each release also includes a `SHA256SUMS.txt` file and build-provenance record.
+The installer is currently unsigned, so Windows may show an **Unknown publisher**
+or Microsoft Defender SmartScreen warning. The checksum verifies that a download
+matches the GitHub release asset, but it is not a substitute for a trusted
+publisher signature.
+
+Upgrades and uninstalling preserve the journal, preferences, and encrypted
+Robinhood session under `%LOCALAPPDATA%\PriceSentinel3000`. Delete that folder
+manually only when you intentionally want to remove local PriceSentinel data and
+saved authorization.
+
 ## Status
 
 The current development build adds an auditable, explicitly armed LIVE equity
@@ -340,6 +360,17 @@ dotnet test PriceSentinel3000.sln --configuration Release --no-build
 The Windows CI workflow runs the same Release build with warnings promoted to
 errors and executes the complete test suite on every pull request and push to
 `main`.
+
+Publishing a numeric GitHub release tag such as `1.1` or `v1.1.0` starts the
+Windows release workflow. It builds and tests the exact tagged source, creates a
+self-contained x64 publish, compiles the Inno Setup installer, and attaches the
+installer, SHA-256 checksums, and provenance to the release. The existing `1.0`
+release can be packaged once through the workflow's manual `tag` input.
+
+For an older tag that predates the packaging files, the workflow uses the exact
+workflow commit for the installer definition and artwork while compiling only
+the tagged application source. Both commits are recorded in the provenance
+asset; the tag itself is never moved or rewritten.
 
 The workspace always starts OFF after the required Robinhood connection succeeds.
 Accepting the LIVE warning makes LIVE the effective mode while broker execution
