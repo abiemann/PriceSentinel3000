@@ -202,33 +202,21 @@ jobs:
           DISPLAY_VERSION: ${{ steps.version.outputs.display_version }}
           WINDOWS_VERSION: ${{ steps.version.outputs.windows_version }}
         run: |
-          $commandPath = (Get-Command ISCC.exe -ErrorAction SilentlyContinue |
-            Select-Object -First 1 -ExpandProperty Source)
-
-          $candidates = @(
-            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-            "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
-            $commandPath
-          ) | Where-Object { $_ } | Select-Object -Unique
-
-          $iscc = $null
-          $innoVersion = $null
-          $detected = @()
-          foreach ($candidate in $candidates) {
-            if (-not (Test-Path -LiteralPath $candidate)) { continue }
-
-            $candidateVersion = (Get-Item -LiteralPath $candidate).VersionInfo.ProductVersion
-            $detected += "$candidate ($candidateVersion)"
-            if ($candidateVersion -like '6.7.1*') {
-              $iscc = (Resolve-Path -LiteralPath $candidate).Path
-              $innoVersion = $candidateVersion
-              break
-            }
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path -LiteralPath $iscc)) {
+            throw "Inno Setup compiler was not found at $iscc."
           }
 
-          if (-not $iscc) {
-            $details = if ($detected.Count -gt 0) { $detected -join '; ' } else { 'none' }
-            throw "Expected Inno Setup 6.7.1. Detected candidates: $details."
+          $packageDirectory = Join-Path $env:ChocolateyInstall 'lib\innosetup'
+          $nuspecFiles = @(Get-ChildItem -LiteralPath $packageDirectory -Filter '*.nuspec' -File)
+          if ($nuspecFiles.Count -ne 1) {
+            throw "Expected one installed Inno Setup package manifest in $packageDirectory."
+          }
+
+          [xml]$packageManifest = Get-Content -LiteralPath $nuspecFiles[0].FullName -Raw
+          $innoVersion = [string]$packageManifest.package.metadata.version
+          if ($innoVersion -ne '6.7.1') {
+            throw "Expected Inno Setup 6.7.1, but Chocolatey reports $innoVersion."
           }
 
           $sourceDirectory = (Resolve-Path 'artifacts\publish').Path
