@@ -406,6 +406,77 @@ public sealed class SqliteTradingJournal : ITradingJournal
             : Convert.ToDecimal(result, CultureInfo.InvariantCulture);
     }
 
+    public bool HasUnattributedLiveSessionsSince(DateTimeOffset startedAtGteUtc)
+    {
+        EnsureInitialized();
+        using SqliteConnection connection = OpenConnection();
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT EXISTS (
+                SELECT 1 FROM sessions
+                WHERE mode = $mode AND started_at_utc >= $day
+                  AND CASE WHEN json_valid(settings_json) THEN
+                      COALESCE(json_type(settings_json, '$.LiveAccountNumber'), '') <> 'text'
+                      OR trim(COALESCE(json_extract(settings_json, '$.LiveAccountNumber'), '')) = ''
+                      ELSE 1 END);
+            """;
+        command.Parameters.AddWithValue("$mode", TradingMode.Live.ToString());
+        command.Parameters.AddWithValue("$day", Format(startedAtGteUtc));
+        return (long)command.ExecuteScalar()! != 0;
+    }
+
+    public decimal? GetLiveDailyStartingBalance(
+        string accountNumber,
+        DateTimeOffset tradingDayStartUtc)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountNumber);
+        EnsureInitialized();
+        using SqliteConnection connection = OpenConnection();
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT starting_balance FROM live_daily_baselines
+            WHERE account_number = $account_number AND trading_day_start_utc = $day;
+            """;
+        command.Parameters.AddWithValue("$account_number", accountNumber);
+        command.Parameters.AddWithValue("$day", Format(tradingDayStartUtc));
+        object? result = command.ExecuteScalar();
+        return result is null or DBNull
+            ? null
+            : decimal.Parse((string)result, CultureInfo.InvariantCulture);
+    }
+
+    public decimal GetOrCreateLiveDailyStartingBalance(
+        string accountNumber,
+        DateTimeOffset tradingDayStartUtc,
+        decimal startingBalance)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountNumber);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(startingBalance);
+        EnsureInitialized();
+        using SqliteConnection connection = OpenConnection();
+        using SqliteTransaction transaction = connection.BeginTransaction();
+        using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT OR IGNORE INTO live_daily_baselines(
+                account_number, trading_day_start_utc, starting_balance)
+            VALUES ($account_number, $day, $balance);
+            SELECT starting_balance FROM live_daily_baselines
+            WHERE account_number = $account_number AND trading_day_start_utc = $day;
+            """;
+        command.Parameters.AddWithValue("$account_number", accountNumber);
+        command.Parameters.AddWithValue("$day", Format(tradingDayStartUtc));
+        command.Parameters.AddWithValue(
+            "$balance", startingBalance.ToString(CultureInfo.InvariantCulture));
+        decimal baseline = decimal.Parse(
+            (string)command.ExecuteScalar()!, CultureInfo.InvariantCulture);
+        transaction.Commit();
+        return baseline;
+    }
+
     public void CompleteSession(Guid sessionId, DateTimeOffset endedAtUtc, string outcome)
     {
         EnsureInitialized();
@@ -580,7 +651,7 @@ public sealed class SqliteTradingJournal : ITradingJournal
             ? null
             : Convert.ToDecimal(reader.GetDouble(ordinal), CultureInfo.InvariantCulture);
 
-    private static void AppendLiveExecutions(
+    internal static void AppendLiveExecutions(
         SqliteConnection connection,
         SqliteTransaction transaction,
         string orderId,
@@ -588,20 +659,29 @@ public sealed class SqliteTradingJournal : ITradingJournal
     {
         foreach (BrokerExecution execution in executions)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(execution.Id);
             using SqliteCommand fillCommand = connection.CreateCommand();
             fillCommand.Transaction = transaction;
             fillCommand.CommandText =
                 """
-                INSERT INTO fills(order_id, filled_at_utc, quantity, price, fees)
-                SELECT $order_id, $filled_at_utc, $quantity, $price, 0
+                UPDATE fills SET execution_id = $execution_id
+                WHERE id = (
+                    SELECT id FROM fills
+                    WHERE order_id = $order_id AND execution_id IS NULL
+                      AND filled_at_utc = $filled_at_utc
+                      AND quantity = $quantity AND price = $price
+                    ORDER BY id LIMIT 1)
+                  AND NOT EXISTS (
+                    SELECT 1 FROM fills
+                    WHERE order_id = $order_id AND execution_id = $execution_id);
+                INSERT INTO fills(order_id, execution_id, filled_at_utc, quantity, price, fees)
+                SELECT $order_id, $execution_id, $filled_at_utc, $quantity, $price, 0
                 WHERE NOT EXISTS (
                     SELECT 1 FROM fills
-                    WHERE order_id = $order_id
-                      AND filled_at_utc = $filled_at_utc
-                      AND quantity = $quantity
-                      AND price = $price);
+                    WHERE order_id = $order_id AND execution_id = $execution_id);
                 """;
             fillCommand.Parameters.AddWithValue("$order_id", orderId);
+            fillCommand.Parameters.AddWithValue("$execution_id", execution.Id);
             fillCommand.Parameters.AddWithValue(
                 "$filled_at_utc",
                 Format(execution.OccurredAtUtc));

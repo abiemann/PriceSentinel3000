@@ -221,6 +221,81 @@ public sealed class LiveOrderCoordinatorTests
         Assert.True(coordinator.HasActiveContext);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExecuteAsync_DoesNotAdoptUnprovenReferenceFromRecentHistory(
+        bool missingReference)
+    {
+        BrokerOrderIntent intent = Intent();
+        BrokerOrderSnapshot unrelated = Order(intent, BrokerOrderState.Filled) with
+        {
+            ClientReferenceId = missingReference ? Guid.Empty : Guid.NewGuid(),
+        };
+        var gateway = new RecordingGateway
+        {
+            PlaceHandler = (_, _) => throw new IOException("Lost placement response."),
+            RecentOrders = [unrelated],
+        };
+        var journal = new RecordingJournal();
+        using var coordinator = new LiveOrderCoordinator(
+            gateway,
+            journal,
+            new ImmediateTimeProvider(Now));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => coordinator.ExecuteAsync(
+            Account,
+            SessionId,
+            Instrument,
+            Trigger(),
+            intent,
+            CancellationToken.None));
+
+        Assert.True(coordinator.HasActiveContext);
+        Assert.Null(coordinator.ActiveOrder);
+        Assert.Contains(journal.LiveEvents, item => item.EventType == "PLACEMENT_UNCERTAIN");
+        Assert.DoesNotContain(journal.LiveEvents, item => item.EventType == "TERMINAL");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CancelActiveAsync_DoesNotCancelAnOrderWithoutMatchingReference(
+        bool missingReference)
+    {
+        BrokerOrderIntent intent = Intent();
+        BrokerOrderSnapshot unrelated = Order(intent, BrokerOrderState.New) with
+        {
+            ClientReferenceId = missingReference ? Guid.Empty : Guid.NewGuid(),
+        };
+        var gateway = new RecordingGateway
+        {
+            PlaceHandler = (_, _) => throw new OperationCanceledException(),
+            FindResult = unrelated,
+            RecentOrders = [unrelated],
+        };
+        using var coordinator = new LiveOrderCoordinator(
+            gateway,
+            new RecordingJournal(),
+            new ImmediateTimeProvider(Now));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => coordinator.ExecuteAsync(
+            Account,
+            SessionId,
+            Instrument,
+            Trigger(),
+            intent,
+            CancellationToken.None));
+
+        LiveOrderOperationResult result = await coordinator.CancelActiveAsync(
+            Account,
+            SessionId,
+            Instrument);
+
+        Assert.False(result.Handled);
+        Assert.True(coordinator.HasActiveContext);
+        Assert.Equal(0, gateway.CancelCalls);
+    }
+
     [Fact]
     public async Task ReconcileActiveAsync_DisarmsRejectedActiveOrder()
     {
@@ -574,6 +649,17 @@ public sealed class LiveOrderCoordinatorTests
 
         public decimal? GetLiveStartingBalanceSince(DateTimeOffset startedAtGteUtc) =>
             throw new NotSupportedException();
+
+        public bool HasUnattributedLiveSessionsSince(DateTimeOffset startedAtGteUtc) => false;
+
+        public decimal? GetLiveDailyStartingBalance(
+            string accountNumber,
+            DateTimeOffset tradingDayStartUtc) => throw new NotSupportedException();
+
+        public decimal GetOrCreateLiveDailyStartingBalance(
+            string accountNumber,
+            DateTimeOffset tradingDayStartUtc,
+            decimal startingBalance) => throw new NotSupportedException();
 
         public void CompleteSession(
             Guid sessionId,

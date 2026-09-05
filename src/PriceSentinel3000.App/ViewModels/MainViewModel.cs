@@ -55,6 +55,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
     private decimal _replaySpeed;
     private bool _isSessionRunning;
     private bool _isStartingSession;
+    private bool _hasConfigurationErrors;
     private bool _liveRiskAcknowledged;
     private bool _journalReady;
     private bool _hasMarketData;
@@ -204,7 +205,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
                   (SelectedMode is TradingMode.PaperTrader or TradingMode.Replay or TradingMode.Live &&
                    EffectiveMode == SelectedMode &&
                    !IsSessionRunning &&
-                   !_isStartingSession),
+                   !_isStartingSession &&
+                   !HasConfigurationErrors),
             () => IsReplayPaused);
         StopSessionCommand = new AsyncRelayCommand(
             ExecuteSecondarySessionActionAsync,
@@ -247,6 +249,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
     public bool IsLiveEffective => EffectiveMode is TradingMode.Live;
     public bool IsConfigurationPanelExpanded =>
         EffectiveMode is not TradingMode.Off;
+    public bool IsSessionConfigurationEditable => !IsSessionRunning && !_isStartingSession;
+    public bool HasConfigurationErrors => _hasConfigurationErrors;
+    internal Func<bool>? ValidateConfigurationInputs { get; set; }
     public bool LiveArmed => _modeState.LiveArmed;
     public bool LiveRiskAcknowledged => _liveRiskAcknowledged;
     public string BrokerExecutionLabel => EffectiveMode switch
@@ -373,9 +378,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
         _isMarketDataConnected ? "#24684C" : "#7B5426";
     public string MarketDataStatusForeground =>
         _isMarketDataConnected ? "#5EE6B1" : "#F4B45E";
-    public string SymbolDisplay => string.IsNullOrWhiteSpace(Symbol)
-        ? "—"
-        : Symbol.Trim().ToUpperInvariant();
+    public string SymbolDisplay => _activeSession?.Instrument.Symbol ??
+        (_hasMarketData ? _ringBuffer?.Instrument.Symbol : null) ??
+        (string.IsNullOrWhiteSpace(Symbol) ? "—" : Symbol.Trim().ToUpperInvariant());
     public string BuyingPowerDisplay =>
         _paperBuyingPower.ToString("C", CultureInfo.CurrentCulture);
     public string AccountEquityDisplay =>
@@ -564,6 +569,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
                 OnPropertyChanged(nameof(SessionStateLabel));
                 OnPropertyChanged(nameof(PrimaryActionLabel));
                 OnPropertyChanged(nameof(SecondaryActionLabel));
+                OnPropertyChanged(nameof(IsSessionConfigurationEditable));
                 StartSessionCommand.RaiseCanExecuteChanged();
                 StopSessionCommand.RaiseCanExecuteChanged();
             }
@@ -659,7 +665,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
         _liveRiskAcknowledged = true;
         _modeState = _modeState.ActivateLiveDisarmed();
         CancellationToken cancellationToken = _sessionCoordinator.Begin();
-        _isStartingSession = true;
+        SetStartingSession(true);
         StatusMessage = "LIVE mode is effective and disarmed. Verifying the Robinhood connection...";
         AddActivity("LIVE risk acknowledged; verifying the startup Robinhood connection.");
         OnPropertyChanged(nameof(LiveRiskAcknowledged));
@@ -689,8 +695,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
         }
         finally
         {
-            _isStartingSession = false;
-            StartSessionCommand.RaiseCanExecuteChanged();
+            SetStartingSession(false);
         }
     }
 
@@ -995,9 +1000,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
         OnPropertyChanged(nameof(JournalStatus));
     }
 
-    private static bool IsFreshObservation(MarketQuote quote)
+    private bool IsFreshObservation(MarketQuote quote)
     {
-        TimeSpan age = quote.ObservedAtUtc - quote.SourceTimestampUtc;
+        TimeSpan age = _timeProvider.GetUtcNow() - quote.SourceTimestampUtc;
         return age >= TimeSpan.FromSeconds(-30) &&
                age <= TimeSpan.FromMinutes(2);
     }
@@ -1022,6 +1027,13 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
         T value,
         [CallerMemberName] string? propertyName = null)
     {
+        if (!IsSessionConfigurationEditable &&
+            propertyName != nameof(ChartCandleIntervalSeconds))
+        {
+            OnPropertyChanged(propertyName);
+            return false;
+        }
+
         if (!SetField(ref field, value, propertyName))
         {
             return false;
@@ -1029,6 +1041,22 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
 
         SavePreferences();
         return true;
+    }
+
+    internal void SetConfigurationErrors(bool hasErrors)
+    {
+        if (SetField(ref _hasConfigurationErrors, hasErrors, nameof(HasConfigurationErrors)))
+        {
+            StartSessionCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private void SetStartingSession(bool value)
+    {
+        _isStartingSession = value;
+        OnPropertyChanged(nameof(IsSessionConfigurationEditable));
+        StartSessionCommand.RaiseCanExecuteChanged();
+        StopSessionCommand.RaiseCanExecuteChanged();
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>

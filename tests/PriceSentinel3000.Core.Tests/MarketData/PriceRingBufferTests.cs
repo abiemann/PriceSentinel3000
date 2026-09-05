@@ -1,4 +1,6 @@
+using PriceSentinel3000.Core.Configuration;
 using PriceSentinel3000.Core.MarketData;
+using PriceSentinel3000.Core.Strategy;
 
 namespace PriceSentinel3000.Core.Tests.MarketData;
 
@@ -46,6 +48,49 @@ public sealed class PriceRingBufferTests
     }
 
     [Fact]
+    public void MinimumObservations_KeepSparsePollingStrategyWarmAfterInitialHistoryExpires()
+    {
+        TradingSessionSettings settings = TradingSessionSettings.Default with
+        {
+            BufferMinutes = 5,
+            QuotePollingSeconds = 60,
+            ReconciliationSeconds = 300,
+            ReconciliationLookbackSeconds = 60,
+            ReconciliationCompletionDelaySeconds = 30,
+        };
+        Assert.Empty(TradingSessionSettingsValidator.Validate(settings));
+        var buffer = new PriceRingBuffer(
+            Instrument,
+            TimeSpan.FromMinutes(settings.BufferMinutes),
+            minimumObservationCount: PriceActionSignalEngine.RsiPeriod + 2);
+        var strategy = new PriceActionSignalEngine(settings.BufferMinutes);
+        buffer.Merge(Enumerable.Range(-20, 21).Select(index =>
+            Quote(Start.AddSeconds(index * 15), 10m, Start)));
+
+        for (int minute = 1; minute <= 30; minute++)
+        {
+            DateTimeOffset now = Start.AddMinutes(minute);
+            buffer.Merge([Quote(now, 10m, now)]);
+
+            if (minute % 5 == 0)
+            {
+                buffer.Merge(Enumerable.Range(0, 5).Select(index =>
+                    Quote(now.AddSeconds(-90 + index * 15), 10m, now)));
+            }
+
+            IReadOnlyList<MarketQuote> snapshot = buffer.Snapshot();
+            StrategyDecision decision = strategy.Evaluate(snapshot, StrategyPositionContext.Flat);
+            Assert.NotNull(decision.SimpleRsi);
+            Assert.NotEqual("WARMING UP", decision.State);
+
+            if (minute >= 10)
+            {
+                Assert.Equal(PriceActionSignalEngine.RsiPeriod + 2, snapshot.Count);
+            }
+        }
+    }
+
+    [Fact]
     public void Merge_AcceptsHistoricalBarWithoutBidAskBook()
     {
         var buffer = new PriceRingBuffer(Instrument, TimeSpan.FromMinutes(7));
@@ -82,6 +127,52 @@ public sealed class PriceRingBufferTests
 
         Assert.Equal(1, result.Rejected);
         Assert.Empty(buffer.Snapshot());
+    }
+
+    [Theory]
+    [InlineData(0, 0, 0, false)]
+    [InlineData(0, 0, -1, false)]
+    [InlineData(11, 10, 10, false)]
+    [InlineData(10, 0, 10, false)]
+    [InlineData(0, 10, 10, false)]
+    [InlineData(-1, 10, 10, false)]
+    [InlineData(0, 0, 10, true)]
+    [InlineData(10, 10, 10, true)]
+    public void IsValidQuote_UsesTheSamePriceRulesAsMerge(
+        decimal bid,
+        decimal ask,
+        decimal last,
+        bool expected)
+    {
+        var buffer = new PriceRingBuffer(Instrument, TimeSpan.FromMinutes(7));
+        var quote = new MarketQuote(Instrument, Start, Start, bid, ask, last, 0m);
+
+        Assert.Equal(expected, buffer.IsValidQuote(quote));
+        Assert.Equal(expected ? 1 : 0, buffer.Merge([quote]).Added);
+    }
+
+    [Fact]
+    public void IsValidQuote_RejectsAnotherInstrumentAndMalformedCandles()
+    {
+        var buffer = new PriceRingBuffer(Instrument, TimeSpan.FromMinutes(7));
+        MarketQuote quote = Quote(Start, 10m, Start);
+
+        Assert.False(buffer.IsValidQuote(quote with { Instrument = new("SPY") }));
+        Assert.False(buffer.IsValidQuote(quote with { OpenPrice = 10m }));
+        Assert.False(buffer.IsValidQuote(quote with
+        {
+            OpenPrice = 10m,
+            HighPrice = 9m,
+            LowPrice = 8m,
+            ClosePrice = 10m,
+        }));
+        Assert.False(buffer.IsValidQuote(quote with
+        {
+            OpenPrice = 10m,
+            HighPrice = 12m,
+            LowPrice = 11m,
+            ClosePrice = 10m,
+        }));
     }
 
     [Fact]

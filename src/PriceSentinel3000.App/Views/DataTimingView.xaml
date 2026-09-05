@@ -18,7 +18,7 @@
                     <TextBox Style="{StaticResource InputTextBoxStyle}"
                              ToolTip="Minutes of recent market data kept for charting and strategy analysis. Allowed range: 5-15 minutes."
                              ToolTipService.ShowOnDisabled="True"
-                             Text="{Binding BufferMinutes, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                             Text="{Binding BufferMinutes, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True, NotifyOnValidationError=True}" />
                 </StackPanel>
                 <StackPanel Grid.Column="2">
                     <TextBlock Style="{StaticResource FieldLabelStyle}"
@@ -26,7 +26,7 @@
                     <TextBox Style="{StaticResource InputTextBoxStyle}"
                              ToolTip="How often PriceSentinel requests the latest quote. Lower values update faster but make more Robinhood requests. Allowed range: 1-60 seconds."
                              ToolTipService.ShowOnDisabled="True"
-                             Text="{Binding QuotePollingSeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                             Text="{Binding QuotePollingSeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True, NotifyOnValidationError=True}" />
                 </StackPanel>
             </Grid>
             <Grid Margin="0,12,0,0">
@@ -41,7 +41,7 @@
                     <TextBox Style="{StaticResource InputTextBoxStyle}"
                              ToolTip="How often PriceSentinel checks Robinhood price history to verify recent candles and fill gaps. Allowed range: 15-300 seconds."
                              ToolTipService.ShowOnDisabled="True"
-                             Text="{Binding ReconciliationSeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                             Text="{Binding ReconciliationSeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True, NotifyOnValidationError=True}" />
                 </StackPanel>
                 <StackPanel Grid.Column="2">
                     <TextBlock Style="{StaticResource FieldLabelStyle}"
@@ -49,7 +49,7 @@
                     <TextBox Style="{StaticResource InputTextBoxStyle}"
                              ToolTip="How far back each reconciliation check requests price history. A longer window can repair older gaps but transfers more data. Allowed range: 60-3600 seconds."
                              ToolTipService.ShowOnDisabled="True"
-                             Text="{Binding ReconciliationLookbackSeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                             Text="{Binding ReconciliationLookbackSeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True, NotifyOnValidationError=True}" />
                 </StackPanel>
             </Grid>
             <Grid Margin="0,12,0,0">
@@ -64,7 +64,7 @@
                     <TextBox Style="{StaticResource InputTextBoxStyle}"
                              ToolTip="Leaves this many seconds at the newest edge out of reconciliation so Robinhood has time to finalize candles. Allowed range: 0-300 seconds."
                              ToolTipService.ShowOnDisabled="True"
-                             Text="{Binding ReconciliationCompletionDelaySeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                             Text="{Binding ReconciliationCompletionDelaySeconds, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True, NotifyOnValidationError=True}" />
                 </StackPanel>
             </Grid>
             <Grid Margin="0,12,0,0">
@@ -93,7 +93,7 @@
                     <TextBlock Style="{StaticResource FieldLabelStyle}"
                                Text="Replay speed (x)" />
                     <TextBox Style="{StaticResource InputTextBoxStyle}"
-                             Text="{Binding ReplaySpeed, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                             Text="{Binding ReplaySpeed, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True, NotifyOnValidationError=True}" />
                 </StackPanel>
             </Grid>
             <Grid Margin="0,12,0,0">

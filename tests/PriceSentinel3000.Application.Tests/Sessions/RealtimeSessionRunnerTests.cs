@@ -69,6 +69,99 @@ public sealed class RealtimeSessionRunnerTests
         Assert.Equal(observedAt, reconciliation.ObservedAtUtc);
     }
 
+    [Fact]
+    public async Task RunAsync_KeepsPollingWhileReconciliationIsPending()
+    {
+        var source = DelayedSource();
+        var runner = new RealtimeSessionRunner(source, new FixedTimeProvider(Now));
+        await using IAsyncEnumerator<RealtimeSessionUpdate> enumerator = runner
+            .RunAsync(Request(), 0, 300, 30, CancellationToken.None)
+            .GetAsyncEnumerator();
+
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Empty(enumerator.Current.Reconciliation);
+        Assert.True(await enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Empty(enumerator.Current.Reconciliation);
+        Assert.Equal(3, source.QuoteObservations.Count);
+        Assert.Equal(2, source.HistoryCalls.Count);
+
+        MarketQuote reconciled = Quote(Now.AddSeconds(-45), 9.9m);
+        source.PendingReconciliation!.SetResult([reconciled]);
+        await source.ActiveReconciliation!.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.True(await enumerator.MoveNextAsync());
+
+        Assert.Equal([reconciled], enumerator.Current.Reconciliation);
+        Assert.Equal(4, source.QuoteObservations.Count);
+        Assert.Equal(2, source.HistoryCalls.Count);
+    }
+
+    [Fact]
+    public async Task RunAsync_DisposalCancelsAndDrainsPendingReconciliation()
+    {
+        var source = DelayedSource();
+        var runner = new RealtimeSessionRunner(source, new FixedTimeProvider(Now));
+        IAsyncEnumerator<RealtimeSessionUpdate> enumerator = runner
+            .RunAsync(Request(), 0, 300, 30, CancellationToken.None)
+            .GetAsyncEnumerator();
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.True(await enumerator.MoveNextAsync());
+
+        await enumerator.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.True(source.ReconciliationToken.IsCancellationRequested);
+        Assert.True(source.ReconciliationFinished.Task.IsCompletedSuccessfully);
+    }
+
+    [Fact]
+    public async Task RunAsync_CancellationDrainsPendingReconciliation()
+    {
+        var source = DelayedSource();
+        var runner = new RealtimeSessionRunner(source, new FixedTimeProvider(Now));
+        using var cancellation = new CancellationTokenSource();
+        await using IAsyncEnumerator<RealtimeSessionUpdate> enumerator = runner
+            .RunAsync(Request(), 0, 300, 30, cancellation.Token)
+            .GetAsyncEnumerator();
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.True(await enumerator.MoveNextAsync());
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+
+        Assert.True(source.ReconciliationToken.IsCancellationRequested);
+        Assert.True(source.ReconciliationFinished.Task.IsCompletedSuccessfully);
+    }
+
+    [Fact]
+    public async Task RunAsync_ReportsReconciliationFailureOnTheNextPoll()
+    {
+        var source = DelayedSource();
+        var runner = new RealtimeSessionRunner(source, new FixedTimeProvider(Now));
+        await using IAsyncEnumerator<RealtimeSessionUpdate> enumerator = runner
+            .RunAsync(Request(), 0, 300, 30, CancellationToken.None)
+            .GetAsyncEnumerator();
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.True(await enumerator.MoveNextAsync());
+        source.PendingReconciliation!.SetException(new IOException("History unavailable."));
+        await Assert.ThrowsAsync<IOException>(() =>
+            source.ActiveReconciliation!.WaitAsync(TimeSpan.FromSeconds(5)));
+
+        IOException failure = await Assert.ThrowsAsync<IOException>(() =>
+            enumerator.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+
+        Assert.Equal("History unavailable.", failure.Message);
+    }
+
+    private static RecordingMarketDataSource DelayedSource() =>
+        new([], Quote(Now, 10m))
+        {
+            PendingReconciliation = new(TaskCreationOptions.RunContinuationsAsynchronously),
+        };
+
+    private static MarketDataRequest Request() =>
+        new(Instrument, TimeSpan.FromSeconds(5), TimeSpan.FromMinutes(5));
+
     private static MarketQuote Quote(DateTimeOffset timestamp, decimal last) =>
         new(
             Instrument,
@@ -142,6 +235,11 @@ public sealed class RealtimeSessionRunnerTests
     {
         public string Name => "Recording market data";
         public IReadOnlyList<MarketQuote> Reconciliation { get; init; } = [];
+        public TaskCompletionSource<IReadOnlyList<MarketQuote>>? PendingReconciliation { get; init; }
+        public Task<IReadOnlyList<MarketQuote>>? ActiveReconciliation { get; private set; }
+        public TaskCompletionSource ReconciliationFinished { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public CancellationToken ReconciliationToken { get; private set; }
         public List<HistoryCall> HistoryCalls { get; } = [];
         public List<DateTimeOffset> QuoteObservations { get; } = [];
 
@@ -156,10 +254,31 @@ public sealed class RealtimeSessionRunnerTests
             CancellationToken cancellationToken)
         {
             HistoryCalls.Add(new(fromUtc, throughUtc, observedAtUtc));
+
+            if (HistoryCalls.Count > 1 && PendingReconciliation is not null)
+            {
+                ReconciliationToken = cancellationToken;
+                ActiveReconciliation = AwaitReconciliationAsync(cancellationToken);
+                return ActiveReconciliation;
+            }
+
             IReadOnlyList<MarketQuote> result = HistoryCalls.Count == 1
                 ? warmStart
                 : Reconciliation;
             return Task.FromResult(result);
+        }
+
+        private async Task<IReadOnlyList<MarketQuote>> AwaitReconciliationAsync(
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                return await PendingReconciliation!.Task.WaitAsync(cancellationToken);
+            }
+            finally
+            {
+                ReconciliationFinished.TrySetResult();
+            }
         }
 
         public Task<MarketQuote> GetQuoteAsync(

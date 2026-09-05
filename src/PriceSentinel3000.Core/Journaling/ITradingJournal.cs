@@ -80,6 +80,17 @@ public interface ITradingJournal : IDisposable
     decimal? GetLiveStartingBalanceSince(
         DateTimeOffset startedAtGteUtc);
 
+    bool HasUnattributedLiveSessionsSince(DateTimeOffset startedAtGteUtc);
+
+    decimal? GetLiveDailyStartingBalance(
+        string accountNumber,
+        DateTimeOffset tradingDayStartUtc);
+
+    decimal GetOrCreateLiveDailyStartingBalance(
+        string accountNumber,
+        DateTimeOffset tradingDayStartUtc,
+        decimal startingBalance);
+
     void CompleteSession(Guid sessionId, DateTimeOffset endedAtUtc, string outcome);
 
     JournalSummary GetSummary(Guid sessionId);

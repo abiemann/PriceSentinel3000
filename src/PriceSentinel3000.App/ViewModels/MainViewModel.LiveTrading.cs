@@ -7,6 +7,21 @@ namespace PriceSentinel3000.App.ViewModels;
 
 public sealed partial class MainViewModel
 {
+    private DateOnly? _persistedLiveTradingDate;
+    private DateOnly? _reconciledLiveEntriesDate;
+
+    private decimal ReadLiveDailyBaseline(string accountNumber, DateTimeOffset dayStart, decimal currentEquity)
+    {
+        decimal? baseline = _journal.GetLiveDailyStartingBalance(accountNumber, dayStart);
+        if (baseline is null && _journal.HasUnattributedLiveSessionsSince(dayStart))
+        {
+            throw new InvalidOperationException(
+                "Earlier LIVE sessions lack the account information needed to restore today's risk baseline. LIVE remains disarmed until the next Eastern trading day.");
+        }
+
+        return baseline ?? currentEquity;
+    }
+
     private async Task<LiveBrokerSnapshot> InitializeLiveBrokerAsync(
         Instrument instrument,
         CancellationToken cancellationToken)
@@ -77,14 +92,68 @@ public sealed partial class MainViewModel
             account.AccountNumber,
             instrument,
             cancellationToken);
-        return new(
+        var snapshot = new LiveBrokerSnapshot(
             account,
             portfolio,
             position,
             tradability,
             orders,
             _timeProvider.GetUtcNow());
+        await ReconcileLiveTradingDayAsync(snapshot, cancellationToken);
+        return snapshot;
     }
+
+    private async Task ReconcileLiveTradingDayAsync(
+        LiveBrokerSnapshot broker,
+        CancellationToken cancellationToken)
+    {
+        if (_liveExecutionEngine is not LiveExecutionEngine engine)
+        {
+            return;
+        }
+
+        engine.ObserveAccount(broker.CapturedAtUtc, broker.Portfolio.TotalValue);
+        DateOnly tradingDate = engine.TradingDate!.Value;
+        DateTimeOffset dayStart = GetEasternTradingDayStartUtc(broker.CapturedAtUtc);
+        PersistLiveDailyBaseline(broker.CapturedAtUtc, broker.Portfolio.TotalValue);
+
+        if (!_liveOrderCoordinator.HasActiveContext && _reconciledLiveEntriesDate != tradingDate)
+        {
+            IReadOnlyList<BrokerOrderSnapshot> orders = await _liveBrokerGateway.GetOrdersCreatedSinceAsync(
+                broker.Account.AccountNumber,
+                dayStart,
+                cancellationToken);
+            engine.ObserveAccount(
+                broker.CapturedAtUtc,
+                broker.Portfolio.TotalValue,
+                entriesToday: Math.Max(engine.EntriesToday, CountLiveEntries(orders)));
+            _reconciledLiveEntriesDate = tradingDate;
+        }
+    }
+
+    private void PersistLiveDailyBaseline(DateTimeOffset observedAtUtc, decimal equity)
+    {
+        if (_liveExecutionEngine is not { TradingDate: DateOnly tradingDate } engine ||
+            _liveAccount is null || _persistedLiveTradingDate == tradingDate)
+        {
+            return;
+        }
+
+        decimal baseline = _journal.GetOrCreateLiveDailyStartingBalance(
+            _liveAccount.AccountNumber,
+            GetEasternTradingDayStartUtc(tradingDate),
+            engine.DailyStartingEquity);
+        engine.ObserveAccount(observedAtUtc, equity, baseline);
+        _persistedLiveTradingDate = tradingDate;
+    }
+
+    private static int CountLiveEntries(IReadOnlyList<BrokerOrderSnapshot> orders) => orders
+        .Where(order => order.Side is BrokerOrderSide.Buy && order.FilledQuantity > 0m)
+        .Select(order => string.IsNullOrWhiteSpace(order.BrokerOrderId)
+            ? order.ClientReferenceId.ToString("D")
+            : order.BrokerOrderId)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .Count();
 
     private async Task ProcessLiveObservationAsync(
         MarketQuote trigger,
@@ -96,6 +165,14 @@ public sealed partial class MainViewModel
             _liveAccount is null)
         {
             return;
+        }
+
+        if (_liveOrderCoordinator.HasActiveContext)
+        {
+            LiveBrokerSnapshot pendingBroker = await CaptureLiveBrokerAsync(
+                _ringBuffer.Instrument,
+                cancellationToken);
+            UpdateLiveAccount(pendingBroker, trigger.Last);
         }
 
         LiveOrderOperationResult reconciliation =
@@ -138,7 +215,7 @@ public sealed partial class MainViewModel
         }
 
         LiveTradeEvaluation evaluation = _liveExecutionEngine.Evaluate(
-            _ringBuffer.Snapshot(),
+            GetExecutionHistory(trigger),
             broker);
         _journal.AppendDecision(_activeSession.Id, evaluation.Decision);
         UpdateStrategyDecision(evaluation.Decision);
@@ -229,6 +306,7 @@ public sealed partial class MainViewModel
                 operation.Intent.Side is BrokerOrderSide.Buy
                     ? ChartTradeMarker.Buy
                     : ChartTradeMarker.Sell;
+            _tradeMarkerVersion++;
         }
 
         if (terminalOrder.FilledQuantity <= 0m)
@@ -272,10 +350,12 @@ public sealed partial class MainViewModel
     }
 
     private static DateTimeOffset GetEasternTradingDayStartUtc(DateTimeOffset nowUtc)
+        => GetEasternTradingDayStartUtc(EasternTradingDay.GetDate(nowUtc));
+
+    private static DateTimeOffset GetEasternTradingDayStartUtc(DateOnly tradingDate)
     {
         TimeZoneInfo eastern = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
-        DateTimeOffset easternNow = TimeZoneInfo.ConvertTime(nowUtc, eastern);
-        DateTime easternDate = DateTime.SpecifyKind(easternNow.Date, DateTimeKind.Unspecified);
+        DateTime easternDate = tradingDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
         TimeSpan offset = eastern.GetUtcOffset(easternDate);
         return new DateTimeOffset(easternDate, offset).ToUniversalTime();
     }

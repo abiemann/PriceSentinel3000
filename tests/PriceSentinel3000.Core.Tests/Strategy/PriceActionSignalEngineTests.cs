@@ -62,6 +62,32 @@ public sealed class PriceActionSignalEngineTests
         Assert.Equal("WARMING UP", decision.State);
     }
 
+    [Fact]
+    public void Evaluate_ExcludesExtraIndicatorHistoryFromTheExitPatternWindow()
+    {
+        IReadOnlyList<MarketQuote> recent = Quotes(
+        [
+            100.00m, 100.10m, 100.20m, 100.30m, 100.40m,
+            100.50m, 100.60m, 100.70m, 100.80m, 100.90m,
+            101.00m, 100.98m, 101.00m, 100.99m, 101.00m,
+            100.98m, 100.95m, 100.91m, 100.86m, 100.80m,
+        ]);
+        MarketQuote oldPeak = recent[0] with
+        {
+            SourceTimestampUtc = Start.AddMinutes(-10),
+            Last = 110m,
+        };
+        var position = new StrategyPositionContext(5m, 100m, Start.AddMinutes(-15));
+        var engine = new PriceActionSignalEngine(blockCount: 5);
+
+        StrategyDecision expected = engine.Evaluate(recent, position);
+        StrategyDecision actual = engine.Evaluate([oldPeak, .. recent], position);
+
+        Assert.Equal(expected.Signal, actual.Signal);
+        Assert.Equal(expected.ReferenceMovePercent, actual.ReferenceMovePercent);
+        Assert.Equal(expected.Reasons, actual.Reasons);
+    }
+
     internal static IReadOnlyList<MarketQuote> Quotes(IReadOnlyList<decimal> prices) =>
         [
             .. prices.Select((price, index) =>

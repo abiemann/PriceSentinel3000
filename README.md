@@ -29,7 +29,7 @@ credentials. For a quick code review:
 4. Review `PriceSentinel3000.Infrastructure` for Robinhood MCP/OAuth, DPAPI,
    SQLite, and JSON adapter implementations.
 5. Review the WPF `Views`, `Styles`, and `Themes` folders for the modular desktop
-   presentation, then run the three boundary-specific test projects for executable
+   presentation, then run the four boundary-specific test projects for executable
    safety examples.
 
 > [!WARNING]
@@ -74,7 +74,8 @@ execution path to the authenticated Robinhood data foundation:
 - Replay local start/end range (up to 24 hours) and playback speed (1x-100x)
   are tunable
 - A tunable 5-15 minute rolling buffer is analyzed as individual one-minute
-  blocks and as a whole
+  blocks and as a whole; the strategy retains at least 16 observations for RSI
+  when slow polling would otherwise leave too little history
 - Bottom detection combines a meaningful decline, lingering or separated
   low-zone touches, a confirmed positive turn, and simple-average RSI(14)
 - Peak detection combines open-position profit, repeated peak or pullback
@@ -91,6 +92,8 @@ execution path to the authenticated Robinhood data foundation:
 - Maximum entries, maximum daily loss, purchase-price percentage/total-position
   dollar stop loss, a 30-second re-entry cooldown, and a post-sell price deadband
   are enforced before simulated execution
+- Daily entry counts and loss limits roll over at Eastern midnight while preserving
+  positions and settlement state; LIVE baselines are persisted by account and date
 - The WPF chart renders selectable 15-, 30-, 60-, or 120-second candlesticks.
   Replay preserves Robinhood's true OHLC observations while larger intervals
   aggregate them into continuous candles; Paper Trader combines incoming quotes
@@ -102,6 +105,9 @@ execution path to the authenticated Robinhood data foundation:
 - OFF collapses the configuration tiles under the rotary selector. Selecting
   Replay, Paper Trader, or an acknowledged LIVE mode reveals the relevant controls;
   LIVE retains polling/buffer controls while hiding Replay-only date and speed fields
+- START commits and validates enabled inputs. Session settings remain fixed during
+  startup and trading; STOP can cancel startup, and chart interval changes remain
+  available while a session runs
 - SQLite WAL journaling records sessions, observations, every strategy decision,
   paper orders, fills, position snapshots, activities, and idempotent LIVE order events
 - LIVE enters disarmed, then **Start Live Trader** reconciles the agentic account,
@@ -184,9 +190,13 @@ and
    window ending behind real time by the completion delay. This avoids treating a
    still-forming historical bar as final. Matching timestamps are verified,
    corrections replace old values, and missing bars are added to the ring buffer.
+   One history request can run alongside quote polling, so slow reconciliation
+   does not hold up delivery of fresh quotes.
 5. Each fresh quote evaluates the block/whole-buffer strategy. Confirmed entries
    and exits update only the in-memory paper account, then persist the decision,
-   order, fill, and position snapshot to SQLite.
+   order, fill, and position snapshot to SQLite. Execution uses that quote's
+   bid/ask and checks its age against the current clock, even when history
+   reconciliation changes a bar at the same timestamp.
 6. If the newest venue timestamp is old, the app says **MARKET CLOSED** and pauses
    strategy decisions and paper fills.
 
@@ -215,7 +225,8 @@ is unavailable, the session stops and reports the failure.
 5. LIVE arms only after account, balance, buying power, tradability, position,
    open-order, daily-entry, daily-loss, and any existing-position recovery checks
    succeed. Broker state and the quote are refreshed after the dialog so a changed
-   position cannot be acted upon using stale confirmation.
+   position cannot be acted upon using stale confirmation. If the dialog spans
+   Eastern midnight, startup must be repeated to confirm the new day's limits.
 6. A strategy signal must pass the app's local risk gates before it can create an
    intent. That intent must also pass arming, regular-hours, tradability, and
    fractional-share gates before Robinhood reviews the exact order. The app records
@@ -228,6 +239,13 @@ is unavailable, the session stops and reports the failure.
    position in Robinhood. An order can fill while cancellation is in flight. If
    shutdown cannot confirm a terminal state, the app pauses closing and requires
    explicit confirmation before exiting.
+
+LIVE daily-loss baselines are stored separately for each account and Eastern
+trading date. A continuing session carries its last observed equity into the new
+day's baseline. On upgrade, an older journal may contain today's LIVE sessions
+without an account number. If no account-specific baseline already exists, LIVE
+stays disarmed until the next Eastern day because that old baseline cannot be
+safely attributed to the current account. Paper Trader and Replay remain available.
 
 LIVE is experimental and not production-proven. The first market-hours validation
 should use the smallest practical position, one maximum entry, and direct Robinhood

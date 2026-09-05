@@ -38,7 +38,9 @@ view model remains the overall workspace and mode orchestrator:
 - `TradingSessionCoordinator` owns the cancellation lifetime for the single active
   session through explicit begin, cancel, and dispose operations.
 - `RealtimeSessionRunner` owns warm-start history, quote polling, delayed-lookback
-  reconciliation, and observation delivery shared by Paper Trader and LIVE.
+  reconciliation, and observation delivery shared by Paper Trader and LIVE. At most
+  one reconciliation request runs alongside polling; its result accompanies the
+  next quote after completion. Cancellation drains the pending request.
 - `ReplaySessionRunner` owns source-time playback pacing, including pause and
   resume without discarding session state. `MainViewModel` requests the bounded
   history before passing observations to the runner.
@@ -54,6 +56,11 @@ coordination, and chart projection. Its implementation is grouped into session,
 LIVE, existing-position recovery, paper, presentation, symbol-search, and
 tradability partials so those responsibilities remain navigable without adding
 artificial service layers.
+
+Session-defining inputs are locked during startup and while a session runs. START
+commits enabled WPF bindings and blocks conversion errors before capturing settings.
+Starting-state changes notify both START and STOP commands. Chart candle interval
+remains a display setting that can change during a session.
 
 Window shutdown is a two-phase workflow. `MainWindow` first awaits
 `MainViewModel.PrepareForShutdownAsync`, which cancels the active data session,
@@ -86,6 +93,18 @@ Chart candle selection is a presentation concern. The 15-, 30-, 60-, and
 120-second display intervals do not change the strategy's source observations or
 risk rules.
 
+The strategy buffer retains at least 16 observations for RSI and its prior value,
+even when slow polling puts those observations outside the configured time window.
+Pattern detection still uses only the configured window. Execution receives the
+validated triggering quote explicitly, after observations strictly earlier than
+its source timestamp; reconciled OHLC cannot replace its executable bid/ask. Paper
+freshness uses the injected current clock, with an explicit historical Replay
+exemption.
+
+Chart projection is reused when history, candle interval, buffer duration, and
+trade markers are unchanged. Markers are grouped by candle in one pass. The chart
+control caches RSI until its points change, avoiding recalculation on pointer moves.
+
 Paper Trader and LIVE share the real-time ingestion path, but not execution:
 
 - Paper Trader sends strategy decisions only to the paper fill model.
@@ -109,7 +128,8 @@ LIVE is intentionally fail-closed:
 2. The user must acknowledge the loss warning and explicitly start LIVE.
 3. Account value, buying power, symbol tradability, the selected symbol's position,
    and its open orders are queried before arming. An open order for that symbol
-   blocks LIVE startup.
+   blocks LIVE startup. Missing or malformed position/order collections and
+   invalid required broker numbers fail instead of implying a flat account.
 4. An existing long position requires an explicit user choice: request an immediate
    reviewed sale, adopt it for profitable-exit monitoring, or cancel without an
    order. Quantity, average cost, available shares, and a fresh estimated sell price
@@ -122,9 +142,12 @@ LIVE is intentionally fail-closed:
    position and no open order. Rejection, partial fill, unexpected position changes,
    or an unresolved order keep execution stopped or disarmed for manual review.
 5. Entry count is reconstructed from filled agentic BUY orders created since New
-   York midnight. The daily-loss baseline comes from the first journaled LIVE
-   starting balance for that trading day, falling back to the current portfolio
-   value; it is not a separate broker daily-P&L query.
+   York midnight. Daily entry counts and risk locks reset on date rollover, while
+   positions, pending-order identity, and exit cooldown state remain. Daily-loss
+   baselines are persisted by account and Eastern date, using the first observed
+   portfolio value for a fresh session or the preceding observation's equity for
+   a continuing session. This is not a separate broker daily-P&L query. A position
+   confirmation spanning midnight is rejected so startup can reconcile the new day.
 6. LIVE broker orders are limited to weekdays from 9:30 AM through 4:00 PM New
    York time and are submitted as `regular_hours` orders. A `24HR` eligibility
    badge or a positive `Tradable now` display does not widen that execution window.
@@ -132,7 +155,10 @@ LIVE is intentionally fail-closed:
    review data, any broker alert, stale pricing, or excessive review-price drift
    blocks the order.
 8. Stable idempotency references and active-order reconciliation prevent duplicate
-   placement while a submission result is uncertain.
+   placement while a submission result is uncertain. Recovery requires the exact
+   non-empty client reference; a matching symbol, side, and quantity alone cannot
+   establish ownership of an order. Final capped quantities are floored to the
+   broker's six decimal places before review or placement.
 9. STOP and application shutdown cancel the data session first. When retained or
    unresolved LIVE order context exists, including a submission with an uncertain
    placement response, they recover by stable client reference when necessary,
@@ -155,7 +181,16 @@ All mutable application data lives under `%LOCALAPPDATA%\PriceSentinel3000`:
   events and fills, plus paper-account position snapshots. LIVE broker position
   state is queried from Robinhood rather than persisted as a position snapshot.
 - `SqliteJournalSchema` isolates schema creation and migrations from the journal's
-  read/write operations.
+  read/write operations. LIVE fills use a unique `(order_id, execution_id)` index;
+  distinct broker executions with identical timestamps, prices, and quantities
+  remain separate. The migration backfills identity from a single execution
+  snapshot per order, preferring the most complete and latest snapshot, without
+  combining IDs synthesized by older parsers across repeated snapshots.
+- LIVE sessions record their account number, and a separate table stores the first
+  daily baseline for each account. If today's legacy LIVE sessions lack account
+  attribution and no account-specific baseline exists, startup stays disarmed until
+  the next Eastern day; guessing the account or resetting its risk baseline would
+  weaken the limit.
 - JSON preferences contain ordinary UI and research settings only.
 
 Passwords are never requested or stored. Runtime databases, token files, and local
@@ -171,6 +206,9 @@ preferences are excluded from source control.
 - `PriceSentinel3000.Infrastructure.Tests` covers Robinhood payload parsing,
   authentication-state protection, preference persistence, and SQLite journaling
   without involving WPF.
+- `PriceSentinel3000.App.Tests` exercises actual WPF input bindings, command
+  notifications, and view-model workflows on an isolated STA dispatcher, with fake
+  broker ports and temporary journals. It does not launch the production app.
 - Application runners accept fakeable ports and `TimeProvider`, keeping orchestration
   tests deterministic and independent of Robinhood or the system clock.
 - The Windows CI workflow restores, builds Release with warnings treated as errors,

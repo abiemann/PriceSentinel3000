@@ -67,29 +67,34 @@ internal static class RobinhoodBrokerParser
     {
         JsonElement data = Data(root);
 
-        if (!data.TryGetProperty("positions", out JsonElement positions) ||
-            positions.ValueKind is not JsonValueKind.Array)
-        {
-            return BrokerPosition.Flat(symbol);
-        }
+        JsonElement positions = RequiredArray(data, "positions");
+        BrokerPosition? matching = null;
 
         foreach (JsonElement position in positions.EnumerateArray())
         {
-            if (!string.Equals(String(position, "symbol"), symbol,
+            string positionSymbol = RequiredString(position, "symbol");
+            var parsed = new BrokerPosition(
+                positionSymbol.ToUpperInvariant(),
+                RequiredDecimal(position, "quantity"),
+                RequiredDecimal(position, "average_buy_price"),
+                RequiredDecimal(position, "shares_available_for_sells"),
+                RequiredDecimal(position, "shares_held_for_sells"));
+            if (!string.Equals(positionSymbol, symbol,
                     StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            return new(
-                symbol.ToUpperInvariant(),
-                Decimal(position, "quantity"),
-                Decimal(position, "average_buy_price"),
-                Decimal(position, "shares_available_for_sells"),
-                Decimal(position, "shares_held_for_sells"));
+            if (matching is not null)
+            {
+                throw new InvalidOperationException(
+                    $"Robinhood returned duplicate positions for {symbol}.");
+            }
+
+            matching = parsed;
         }
 
-        return BrokerPosition.Flat(symbol);
+        return matching ?? BrokerPosition.Flat(symbol);
     }
 
     public static EquityTradability ParseTradability(
@@ -258,11 +263,7 @@ internal static class RobinhoodBrokerParser
     {
         JsonElement data = Data(root);
 
-        if (!data.TryGetProperty("orders", out JsonElement orders) ||
-            orders.ValueKind is not JsonValueKind.Array)
-        {
-            return [];
-        }
+        JsonElement orders = RequiredArray(data, "orders");
 
         return [.. orders.EnumerateArray().Select(order => ParseOrderNode(order, Guid.Empty))];
     }
@@ -288,6 +289,23 @@ internal static class RobinhoodBrokerParser
         JsonElement order,
         Guid fallbackReferenceId)
     {
+        string id = RequiredString(order, "id");
+        string symbol = RequiredString(order, "symbol");
+        string side = RequiredString(order, "side");
+        if (!string.Equals(side, "buy", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(side, "sell", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Robinhood returned an invalid order side.");
+        }
+
+        BrokerOrderState state = ParseState(RequiredString(order, "state"));
+        decimal quantity = RequiredDecimal(order, "quantity");
+        decimal filledQuantity = RequiredDecimal(order, "cumulative_quantity");
+        if (quantity <= 0m || filledQuantity < 0m || filledQuantity > quantity)
+        {
+            throw new InvalidOperationException("Robinhood returned invalid order quantities.");
+        }
+
         string refText = String(order, "ref_id");
         Guid referenceId = Guid.TryParse(refText, out Guid parsedReference)
             ? parsedReference
@@ -301,29 +319,35 @@ internal static class RobinhoodBrokerParser
             : default;
         var parsedExecutions = new List<BrokerExecution>();
 
+        if (executionsNode.ValueKind is not (
+                JsonValueKind.Undefined or JsonValueKind.Null or JsonValueKind.Array))
+        {
+            throw new InvalidOperationException("Robinhood returned an invalid executions array.");
+        }
+
         if (executionsNode.ValueKind is JsonValueKind.Array)
         {
             foreach (JsonElement execution in executionsNode.EnumerateArray())
             {
                 parsedExecutions.Add(new(
-                    String(execution, "id", Guid.NewGuid().ToString("D")),
+                    RequiredString(execution, "id"),
                     Timestamp(
                         execution,
                         "timestamp",
                         Timestamp(execution, "created_at", updated)),
-                    Decimal(execution, "quantity"),
-                    Decimal(execution, "price")));
+                    RequiredDecimal(execution, "quantity"),
+                    RequiredDecimal(execution, "price")));
             }
         }
 
         return new(
             referenceId,
-            String(order, "id"),
-            String(order, "symbol").ToUpperInvariant(),
-            ParseSide(String(order, "side")),
-            ParseState(String(order, "state")),
-            Decimal(order, "quantity"),
-            Decimal(order, "cumulative_quantity"),
+            id,
+            symbol.ToUpperInvariant(),
+            ParseSide(side),
+            state,
+            quantity,
+            filledQuantity,
             NullableDecimal(order, "average_price"),
             FirstNonEmpty(String(order, "reject_reason"), String(order, "rejection_reason")),
             updated,
@@ -412,8 +436,49 @@ internal static class RobinhoodBrokerParser
             _ => BrokerOrderState.Unknown,
         };
 
-    private static JsonElement Data(JsonElement root) =>
-        root.TryGetProperty("data", out JsonElement data) ? data : root;
+    private static JsonElement Data(JsonElement root)
+    {
+        if (root.ValueKind is not JsonValueKind.Object)
+        {
+            throw new InvalidOperationException("Robinhood returned an invalid response object.");
+        }
+
+        JsonElement data = root.TryGetProperty("data", out JsonElement node) ? node : root;
+        if (data.ValueKind is not JsonValueKind.Object)
+        {
+            throw new InvalidOperationException("Robinhood returned an invalid data object.");
+        }
+
+        return data;
+    }
+
+    private static JsonElement RequiredArray(JsonElement element, string property)
+    {
+        if (!element.TryGetProperty(property, out JsonElement value) ||
+            value.ValueKind is not JsonValueKind.Array)
+        {
+            throw new InvalidOperationException($"Robinhood returned an invalid {property} array.");
+        }
+
+        return value;
+    }
+
+    private static string RequiredString(JsonElement element, string property)
+    {
+        if (element.ValueKind is not JsonValueKind.Object ||
+            !element.TryGetProperty(property, out JsonElement value) ||
+            value.ValueKind is not JsonValueKind.String ||
+            string.IsNullOrWhiteSpace(value.GetString()))
+        {
+            throw new InvalidOperationException($"Robinhood returned an invalid {property} value.");
+        }
+
+        return value.GetString()!;
+    }
+
+    private static decimal RequiredDecimal(JsonElement element, string property) =>
+        NullableDecimal(element, property) ?? throw new InvalidOperationException(
+            $"Robinhood returned an invalid {property} value.");
 
     private static string String(
         JsonElement element,
@@ -460,6 +525,11 @@ internal static class RobinhoodBrokerParser
         if (value.ValueKind is JsonValueKind.Number && value.TryGetDecimal(out decimal number))
         {
             return number;
+        }
+
+        if (value.ValueKind is not JsonValueKind.String)
+        {
+            return null;
         }
 
         return decimal.TryParse(

@@ -21,6 +21,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PriceSentinel3000.Applicati
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PriceSentinel3000.Infrastructure.Tests", "tests\PriceSentinel3000.Infrastructure.Tests\PriceSentinel3000.Infrastructure.Tests.csproj", "{D2C7C9BF-6E32-47AB-A03C-E2F9E14CF53A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PriceSentinel3000.App.Tests", "tests\PriceSentinel3000.App.Tests\PriceSentinel3000.App.Tests.csproj", "{86E6BEA3-5086-4585-97D0-3DDF808971F0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -115,6 +117,18 @@ Global
 		{D2C7C9BF-6E32-47AB-A03C-E2F9E14CF53A}.Release|x64.Build.0 = Release|Any CPU
 		{D2C7C9BF-6E32-47AB-A03C-E2F9E14CF53A}.Release|x86.ActiveCfg = Release|Any CPU
 		{D2C7C9BF-6E32-47AB-A03C-E2F9E14CF53A}.Release|x86.Build.0 = Release|Any CPU
+		{86E6BEA3-5086-4585-97D0-3DDF808971F0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{86E6BEA3-5086-4585-97D0-3DDF808971F0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{86E6BEA3-5086-4585-97D0-3DDF808971F0}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{86E6BEA3-5086-4585-97D0-3DDF808971F0}.Debug|x64.Build.0 = Debug|Any CPU
+		{86E6BEA3-5086-4585-97D0-3DDF808971F0}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{86E6BEA3-5086-4585-97D0-3DDF808971F0}.Debug|x86.Build.0 = Debug|Any CPU
+		{86E6BEA3-5086-4585-97D0-3DDF808971F0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{86E6BEA3-5086-4585-97D0-3DDF808971F0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{86E6BEA3-5086-4585-97D0-3DDF808971F0}.Release|x64.ActiveCfg = Release|Any CPU
+		{86E6BEA3-5086-4585-97D0-3DDF808971F0}.Release|x64.Build.0 = Release|Any CPU
+		{86E6BEA3-5086-4585-97D0-3DDF808971F0}.Release|x86.ActiveCfg = Release|Any CPU
+		{86E6BEA3-5086-4585-97D0-3DDF808971F0}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -127,5 +141,6 @@ Global
 		{3399431D-0FE5-4855-83BC-565EE0E9E4AF} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{A5EDE8C1-EDE8-4DF3-99AA-7CA91C97811D} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{D2C7C9BF-6E32-47AB-A03C-E2F9E14CF53A} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{86E6BEA3-5086-4585-97D0-3DDF808971F0} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

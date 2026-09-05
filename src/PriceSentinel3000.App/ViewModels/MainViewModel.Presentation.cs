@@ -8,6 +8,26 @@ namespace PriceSentinel3000.App.ViewModels;
 
 public sealed partial class MainViewModel
 {
+    private IReadOnlyList<MarketQuote>? _lastProjectedHistory;
+    private int _lastProjectedBufferMinutes;
+    private int _lastProjectedCandleInterval;
+    private int _tradeMarkerVersion;
+    private int _lastProjectedMarkerVersion;
+
+    private IReadOnlyList<MarketQuote> GetExecutionHistory(MarketQuote trigger)
+    {
+        if (!_ringBuffer!.IsValidQuote(trigger))
+        {
+            throw new InvalidOperationException("The execution quote has invalid prices or a different instrument.");
+        }
+
+        return
+        [
+            .. _ringBuffer.Snapshot().Where(quote => quote.SourceTimestampUtc < trigger.SourceTimestampUtc),
+            trigger,
+        ];
+    }
+
     private void RefreshMarketView()
     {
         if (_ringBuffer is null)
@@ -24,21 +44,56 @@ public sealed partial class MainViewModel
 
         IReadOnlyList<MarketQuote> retainedChartSnapshot =
             _chartRingBuffer?.Snapshot() ?? snapshot;
+        RefreshChartPoints(retainedChartSnapshot);
+
+        MarketQuote latest = snapshot[^1];
+        _currentPrice = latest.Last.ToString("$0.00", CultureInfo.InvariantCulture);
+        _bidAskDisplay = latest.HasTwoSidedMarket
+            ? $"{latest.Bid.ToString("0.00", CultureInfo.InvariantCulture)} / {latest.Ask.ToString("0.00", CultureInfo.InvariantCulture)}"
+            : "-- / --";
+        _hasMarketData = true;
+        OnPropertyChanged(nameof(CurrentPrice));
+        OnPropertyChanged(nameof(BidAskDisplay));
+        OnPropertyChanged(nameof(HasMarketData));
+        OnPropertyChanged(nameof(MarketDataStatusBackground));
+        OnPropertyChanged(nameof(MarketDataStatusBorder));
+        OnPropertyChanged(nameof(MarketDataStatusForeground));
+        RefreshTradableNowState();
+    }
+
+    private void RefreshChartPoints(IReadOnlyList<MarketQuote> retainedChartSnapshot)
+    {
+        if (_lastProjectedHistory is not null &&
+            _lastProjectedBufferMinutes == BufferMinutes &&
+            _lastProjectedCandleInterval == ChartCandleIntervalSeconds &&
+            _lastProjectedMarkerVersion == _tradeMarkerVersion &&
+            _lastProjectedHistory.SequenceEqual(retainedChartSnapshot))
+        {
+            return;
+        }
+
         IReadOnlyList<MarketQuote> chartSnapshot = SelectChartHistory(
             retainedChartSnapshot,
             BufferMinutes,
             ChartCandleIntervalSeconds);
-        IReadOnlyList<PriceCandle> candles = PriceCandleAggregator.Aggregate(
-            chartSnapshot,
-            TimeSpan.FromSeconds(ChartCandleIntervalSeconds));
+        TimeSpan interval = TimeSpan.FromSeconds(ChartCandleIntervalSeconds);
+        IReadOnlyList<PriceCandle> candles = PriceCandleAggregator.Aggregate(chartSnapshot, interval);
         var refreshedPoints = new List<PricePointViewModel>(candles.Count);
+        var candleMarkers = new Dictionary<DateTimeOffset, MarketQuote>();
+        if (_tradeMarkers.Count > 0)
+        {
+            foreach (MarketQuote quote in chartSnapshot)
+            {
+                if (_tradeMarkers.ContainsKey(quote.SourceTimestampUtc))
+                {
+                    candleMarkers[PriceCandleAggregator.AlignToInterval(quote.SourceTimestampUtc, interval)] = quote;
+                }
+            }
+        }
 
         foreach (PriceCandle candle in candles)
         {
-            MarketQuote? markedQuote = chartSnapshot.LastOrDefault(quote =>
-                quote.SourceTimestampUtc >= candle.StartsAtUtc &&
-                quote.SourceTimestampUtc < candle.EndsAtUtc &&
-                _tradeMarkers.ContainsKey(quote.SourceTimestampUtc));
+            candleMarkers.TryGetValue(candle.StartsAtUtc, out MarketQuote? markedQuote);
             ChartTradeMarker marker = markedQuote is null
                 ? ChartTradeMarker.None
                 : _tradeMarkers[markedQuote.SourceTimestampUtc];
@@ -54,21 +109,10 @@ public sealed partial class MainViewModel
         }
 
         SynchronizeChartPoints(refreshedPoints);
-
-        MarketQuote latest = snapshot[^1];
-        _currentPrice = latest.Last.ToString("$0.00", CultureInfo.InvariantCulture);
-        _bidAskDisplay = latest.HasTwoSidedMarket
-            ? $"{latest.Bid.ToString("0.00", CultureInfo.InvariantCulture)} / {latest.Ask.ToString("0.00", CultureInfo.InvariantCulture)}"
-            : "-- / --";
-        _hasMarketData = true;
-        OnPropertyChanged(nameof(CurrentPrice));
-        OnPropertyChanged(nameof(BidAskDisplay));
-        OnPropertyChanged(nameof(HasMarketData));
-        OnPropertyChanged(nameof(MarketDataStatusBackground));
-        OnPropertyChanged(nameof(MarketDataStatusBorder));
-        OnPropertyChanged(nameof(MarketDataStatusForeground));
-        RefreshTradableNowState();
-
+        _lastProjectedHistory = retainedChartSnapshot;
+        _lastProjectedBufferMinutes = BufferMinutes;
+        _lastProjectedCandleInterval = ChartCandleIntervalSeconds;
+        _lastProjectedMarkerVersion = _tradeMarkerVersion;
     }
 
     private static IReadOnlyList<MarketQuote> SelectChartHistory(

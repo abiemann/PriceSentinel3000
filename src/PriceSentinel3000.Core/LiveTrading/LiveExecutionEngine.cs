@@ -19,7 +19,9 @@ public sealed class LiveExecutionEngine
     private readonly TradingSessionSettings _settings;
     private readonly IPriceActionSignalEngine _strategy;
     private readonly HashSet<Guid> _observedTerminalOrders = [];
-    private readonly decimal _sessionStartingEquity;
+    private decimal _dailyStartingEquity;
+    private decimal _lastObservedEquity;
+    private DateOnly? _tradingDate;
     private DateTimeOffset? _lastEvaluatedUtc;
     private DateTimeOffset? _lastExitUtc;
     private decimal? _lastExitPrice;
@@ -35,7 +37,8 @@ public sealed class LiveExecutionEngine
         int initialEntriesToday = 0,
         DateTimeOffset? initialLastExitUtc = null,
         decimal? initialLastExitPrice = null,
-        bool requireInheritedPositionExit = false)
+        bool requireInheritedPositionExit = false,
+        DateOnly? initialTradingDate = null)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
@@ -57,7 +60,9 @@ public sealed class LiveExecutionEngine
         }
 
         _settings = settings;
-        _sessionStartingEquity = sessionStartingEquity;
+        _dailyStartingEquity = sessionStartingEquity;
+        _lastObservedEquity = sessionStartingEquity;
+        _tradingDate = initialTradingDate;
         _entriesToday = initialEntriesToday;
         _lastExitUtc = initialLastExitUtc;
         _lastExitPrice = initialLastExitPrice;
@@ -67,6 +72,44 @@ public sealed class LiveExecutionEngine
 
     public int EntriesToday => _entriesToday;
     public bool RiskLocked => _riskLocked;
+    public DateOnly? TradingDate => _tradingDate;
+    public decimal DailyStartingEquity => _dailyStartingEquity;
+
+    public void ObserveAccount(
+        DateTimeOffset capturedAtUtc,
+        decimal equity,
+        decimal? dailyStartingEquity = null,
+        int? entriesToday = null)
+    {
+        if (dailyStartingEquity is <= 0m)
+        {
+            throw new ArgumentOutOfRangeException(nameof(dailyStartingEquity));
+        }
+
+        if (entriesToday is < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(entriesToday));
+        }
+
+        DateOnly tradingDate = EasternTradingDay.GetDate(capturedAtUtc);
+        if (_tradingDate is not null && tradingDate < _tradingDate.Value)
+        {
+            return;
+        }
+
+        AdvanceTradingDay(tradingDate);
+        if (dailyStartingEquity is not null)
+        {
+            _dailyStartingEquity = dailyStartingEquity.Value;
+        }
+
+        if (entriesToday is not null)
+        {
+            _entriesToday = entriesToday.Value;
+        }
+
+        _lastObservedEquity = equity;
+    }
 
     public LiveTradeEvaluation Evaluate(
         IReadOnlyList<MarketQuote> quotes,
@@ -74,6 +117,7 @@ public sealed class LiveExecutionEngine
     {
         ArgumentNullException.ThrowIfNull(quotes);
         ArgumentNullException.ThrowIfNull(broker);
+        ObserveAccount(broker.CapturedAtUtc, broker.Portfolio.TotalValue);
 
         if (quotes.Count == 0)
         {
@@ -133,12 +177,14 @@ public sealed class LiveExecutionEngine
                 _ => broker.Portfolio.TotalValue * _settings.PositionSizeValue / 100m,
             };
             allocation = Math.Min(allocation, broker.Portfolio.BuyingPower);
-            decimal quantity = FloorQuantity(allocation / entryPrice);
+            decimal quantity = allocation / entryPrice;
 
             if (_settings.QuantityLimitMode is QuantityLimitMode.NoMoreThan)
             {
                 quantity = Math.Min(quantity, _settings.MaximumQuantity);
             }
+
+            quantity = FloorQuantity(quantity);
 
             if (quantity <= 0m)
             {
@@ -199,9 +245,16 @@ public sealed class LiveExecutionEngine
             return;
         }
 
+        DateOnly filledDate = EasternTradingDay.GetDate(order.UpdatedAtUtc);
+        AdvanceTradingDay(filledDate);
+
         if (order.Side is BrokerOrderSide.Buy)
         {
-            _entriesToday++;
+            if (filledDate == _tradingDate)
+            {
+                _entriesToday++;
+            }
+
             _positionOpenedAtUtc = order.UpdatedAtUtc;
         }
         else
@@ -217,7 +270,7 @@ public sealed class LiveExecutionEngine
         decimal mark,
         LiveBrokerSnapshot broker)
     {
-        decimal dailyLoss = Math.Max(0m, _sessionStartingEquity - broker.Portfolio.TotalValue);
+        decimal dailyLoss = Math.Max(0m, _dailyStartingEquity - broker.Portfolio.TotalValue);
         decimal dailyLimit = DailyLossLimit();
 
         if (dailyLoss >= dailyLimit)
@@ -240,7 +293,7 @@ public sealed class LiveExecutionEngine
                 [$"Account drawdown ${dailyLoss:0.00} reached the ${dailyLimit:0.00} daily limit; liquidating the monitored position."],
                 null,
                 0m,
-                -dailyLoss / _sessionStartingEquity * 100m);
+                -dailyLoss / _dailyStartingEquity * 100m);
         }
 
         if (!broker.Position.HasPosition || broker.Position.AverageBuyPrice <= 0m)
@@ -305,7 +358,7 @@ public sealed class LiveExecutionEngine
     {
         if (_riskLocked)
         {
-            return "Maximum daily loss reached; new LIVE entries are locked for this session.";
+            return "Maximum daily loss reached; new LIVE entries are locked for this trading day.";
         }
 
         if (broker.Position.HasPosition)
@@ -358,8 +411,23 @@ public sealed class LiveExecutionEngine
     private decimal DailyLossLimit() => _settings.MaximumDailyLossBasis switch
     {
         AmountBasis.FixedAmount => _settings.MaximumDailyLossValue,
-        _ => _sessionStartingEquity * _settings.MaximumDailyLossValue / 100m,
+        _ => _dailyStartingEquity * _settings.MaximumDailyLossValue / 100m,
     };
+
+    private void AdvanceTradingDay(DateOnly tradingDate)
+    {
+        if (_tradingDate is not null && tradingDate > _tradingDate.Value)
+        {
+            _dailyStartingEquity = _lastObservedEquity;
+            _entriesToday = 0;
+            _riskLocked = false;
+        }
+
+        if (_tradingDate is null || tradingDate > _tradingDate.Value)
+        {
+            _tradingDate = tradingDate;
+        }
+    }
 
     private static decimal FloorQuantity(decimal quantity) =>
         Math.Floor(quantity * 1_000_000m) / 1_000_000m;

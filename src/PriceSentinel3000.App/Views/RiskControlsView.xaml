@@ -23,7 +23,7 @@
                           SelectedValue="{Binding PositionSizeBasis}" />
                 <TextBox Grid.Column="2"
                          Style="{StaticResource InputTextBoxStyle}"
-                         Text="{Binding PositionSizeValue, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                         Text="{Binding PositionSizeValue, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True, NotifyOnValidationError=True}" />
             </Grid>
 
             <TextBlock Margin="0,14,0,0"
@@ -43,7 +43,7 @@
                 <TextBox Grid.Column="2"
                          IsEnabled="{Binding IsQuantityLimited}"
                          Style="{StaticResource InputTextBoxStyle}"
-                         Text="{Binding MaximumQuantity, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                         Text="{Binding MaximumQuantity, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True, NotifyOnValidationError=True}" />
             </Grid>
 
             <TextBlock Margin="0,14,0,0"
@@ -63,7 +63,7 @@
                 <TextBox Grid.Column="2"
                          IsEnabled="{Binding IsEntryLimited}"
                          Style="{StaticResource InputTextBoxStyle}"
-                         Text="{Binding MaximumEntriesPerDay, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                         Text="{Binding MaximumEntriesPerDay, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True, NotifyOnValidationError=True}" />
             </Grid>
 
             <TextBlock Margin="0,14,0,0"
@@ -82,7 +82,7 @@
                           SelectedValue="{Binding MaximumDailyLossBasis}" />
                 <TextBox Grid.Column="2"
                          Style="{StaticResource InputTextBoxStyle}"
-                         Text="{Binding MaximumDailyLossValue, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                         Text="{Binding MaximumDailyLossValue, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True, NotifyOnValidationError=True}" />
             </Grid>
 
             <TextBlock Margin="0,14,0,0"
@@ -101,7 +101,7 @@
                           SelectedValue="{Binding StopLossBasis}" />
                 <TextBox Grid.Column="2"
                          Style="{StaticResource InputTextBoxStyle}"
-                         Text="{Binding StopLossValue, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                         Text="{Binding StopLossValue, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True, NotifyOnValidationError=True}" />
             </Grid>
         </StackPanel>
     </Border>

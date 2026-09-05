@@ -41,36 +41,65 @@ public sealed class RealtimeSessionRunner(
 
         DateTimeOffset nextReconciliation = _timeProvider.GetUtcNow()
             .AddSeconds(reconciliationSeconds);
+        using var reconciliationCancellation = CancellationTokenSource
+            .CreateLinkedTokenSource(cancellationToken);
+        Task<IReadOnlyList<MarketQuote>>? pendingReconciliation = null;
 
-        while (true)
+        try
         {
-            await Task.Delay(
-                request.PollingInterval,
-                _timeProvider,
-                cancellationToken);
-            DateTimeOffset observedAt = _timeProvider.GetUtcNow();
-            MarketQuote quote = await _marketDataSource.GetQuoteAsync(
-                request,
-                observedAt,
-                cancellationToken);
-            IReadOnlyList<MarketQuote> reconciliation = [];
-
-            if (observedAt >= nextReconciliation)
+            while (true)
             {
-                DateTimeOffset through = observedAt.AddSeconds(
-                    -reconciliationCompletionDelaySeconds);
-                DateTimeOffset from = through.AddSeconds(
-                    -reconciliationLookbackSeconds);
-                reconciliation = await _marketDataSource.GetHistoryAsync(
+                await Task.Delay(
+                    request.PollingInterval,
+                    _timeProvider,
+                    cancellationToken);
+                DateTimeOffset observedAt = _timeProvider.GetUtcNow();
+                MarketQuote quote = await _marketDataSource.GetQuoteAsync(
                     request,
-                    from,
-                    through,
                     observedAt,
                     cancellationToken);
-                nextReconciliation = observedAt.AddSeconds(reconciliationSeconds);
-            }
+                IReadOnlyList<MarketQuote> reconciliation = [];
 
-            yield return new([], quote, reconciliation);
+                if (pendingReconciliation is null && observedAt >= nextReconciliation)
+                {
+                    DateTimeOffset through = observedAt.AddSeconds(
+                        -reconciliationCompletionDelaySeconds);
+                    DateTimeOffset from = through.AddSeconds(
+                        -reconciliationLookbackSeconds);
+                    pendingReconciliation = _marketDataSource.GetHistoryAsync(
+                        request,
+                        from,
+                        through,
+                        observedAt,
+                        reconciliationCancellation.Token);
+                    nextReconciliation = observedAt.AddSeconds(reconciliationSeconds);
+                }
+
+                if (pendingReconciliation is { IsCompleted: true })
+                {
+                    Task<IReadOnlyList<MarketQuote>> completed = pendingReconciliation;
+                    pendingReconciliation = null;
+                    reconciliation = await completed;
+                }
+
+                yield return new([], quote, reconciliation);
+            }
+        }
+        finally
+        {
+            await reconciliationCancellation.CancelAsync();
+
+            if (pendingReconciliation is not null)
+            {
+                try
+                {
+                    await pendingReconciliation;
+                }
+                catch (OperationCanceledException)
+                    when (reconciliationCancellation.IsCancellationRequested)
+                {
+                }
+            }
         }
     }
 }

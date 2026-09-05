@@ -10,7 +10,7 @@ public sealed class ReplaySessionRunnerTests
         new(2026, 8, 3, 16, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public void CalculateDelay_AppliesSpeedAndSafetyBounds()
+    public void CalculateDelay_AppliesSpeedAndMinimumDelay()
     {
         Assert.Equal(
             TimeSpan.FromMilliseconds(500),
@@ -19,8 +19,29 @@ public sealed class ReplaySessionRunnerTests
             TimeSpan.FromMilliseconds(20),
             ReplaySessionRunner.CalculateDelay(Start, Start, speed: 1m));
         Assert.Equal(
-            TimeSpan.FromSeconds(2),
+            TimeSpan.FromSeconds(10),
             ReplaySessionRunner.CalculateDelay(Start, Start.AddSeconds(10), speed: 1m));
+    }
+
+    [Theory]
+    [InlineData(1, 15)]
+    [InlineData(5, 3)]
+    [InlineData(10, 1.5)]
+    [InlineData(100, 0.15)]
+    public void CalculateDelay_PreservesHistoricalBarSpeed(int speed, double seconds)
+    {
+        Assert.Equal(
+            TimeSpan.FromSeconds(seconds),
+            ReplaySessionRunner.CalculateDelay(Start, Start.AddSeconds(15), speed));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void CalculateDelay_RejectsNonPositiveSpeed(int speed)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            ReplaySessionRunner.CalculateDelay(Start, Start.AddSeconds(15), speed));
     }
 
     [Fact]
@@ -72,6 +93,27 @@ public sealed class ReplaySessionRunnerTests
         Assert.True(await moveNext);
         Assert.False(runner.IsPaused);
         Assert.False(runner.Resume());
+    }
+
+    [Fact]
+    public async Task RunAsync_CanCancelAnUncompressedHistoricalGap()
+    {
+        var runner = new ReplaySessionRunner();
+        using var cancellation = new CancellationTokenSource();
+        MarketQuote next = Quote(11m) with
+        {
+            SourceTimestampUtc = Start.AddHours(1),
+        };
+        await using IAsyncEnumerator<ReplaySessionUpdate> enumerator = runner
+            .RunAsync([Quote(10m), next], speed: 1m, cancellation.Token)
+            .GetAsyncEnumerator();
+        Assert.True(await enumerator.MoveNextAsync());
+        Task<bool> pending = enumerator.MoveNextAsync().AsTask();
+
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            pending.WaitAsync(TimeSpan.FromSeconds(5)));
     }
 
     private static MarketQuote Quote(decimal last) =>

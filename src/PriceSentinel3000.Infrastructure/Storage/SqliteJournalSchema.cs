@@ -1,4 +1,6 @@
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
+using PriceSentinel3000.Core.LiveTrading;
 
 namespace PriceSentinel3000.Infrastructure.Storage;
 
@@ -123,11 +125,19 @@ internal static class SqliteJournalSchema
             CREATE TABLE IF NOT EXISTS fills (
                 id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
                 order_id TEXT NOT NULL,
+                execution_id TEXT NULL,
                 filled_at_utc TEXT NOT NULL,
                 quantity REAL NOT NULL,
                 price REAL NOT NULL,
                 fees REAL NOT NULL DEFAULT 0,
                 FOREIGN KEY(order_id) REFERENCES orders(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS live_daily_baselines (
+                account_number TEXT NOT NULL,
+                trading_day_start_utc TEXT NOT NULL,
+                starting_balance TEXT NOT NULL,
+                PRIMARY KEY(account_number, trading_day_start_utc)
             );
 
             CREATE TABLE IF NOT EXISTS positions (
@@ -172,6 +182,71 @@ internal static class SqliteJournalSchema
             """;
         schema.ExecuteNonQuery();
         EnsureQuoteCandleColumns(connection);
+        EnsureLiveExecutionIds(connection);
+    }
+
+    private static void EnsureLiveExecutionIds(SqliteConnection connection)
+    {
+        using SqliteTransaction transaction = connection.BeginTransaction();
+        using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT COUNT(*) FROM schema_version WHERE version = 3;";
+        if ((long)command.ExecuteScalar()! != 0)
+        {
+            transaction.Commit();
+            return;
+        }
+
+        command.CommandText = "SELECT COUNT(*) FROM pragma_table_info('fills') WHERE name = 'execution_id';";
+        if ((long)command.ExecuteScalar()! == 0)
+        {
+            command.CommandText = "ALTER TABLE fills ADD COLUMN execution_id TEXT NULL;";
+            command.ExecuteNonQuery();
+        }
+
+        command.CommandText =
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_fills_order_execution ON fills(order_id, execution_id);";
+        command.ExecuteNonQuery();
+        command.CommandText =
+            """
+            WITH snapshots AS (
+                SELECT e.client_reference_id, e.details_json,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY e.client_reference_id
+                        ORDER BY json_array_length(e.details_json, '$.Order.Executions') DESC,
+                            e.occurred_at_utc DESC, e.id DESC) AS snapshot_rank
+                FROM live_order_events AS e
+                INNER JOIN orders AS o ON o.id = e.client_reference_id
+                WHERE o.order_type = 'LIVE_MARKET'
+                  AND CASE WHEN json_valid(e.details_json)
+                      THEN json_type(e.details_json, '$.Order.Executions') = 'array'
+                      ELSE 0 END)
+            SELECT client_reference_id, details_json FROM snapshots
+            WHERE snapshot_rank = 1;
+            """;
+        using (SqliteDataReader reader = command.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                using JsonDocument details = JsonDocument.Parse(reader.GetString(1));
+                // Older parsers generated new IDs for missing IDs on every poll.
+                // Use one snapshot so those IDs cannot multiply a historical fill.
+                JsonElement executions = details.RootElement
+                    .GetProperty("Order").GetProperty("Executions");
+                BrokerExecution[] parsed = executions.Deserialize<BrokerExecution[]>()!;
+                SqliteTradingJournal.AppendLiveExecutions(
+                    connection, transaction, reader.GetString(0),
+                    parsed.Where(execution => !string.IsNullOrWhiteSpace(execution.Id)));
+            }
+        }
+
+        command.CommandText =
+            """
+            INSERT INTO schema_version(version, applied_at_utc)
+            VALUES (3, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+            """;
+        command.ExecuteNonQuery();
+        transaction.Commit();
     }
 
     private static void EnsureQuoteCandleColumns(SqliteConnection connection)

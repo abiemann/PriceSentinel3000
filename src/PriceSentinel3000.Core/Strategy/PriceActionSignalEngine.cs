@@ -84,10 +84,13 @@ public sealed class PriceActionSignalEngine : IPriceActionSignalEngine
             ordered,
             _blockCount,
             evaluatedAt));
+        MarketQuote[] patternWindow = Recent(
+            ordered,
+            evaluatedAt.AddMinutes(-_blockCount));
 
         return position.HasPosition
-            ? EvaluateExit(ordered, position, rsi, priorRsi, momentum, blocks)
-            : EvaluateEntry(ordered, rsi, priorRsi, momentum, blocks);
+            ? EvaluateExit(patternWindow, position, rsi, priorRsi, momentum, blocks)
+            : EvaluateEntry(patternWindow, rsi, priorRsi, momentum, blocks);
     }
 
     private static decimal? CalculateRsi(IReadOnlyList<decimal> prices)

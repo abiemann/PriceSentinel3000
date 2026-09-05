@@ -118,7 +118,7 @@
                                Text="{Binding AccountBalanceCaption}" />
                     <TextBox IsReadOnly="{Binding IsLiveEffective}"
                              Style="{StaticResource InputTextBoxStyle}"
-                             Text="{Binding AccountBalanceValue, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}" />
+                             Text="{Binding AccountBalanceValue, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True, NotifyOnValidationError=True}" />
                 </StackPanel>
             </Grid>
             <CheckBox Margin="0,12,0,0"

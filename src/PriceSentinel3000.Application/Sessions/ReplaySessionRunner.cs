@@ -84,13 +84,14 @@ public sealed class ReplaySessionRunner(TimeProvider? timeProvider = null)
         DateTimeOffset current,
         decimal speed)
     {
+        if (speed <= 0m)
+        {
+            throw new ArgumentOutOfRangeException(nameof(speed));
+        }
+
         double milliseconds =
             (current - previous).TotalMilliseconds / decimal.ToDouble(speed);
-        return TimeSpan.FromMilliseconds(
-            Math.Clamp(
-                double.IsFinite(milliseconds) ? milliseconds : 20d,
-                20d,
-                2_000d));
+        return TimeSpan.FromMilliseconds(Math.Max(20d, milliseconds));
     }
 
     private async Task DelayAsync(

@@ -3,8 +3,12 @@ namespace PriceSentinel3000.Core.MarketData;
 public sealed class PriceRingBuffer
 {
     private readonly SortedDictionary<DateTimeOffset, MarketQuote> _quotes = [];
+    private readonly int _minimumObservationCount;
 
-    public PriceRingBuffer(Instrument instrument, TimeSpan retention)
+    public PriceRingBuffer(
+        Instrument instrument,
+        TimeSpan retention,
+        int minimumObservationCount = 0)
     {
         ArgumentNullException.ThrowIfNull(instrument);
 
@@ -13,8 +17,11 @@ public sealed class PriceRingBuffer
             throw new ArgumentOutOfRangeException(nameof(retention), "Retention must be positive.");
         }
 
+        ArgumentOutOfRangeException.ThrowIfNegative(minimumObservationCount);
+
         Instrument = instrument;
         Retention = retention;
+        _minimumObservationCount = minimumObservationCount;
     }
 
     public Instrument Instrument { get; }
@@ -32,9 +39,7 @@ public sealed class PriceRingBuffer
 
         foreach (MarketQuote quote in quotes.OrderBy(item => item.SourceTimestampUtc))
         {
-            if (quote.Instrument != Instrument ||
-                quote.Last <= 0m ||
-                !HasValidMarketPrices(quote))
+            if (!IsValidQuote(quote))
             {
                 rejected++;
                 continue;
@@ -69,6 +74,14 @@ public sealed class PriceRingBuffer
     }
 
     public IReadOnlyList<MarketQuote> Snapshot() => [.. _quotes.Values];
+
+    public bool IsValidQuote(MarketQuote quote)
+    {
+        ArgumentNullException.ThrowIfNull(quote);
+        return quote.Instrument == Instrument &&
+               quote.Last > 0m &&
+               HasValidMarketPrices(quote);
+    }
 
     private static bool HasSameMarketValues(MarketQuote left, MarketQuote right) =>
         left.Bid == right.Bid &&
@@ -120,7 +133,12 @@ public sealed class PriceRingBuffer
         }
 
         DateTimeOffset cutoff = _quotes.Keys.Last() - Retention;
-        DateTimeOffset[] expired = [.. _quotes.Keys.TakeWhile(timestamp => timestamp < cutoff)];
+        DateTimeOffset[] expired =
+        [
+            .. _quotes.Keys
+                .TakeWhile(timestamp => timestamp < cutoff)
+                .Take(Math.Max(0, _quotes.Count - _minimumObservationCount)),
+        ];
 
         foreach (DateTimeOffset timestamp in expired)
         {

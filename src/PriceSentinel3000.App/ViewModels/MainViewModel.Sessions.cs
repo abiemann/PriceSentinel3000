@@ -6,6 +6,7 @@ using PriceSentinel3000.Core.Journaling;
 using PriceSentinel3000.Core.LiveTrading;
 using PriceSentinel3000.Core.MarketData;
 using PriceSentinel3000.Core.Modes;
+using PriceSentinel3000.Core.Strategy;
 
 namespace PriceSentinel3000.App.ViewModels;
 
@@ -37,6 +38,12 @@ public sealed partial class MainViewModel
 
     private async Task StartSelectedSessionAsync()
     {
+        if (ValidateConfigurationInputs?.Invoke() is false || HasConfigurationErrors)
+        {
+            StatusMessage = "Cannot start: correct the highlighted configuration inputs.";
+            return;
+        }
+
         TradingSessionSettings settings = CreateSettings();
         IReadOnlyList<string> errors = TradingSessionSettingsValidator.Validate(settings);
 
@@ -78,8 +85,7 @@ public sealed partial class MainViewModel
 
         NotifyModeProperties();
         CancellationToken cancellationToken = _sessionCoordinator.Begin();
-        _isStartingSession = true;
-        StartSessionCommand.RaiseCanExecuteChanged();
+        SetStartingSession(true);
 
         try
         {
@@ -119,8 +125,7 @@ public sealed partial class MainViewModel
         }
         finally
         {
-            _isStartingSession = false;
-            StartSessionCommand.RaiseCanExecuteChanged();
+            SetStartingSession(false);
         }
     }
 
@@ -155,9 +160,8 @@ public sealed partial class MainViewModel
 
             DateTimeOffset tradingDayStartUtc = GetEasternTradingDayStartUtc(
                 _timeProvider.GetUtcNow());
-            decimal dailyStartingEquity =
-                _journal.GetLiveStartingBalanceSince(tradingDayStartUtc) ??
-                initialBroker.Portfolio.TotalValue;
+            decimal dailyStartingEquity = ReadLiveDailyBaseline(
+                _liveAccount!.AccountNumber, tradingDayStartUtc, initialBroker.Portfolio.TotalValue);
             if (dailyStartingEquity <= 0m)
             {
                 throw new InvalidOperationException("The saved LIVE daily-equity baseline is invalid; execution remains disarmed.");
@@ -177,13 +181,13 @@ public sealed partial class MainViewModel
                 }
 
                 initialBroker = positionRecovery.Broker;
+                tradingDayStartUtc = GetEasternTradingDayStartUtc(_timeProvider.GetUtcNow());
                 sessionSettings = settings with
                 {
                     StartingBalance = initialBroker.Portfolio.TotalValue,
                 };
-                dailyStartingEquity =
-                    _journal.GetLiveStartingBalanceSince(tradingDayStartUtc) ??
-                    initialBroker.Portfolio.TotalValue;
+                dailyStartingEquity = ReadLiveDailyBaseline(
+                    _liveAccount!.AccountNumber, tradingDayStartUtc, initialBroker.Portfolio.TotalValue);
             }
 
             IReadOnlyList<BrokerOrderSnapshot> ordersToday =
@@ -191,13 +195,7 @@ public sealed partial class MainViewModel
                     _liveAccount!.AccountNumber,
                     tradingDayStartUtc,
                     token);
-            int initialEntriesToday = ordersToday
-                .Where(order => order.Side is BrokerOrderSide.Buy && order.FilledQuantity > 0m)
-                .Select(order => string.IsNullOrWhiteSpace(order.BrokerOrderId)
-                    ? order.ClientReferenceId.ToString("D")
-                    : order.BrokerOrderId)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Count();
+            int initialEntriesToday = CountLiveEntries(ordersToday);
             BrokerOrderSnapshot? latestSell = ordersToday
                 .Where(order =>
                     order.Side is BrokerOrderSide.Sell &&
@@ -218,13 +216,27 @@ public sealed partial class MainViewModel
                 throw new InvalidOperationException("The saved LIVE daily-equity baseline is invalid; execution remains disarmed.");
             }
 
+            if (GetEasternTradingDayStartUtc(_timeProvider.GetUtcNow()) != tradingDayStartUtc)
+            {
+                throw new InvalidOperationException("The trading day changed during LIVE startup. Start again to reconcile the new day's limits.");
+            }
+
+            dailyStartingEquity = _journal.GetOrCreateLiveDailyStartingBalance(
+                _liveAccount!.AccountNumber,
+                tradingDayStartUtc,
+                dailyStartingEquity);
+            DateOnly tradingDate = EasternTradingDay.GetDate(tradingDayStartUtc);
             _liveExecutionEngine = new(
                 sessionSettings,
                 dailyStartingEquity,
                 initialEntriesToday: initialEntriesToday,
                 initialLastExitUtc: latestSell?.UpdatedAtUtc,
                 initialLastExitPrice: latestSell?.EffectiveAveragePrice,
-                requireInheritedPositionExit: positionRecovery is not null);
+                requireInheritedPositionExit: positionRecovery is not null,
+                initialTradingDate: tradingDate);
+            _liveExecutionEngine.ObserveAccount(initialBroker.CapturedAtUtc, initialBroker.Portfolio.TotalValue);
+            _persistedLiveTradingDate = tradingDate;
+            _reconciledLiveEntriesDate = tradingDate;
         }
 
         PrepareDataSession(instrument, sessionSettings, mode);
@@ -437,7 +449,10 @@ public sealed partial class MainViewModel
         TradingMode mode)
     {
         ReleaseReplayPause();
-        _ringBuffer = new(instrument, TimeSpan.FromMinutes(settings.BufferMinutes));
+        _ringBuffer = new(
+            instrument,
+            TimeSpan.FromMinutes(settings.BufferMinutes),
+            minimumObservationCount: PriceActionSignalEngine.RsiPeriod + 2);
         _chartRingBuffer = new(
             instrument,
             GetMaximumChartHistoryDuration(settings.BufferMinutes));
@@ -452,6 +467,7 @@ public sealed partial class MainViewModel
         }
         _marketDataRequest = null;
         _tradeMarkers.Clear();
+        _lastProjectedHistory = null;
         _chartScaleResetVersion++;
         OnPropertyChanged(nameof(ChartScaleResetVersion));
         ChartPoints.Clear();
@@ -473,7 +489,12 @@ public sealed partial class MainViewModel
         OnPropertyChanged(nameof(CurrentPrice));
         OnPropertyChanged(nameof(BidAskDisplay));
 
-        string settingsJson = JsonSerializer.Serialize(settings);
+        var settingsNode = JsonSerializer.SerializeToNode(settings)!;
+        if (mode is TradingMode.Live)
+        {
+            settingsNode["LiveAccountNumber"] = _liveAccount!.AccountNumber;
+        }
+        string settingsJson = settingsNode.ToJsonString();
         _activeSession = _journal.StartSession(
             instrument,
             mode,
@@ -481,6 +502,7 @@ public sealed partial class MainViewModel
             settingsJson,
             _timeProvider.GetUtcNow());
         IsSessionRunning = true;
+        OnPropertyChanged(nameof(SymbolDisplay));
     }
 
     private void PauseReplay()
@@ -574,7 +596,10 @@ public sealed partial class MainViewModel
                 instrument);
         if (cancellation.TerminalOrder is not null)
         {
+            DateTimeOffset observedAtUtc = _timeProvider.GetUtcNow();
+            _liveExecutionEngine?.ObserveAccount(observedAtUtc, _paperEquity);
             _liveExecutionEngine?.ObserveTerminalOrder(cancellation.TerminalOrder);
+            PersistLiveDailyBaseline(observedAtUtc, _paperEquity);
         }
 
         return cancellation.Handled;

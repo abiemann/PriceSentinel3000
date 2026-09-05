@@ -95,6 +95,154 @@ public sealed class PaperTradingEngineTests
     }
 
     [Fact]
+    public void Engine_FloorsTheFinalQuantityCapToBrokerPrecision()
+    {
+        var engine = new PaperTradingEngine(
+            new("SOFI"),
+            TradingSessionSettings.Default with
+            {
+                QuantityLimitMode = QuantityLimitMode.NoMoreThan,
+                MaximumQuantity = 1.23456789m,
+            },
+            new ScriptedStrategy(StrategySignalKind.Buy));
+
+        PaperTradeResult result = engine.Process([Bar(DateTimeOffset.UtcNow, 10m)]);
+
+        Assert.Equal(1.234567m, result.Fill?.Quantity);
+    }
+
+    [Fact]
+    public void Engine_BlocksACapSmallerThanBrokerPrecision()
+    {
+        var engine = new PaperTradingEngine(
+            new("SOFI"),
+            TradingSessionSettings.Default with
+            {
+                QuantityLimitMode = QuantityLimitMode.NoMoreThan,
+                MaximumQuantity = 0.0000009m,
+            },
+            new ScriptedStrategy(StrategySignalKind.Buy));
+
+        PaperTradeResult result = engine.Process([Bar(DateTimeOffset.UtcNow, 10m)]);
+
+        Assert.Null(result.Fill);
+        Assert.Equal(0, result.Account.EntriesToday);
+        Assert.Equal(TradingSessionSettings.Default.StartingBalance, result.Account.Cash);
+    }
+
+    [Fact]
+    public void Engine_ResetsEntryLimitAtEasternMidnightInsteadOfUtcMidnight()
+    {
+        var engine = new PaperTradingEngine(
+            new("SOFI"),
+            TradingSessionSettings.Default with { MaximumEntriesPerDay = 1 },
+            new ScriptedStrategy(
+                StrategySignalKind.Buy,
+                StrategySignalKind.Sell,
+                StrategySignalKind.Buy,
+                StrategySignalKind.Buy));
+        DateTimeOffset start = new(2026, 8, 3, 23, 59, 0, TimeSpan.Zero);
+        engine.Process([Bar(start, 10m)]);
+        engine.Process([Bar(start.AddSeconds(5), 10.2m)]);
+
+        PaperTradeResult sameDay = engine.Process([Bar(start.AddMinutes(1), 10.3m)]);
+        PaperTradeResult nextDay = engine.Process([Bar(start.AddHours(4).AddMinutes(1), 10.3m)]);
+
+        Assert.Null(sameDay.Fill);
+        Assert.Contains("Maximum entries", sameDay.Decision.Reasons[0]);
+        Assert.Equal(PaperOrderSide.Buy, nextDay.Fill?.Side);
+        Assert.Equal(1, nextDay.Account.EntriesToday);
+    }
+
+    [Theory]
+    [InlineData(AmountBasis.FixedAmount, 100)]
+    [InlineData(AmountBasis.AccountPercentage, 1)]
+    public void Engine_NewDayLossUsesPriorDayMarkedEquityAndKeepsPosition(
+        AmountBasis lossBasis,
+        int lossValue)
+    {
+        var engine = new PaperTradingEngine(
+            new("SOFI"),
+            TradingSessionSettings.Default with
+            {
+                StartingBalance = 10_000m,
+                PositionSizeBasis = AmountBasis.FixedAmount,
+                PositionSizeValue = 10_000m,
+                StopLossBasis = StopLossBasis.TotalPositionLossAmount,
+                StopLossValue = 10_000m,
+                MaximumDailyLossBasis = lossBasis,
+                MaximumDailyLossValue = lossValue,
+            },
+            new ScriptedStrategy(StrategySignalKind.Buy, StrategySignalKind.Hold));
+        DateTimeOffset priorDay = new(2026, 8, 3, 19, 0, 0, TimeSpan.Zero);
+        engine.Process([Bar(priorDay, 100m)]);
+        PaperTradeResult gain = engine.Process([Bar(priorDay.AddHours(1), 105m)]);
+
+        PaperTradeResult nextDay = engine.Process([Bar(priorDay.AddDays(1), 102m)]);
+
+        Assert.Equal(10_500m, gain.Account.Equity);
+        Assert.Equal(StrategySignalKind.DailyLoss, nextDay.Decision.Signal);
+        Assert.Equal(100m, nextDay.Fill?.Quantity);
+        Assert.Equal(10_200m, nextDay.Account.Equity);
+        Assert.True(nextDay.Account.RiskLocked);
+        Assert.Equal(0, nextDay.Account.EntriesToday);
+    }
+
+    [Fact]
+    public void Engine_NewDayClearsLossLockUsingRemainingEquity()
+    {
+        var engine = new PaperTradingEngine(
+            new("SOFI"),
+            TradingSessionSettings.Default with
+            {
+                StartingBalance = 1_000m,
+                PositionSizeBasis = AmountBasis.FixedAmount,
+                PositionSizeValue = 1_000m,
+                StopLossBasis = StopLossBasis.TotalPositionLossAmount,
+                StopLossValue = 1_000m,
+                MaximumDailyLossBasis = AmountBasis.FixedAmount,
+                MaximumDailyLossValue = 5m,
+            },
+            new ScriptedStrategy(StrategySignalKind.Buy, StrategySignalKind.Buy));
+        DateTimeOffset priorDay = new(2026, 8, 3, 19, 0, 0, TimeSpan.Zero);
+        engine.Process([Bar(priorDay, 10m)]);
+        PaperTradeResult locked = engine.Process([Bar(priorDay.AddMinutes(1), 9.9m)]);
+
+        PaperTradeResult nextDay = engine.Process([Bar(priorDay.AddDays(1), 10.1m)]);
+
+        Assert.True(locked.Account.RiskLocked);
+        Assert.Equal(990m, locked.Account.Equity);
+        Assert.False(nextDay.Account.RiskLocked);
+        Assert.Equal(PaperOrderSide.Buy, nextDay.Fill?.Side);
+        Assert.Equal(1, nextDay.Account.EntriesToday);
+    }
+
+    [Fact]
+    public void Engine_NewDayPreservesExitCooldownAndReentryPriceGate()
+    {
+        var engine = new PaperTradingEngine(
+            new("SOFI"),
+            TradingSessionSettings.Default with { MaximumEntriesPerDay = 1 },
+            new ScriptedStrategy(
+                StrategySignalKind.Buy,
+                StrategySignalKind.Sell,
+                StrategySignalKind.Buy,
+                StrategySignalKind.Buy));
+        DateTimeOffset exitAt = new(2026, 8, 4, 3, 59, 55, TimeSpan.Zero);
+        engine.Process([Bar(exitAt.AddSeconds(-15), 10m)]);
+        engine.Process([Bar(exitAt, 10.2m)]);
+
+        PaperTradeResult cooldown = engine.Process([Bar(exitAt.AddSeconds(10), 10.3m)]);
+        PaperTradeResult unchanged = engine.Process([Bar(exitAt.AddSeconds(35), 10.2m)]);
+
+        Assert.Equal(0, cooldown.Account.EntriesToday);
+        Assert.Null(cooldown.Fill);
+        Assert.Contains("cooldown", cooldown.Decision.Reasons[0]);
+        Assert.Null(unchanged.Fill);
+        Assert.Contains("last sell", unchanged.Decision.Reasons[0]);
+    }
+
+    [Fact]
     public void Engine_ReplayBarWithoutBookFillsAtClose()
     {
         var instrument = new Instrument("USO");
@@ -236,6 +384,7 @@ public sealed class PaperTradingEngineTests
         PaperTradeResult beforeSettlement = engine.Process(quotes);
 
         Assert.Null(beforeSettlement.Fill);
+        Assert.Equal(0, beforeSettlement.Account.EntriesToday);
         Assert.Equal("NO BUYING POWER", beforeSettlement.Decision.State);
         Assert.Contains(
             "unsettled",
@@ -245,6 +394,7 @@ public sealed class PaperTradingEngineTests
         PaperTradeResult afterSettlement = engine.Process(quotes);
 
         Assert.Equal(PaperOrderSide.Buy, afterSettlement.Fill?.Side);
+        Assert.Equal(1, afterSettlement.Account.EntriesToday);
         Assert.True(afterSettlement.Account.PositionQuantity > 0m);
     }
 
@@ -356,6 +506,9 @@ public sealed class PaperTradingEngineTests
         Assert.True(liquidated.Account.RiskLocked);
         Assert.Equal(0m, liquidated.Account.PositionQuantity);
     }
+
+    private static MarketQuote Bar(DateTimeOffset timestamp, decimal price) =>
+        new(new("SOFI"), timestamp, timestamp, 0m, 0m, price, 1_000m);
 
     private static MarketQuote Quote(
         Instrument instrument,

@@ -75,9 +75,12 @@
             </Style>
         </Grid.Style>
         <StackPanel>
-            <views:AccountConfigurationView />
-            <views:RiskControlsView />
-            <views:DataTimingView />
+            <StackPanel x:Name="SessionInputs"
+                        IsEnabled="{Binding IsSessionConfigurationEditable}">
+                <views:AccountConfigurationView />
+                <views:RiskControlsView />
+                <views:DataTimingView />
+            </StackPanel>
 
             <Grid Margin="0,14,0,0">
                 <Grid.ColumnDefinitions>

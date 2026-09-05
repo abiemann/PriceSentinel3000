@@ -21,6 +21,7 @@ public sealed partial class MainViewModel
         decimal dailyStartingEquity,
         CancellationToken cancellationToken)
     {
+        DateOnly confirmationDate = EasternTradingDay.GetDate(_timeProvider.GetUtcNow());
         ValidateRecoverablePosition(initialBroker.Position, instrument);
         MarketQuote quote = await GetLiveStartupQuoteAsync(
             instrument,
@@ -91,6 +92,13 @@ public sealed partial class MainViewModel
         LiveBrokerSnapshot refreshedBroker = await InitializeLiveBrokerAsync(
             instrument,
             cancellationToken);
+        if (EasternTradingDay.GetDate(_timeProvider.GetUtcNow()) != confirmationDate)
+        {
+            AbortLivePositionStartup(
+                "TRADING_DAY_CHANGED",
+                "The trading day changed during position confirmation. Start LIVE again to review the new day's limits.");
+            return null;
+        }
         if (refreshedBroker.HasOpenOrder)
         {
             AbortLivePositionStartup(

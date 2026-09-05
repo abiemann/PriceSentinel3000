@@ -26,7 +26,7 @@ public sealed partial class MainViewModel
             return;
         }
 
-        PaperTradeResult result = _paperTradingEngine.Process(_ringBuffer.Snapshot());
+        PaperTradeResult result = _paperTradingEngine.Process(GetExecutionHistory(trigger));
         _journal.AppendDecision(_activeSession.Id, result.Decision);
         UpdatePaperAccount(result.Account);
         _strategyStateLabel = result.Decision.State;
@@ -51,6 +51,7 @@ public sealed partial class MainViewModel
         _tradeMarkers[result.Fill.FilledAtUtc] = result.Fill.Side is PaperOrderSide.Buy
             ? ChartTradeMarker.Buy
             : ChartTradeMarker.Sell;
+        _tradeMarkerVersion++;
 
         string profitLoss = result.Fill.Side is PaperOrderSide.Sell
             ? $"; realized {result.Fill.RealizedProfitLoss:+$0.00;-$0.00;$0.00}"
@@ -59,7 +60,7 @@ public sealed partial class MainViewModel
             ? $"; proceeds available {availableAtUtc.ToLocalTime():g}"
             : string.Empty;
         AddActivity(
-            $"PAPER {result.Fill.Side.ToString().ToUpperInvariant()} filled {result.Fill.Quantity:0.######} {SymbolDisplay} @ {result.Fill.Price:C2}{profitLoss}{settlement}. " +
+            $"PAPER {result.Fill.Side.ToString().ToUpperInvariant()} filled {result.Fill.Quantity:0.######} {_ringBuffer.Instrument.Symbol} @ {result.Fill.Price:C2}{profitLoss}{settlement}. " +
             $"Reason: {result.Decision.State}.");
     }
 

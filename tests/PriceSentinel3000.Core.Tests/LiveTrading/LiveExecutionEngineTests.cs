@@ -54,6 +54,208 @@ public sealed class LiveExecutionEngineTests
     }
 
     [Fact]
+    public void Evaluate_FloorsTheFinalQuantityCapToBrokerPrecision()
+    {
+        var engine = new LiveExecutionEngine(
+            Settings() with
+            {
+                QuantityLimitMode = QuantityLimitMode.NoMoreThan,
+                MaximumQuantity = 1.23456789m,
+            },
+            10_000m,
+            new ScriptedStrategy(StrategySignalKind.Buy));
+
+        LiveTradeEvaluation result = engine.Evaluate([Quote(10m)], Snapshot());
+
+        Assert.Equal(1.234567m, result.Intent?.Quantity);
+    }
+
+    [Fact]
+    public void Evaluate_BlocksACapSmallerThanBrokerPrecision()
+    {
+        var engine = new LiveExecutionEngine(
+            Settings() with
+            {
+                QuantityLimitMode = QuantityLimitMode.NoMoreThan,
+                MaximumQuantity = 0.0000009m,
+            },
+            10_000m,
+            new ScriptedStrategy(StrategySignalKind.Buy));
+
+        LiveTradeEvaluation result = engine.Evaluate([Quote(10m)], Snapshot());
+
+        Assert.Null(result.Intent);
+        Assert.Equal("RISK BLOCKED", result.Decision.State);
+    }
+
+    [Fact]
+    public void Evaluate_ResetsEntryCountAtEasternMidnightInsteadOfUtcMidnight()
+    {
+        var engine = new LiveExecutionEngine(
+            Settings() with { UnlimitedEntries = false, MaximumEntriesPerDay = 1 },
+            10_000m,
+            new ScriptedStrategy(StrategySignalKind.Buy, StrategySignalKind.Buy),
+            initialEntriesToday: 1,
+            initialTradingDate: new DateOnly(2026, 8, 3));
+        DateTimeOffset utcMidnight = new(2026, 8, 4, 0, 0, 0, TimeSpan.Zero);
+        MarketQuote sameDayQuote = Quote(10m) with { SourceTimestampUtc = utcMidnight };
+
+        LiveTradeEvaluation sameDay = engine.Evaluate(
+            [sameDayQuote],
+            Snapshot() with { CapturedAtUtc = utcMidnight });
+
+        Assert.Null(sameDay.Intent);
+        Assert.Equal(1, engine.EntriesToday);
+        DateTimeOffset easternMidnight = utcMidnight.AddHours(4);
+        LiveTradeEvaluation nextDay = engine.Evaluate(
+            [sameDayQuote with { SourceTimestampUtc = easternMidnight }],
+            Snapshot() with { CapturedAtUtc = easternMidnight });
+
+        Assert.Equal(BrokerOrderSide.Buy, nextDay.Intent?.Side);
+        Assert.Equal(0, engine.EntriesToday);
+        Assert.Equal(new DateOnly(2026, 8, 4), engine.TradingDate);
+    }
+
+    [Theory]
+    [InlineData(AmountBasis.FixedAmount, 100)]
+    [InlineData(AmountBasis.AccountPercentage, 1)]
+    public void Evaluate_NewDayLossUsesLastObservedEquityIncludingPriorDayGains(
+        AmountBasis lossBasis,
+        int lossValue)
+    {
+        DateTimeOffset priorDay = new(2026, 8, 3, 20, 0, 0, TimeSpan.Zero);
+        var engine = new LiveExecutionEngine(
+            Settings() with
+            {
+                MaximumDailyLossBasis = lossBasis,
+                MaximumDailyLossValue = lossValue,
+            },
+            10_000m,
+            new ScriptedStrategy(StrategySignalKind.Hold),
+            initialTradingDate: new DateOnly(2026, 8, 3));
+        engine.ObserveAccount(priorDay, 10_500m);
+        DateTimeOffset nextDay = priorDay.AddDays(1);
+
+        LiveTradeEvaluation result = engine.Evaluate(
+            [Quote(10m) with { SourceTimestampUtc = nextDay }],
+            Snapshot(totalValue: 10_200m, position: new("SOFI", 4m, 10m, 4m, 0m)) with
+            {
+                CapturedAtUtc = nextDay,
+            });
+
+        Assert.Equal(10_500m, engine.DailyStartingEquity);
+        Assert.True(result.RiskLocked);
+        Assert.Equal(StrategySignalKind.DailyLoss, result.Decision.Signal);
+        Assert.Equal(4m, result.Intent?.Quantity);
+    }
+
+    [Fact]
+    public void Evaluate_NewDayClearsLossLockAndPreservesOrderDeduplication()
+    {
+        DateTimeOffset priorDay = new(2026, 8, 3, 20, 0, 0, TimeSpan.Zero);
+        var engine = new LiveExecutionEngine(
+            Settings(),
+            10_000m,
+            new ScriptedStrategy(StrategySignalKind.Buy),
+            initialTradingDate: new DateOnly(2026, 8, 3));
+        BrokerOrderSnapshot buy = Order(BrokerOrderSide.Buy, BrokerOrderState.Filled, 1m) with
+        {
+            UpdatedAtUtc = priorDay,
+        };
+        engine.ObserveTerminalOrder(buy);
+        LiveTradeEvaluation locked = engine.Evaluate(
+            [Quote(10m) with { SourceTimestampUtc = priorDay }],
+            Snapshot(totalValue: 9_800m) with { CapturedAtUtc = priorDay });
+        Assert.True(locked.RiskLocked);
+
+        DateTimeOffset nextDay = priorDay.AddDays(1);
+        LiveTradeEvaluation unlocked = engine.Evaluate(
+            [Quote(10m) with { SourceTimestampUtc = nextDay }],
+            Snapshot(totalValue: 9_800m) with { CapturedAtUtc = nextDay });
+        engine.ObserveTerminalOrder(buy with { UpdatedAtUtc = nextDay });
+
+        Assert.False(unlocked.RiskLocked);
+        Assert.Equal(BrokerOrderSide.Buy, unlocked.Intent?.Side);
+        Assert.Equal(0, engine.EntriesToday);
+        Assert.Equal(9_800m, engine.DailyStartingEquity);
+    }
+
+    [Fact]
+    public void ObserveAccount_RestoresDailyStateWithoutClearingOvernightCooldown()
+    {
+        DateTimeOffset exitAt = new(2026, 8, 4, 3, 59, 55, TimeSpan.Zero);
+        var engine = new LiveExecutionEngine(
+            Settings(),
+            10_000m,
+            new ScriptedStrategy(StrategySignalKind.Buy),
+            initialTradingDate: new DateOnly(2026, 8, 3));
+        engine.ObserveTerminalOrder(
+            Order(BrokerOrderSide.Sell, BrokerOrderState.Filled, 1m) with
+            {
+                UpdatedAtUtc = exitAt,
+            });
+        DateTimeOffset nextDay = exitAt.AddSeconds(10);
+        engine.ObserveAccount(nextDay, 10_500m, dailyStartingEquity: 10_550m, entriesToday: 3);
+
+        LiveTradeEvaluation result = engine.Evaluate(
+            [Quote(10.10m) with { SourceTimestampUtc = nextDay }],
+            Snapshot(totalValue: 10_500m) with { CapturedAtUtc = nextDay });
+
+        Assert.Equal(10_550m, engine.DailyStartingEquity);
+        Assert.Equal(3, engine.EntriesToday);
+        Assert.Null(result.Intent);
+        Assert.Contains("cooldown", result.Decision.Reasons[0]);
+    }
+
+    [Fact]
+    public void ObserveTerminalOrder_NewDayFillCarriesPriorEquityAndCountsOnce()
+    {
+        DateTimeOffset priorDay = new(2026, 8, 3, 20, 0, 0, TimeSpan.Zero);
+        var engine = new LiveExecutionEngine(
+            Settings(),
+            10_000m,
+            initialEntriesToday: 2,
+            initialTradingDate: new DateOnly(2026, 8, 3));
+        engine.ObserveAccount(priorDay, 10_500m);
+        BrokerOrderSnapshot buy = Order(BrokerOrderSide.Buy, BrokerOrderState.Filled, 1m) with
+        {
+            UpdatedAtUtc = priorDay.AddDays(1),
+        };
+
+        engine.ObserveTerminalOrder(buy);
+        engine.ObserveTerminalOrder(buy);
+
+        Assert.Equal(1, engine.EntriesToday);
+        Assert.Equal(10_500m, engine.DailyStartingEquity);
+        Assert.Equal(new DateOnly(2026, 8, 4), engine.TradingDate);
+    }
+
+    [Fact]
+    public void ObserveAccount_RestoredBaselineIsUsedWithoutClearingSameDayLossLock()
+    {
+        DateTimeOffset now = new(2026, 8, 3, 20, 0, 0, TimeSpan.Zero);
+        var engine = new LiveExecutionEngine(
+            Settings(),
+            10_000m,
+            new ScriptedStrategy(StrategySignalKind.Buy),
+            initialTradingDate: new DateOnly(2026, 8, 3));
+        engine.ObserveAccount(now, 10_500m, dailyStartingEquity: 10_650m);
+
+        LiveTradeEvaluation locked = engine.Evaluate(
+            [Quote(10m) with { SourceTimestampUtc = now }],
+            Snapshot(totalValue: 10_500m) with { CapturedAtUtc = now });
+        engine.ObserveAccount(now.AddSeconds(5), 10_600m, dailyStartingEquity: 10_650m);
+        LiveTradeEvaluation recovered = engine.Evaluate(
+            [Quote(10m) with { SourceTimestampUtc = now.AddSeconds(5) }],
+            Snapshot(totalValue: 10_600m) with { CapturedAtUtc = now.AddSeconds(5) });
+
+        Assert.True(locked.RiskLocked);
+        Assert.True(recovered.RiskLocked);
+        Assert.Null(recovered.Intent);
+        Assert.Equal(10_650m, engine.DailyStartingEquity);
+    }
+
+    [Fact]
     public void Evaluate_StopLossSellsOnlySharesAvailableForSale()
     {
         var engine = new LiveExecutionEngine(

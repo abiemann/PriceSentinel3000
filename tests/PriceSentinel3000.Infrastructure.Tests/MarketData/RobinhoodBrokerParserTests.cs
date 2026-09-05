@@ -247,6 +247,70 @@ public sealed class RobinhoodBrokerParserTests
             Json("{\"data\":{\"accepted\":false}}")));
     }
 
+    [Theory]
+    [InlineData("null")]
+    [InlineData("{\"data\":null}")]
+    [InlineData("{\"data\":{}}")]
+    [InlineData("{\"data\":{\"positions\":null}}")]
+    [InlineData("{\"data\":{\"positions\":{}}}")]
+    [InlineData("{\"data\":{\"positions\":[null]}}")]
+    [InlineData("{\"data\":{\"positions\":[{}]}}")]
+    [InlineData("{\"data\":{\"positions\":[{\"symbol\":\"SOFI\",\"quantity\":\"invalid\"}]}}")]
+    [InlineData("{\"data\":{\"positions\":[{\"symbol\":\"SOFI\",\"quantity\":null}]}}")]
+    public void ParsePosition_RejectsMissingOrMalformedBrokerState(string json)
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            RobinhoodBrokerParser.ParsePosition(Json(json), "SOFI"));
+    }
+
+    [Fact]
+    public void ParsePosition_ValidatesRowsAfterTheMatchingSymbol()
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            RobinhoodBrokerParser.ParsePosition(Json(
+                """
+                {"data":{"positions":[
+                  {"symbol":"SOFI","quantity":"2","average_buy_price":"10","shares_available_for_sells":"2","shares_held_for_sells":"0"},
+                  {"quantity":"1"}
+                ]}}
+                """), "SOFI"));
+    }
+
+    [Theory]
+    [InlineData("{\"data\":{}}")]
+    [InlineData("{\"data\":{\"orders\":null}}")]
+    [InlineData("{\"data\":{\"orders\":{}}}")]
+    [InlineData("{\"data\":{\"orders\":[null]}}")]
+    [InlineData("{\"data\":{\"orders\":[{}]}}")]
+    [InlineData("{\"data\":{\"orders\":[{\"id\":\"order-1\",\"symbol\":\"SOFI\",\"side\":\"invalid\",\"state\":\"filled\",\"quantity\":\"2\",\"cumulative_quantity\":\"2\"}]}}")]
+    [InlineData("{\"data\":{\"orders\":[{\"id\":\"order-1\",\"symbol\":\"SOFI\",\"side\":\"buy\",\"state\":\"filled\",\"quantity\":\"2\",\"cumulative_quantity\":\"invalid\"}]}}")]
+    [InlineData("{\"data\":{\"orders\":[{\"id\":\"order-1\",\"symbol\":\"SOFI\",\"side\":\"buy\",\"state\":\"filled\",\"quantity\":\"2\",\"cumulative_quantity\":true}]}}")]
+    [InlineData("{\"data\":{\"orders\":[{\"id\":\"order-1\",\"symbol\":\"SOFI\",\"side\":\"buy\",\"state\":\"filled\",\"quantity\":\"2\",\"cumulative_quantity\":\"3\"}]}}")]
+    public void ParseOrders_RejectsMissingOrMalformedBrokerState(string json)
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            RobinhoodBrokerParser.ParseOrders(Json(json)));
+    }
+
+    [Fact]
+    public void ParseOrders_RejectsExecutionsWithoutStableIds()
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            RobinhoodBrokerParser.ParseOrders(Json(
+                """
+                {"data":{"orders":[{"id":"order-1","symbol":"SOFI","side":"buy","state":"filled","quantity":"2","cumulative_quantity":"2","executions":[{"quantity":"2","price":"10"}]}]}}
+                """)));
+    }
+
+    [Fact]
+    public void EmptyArrays_AreConfirmedEmptyBrokerState()
+    {
+        JsonElement root = Json("{\"data\":{\"positions\":[],\"orders\":[]}}");
+
+        Assert.False(RobinhoodBrokerParser.ParsePosition(root, "SOFI").HasPosition);
+        Assert.Empty(RobinhoodBrokerParser.ParseOrders(root));
+    }
+
     private static BrokerOrderIntent Intent() =>
         new(Guid.NewGuid(), DateTimeOffset.UtcNow, "SOFI", BrokerOrderSide.Buy, 2m, "TEST");
 

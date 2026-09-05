@@ -473,6 +473,12 @@ public sealed class LiveOrderCoordinator : IDisposable
                     instrument,
                     _activeIntent.ClientReferenceId,
                     cancellationToken);
+            if (recovered?.ClientReferenceId == Guid.Empty ||
+                recovered?.ClientReferenceId != _activeIntent.ClientReferenceId)
+            {
+                recovered = null;
+            }
+
             if (recovered is null)
             {
                 IReadOnlyList<BrokerOrderSnapshot> recentOrders =
@@ -484,6 +490,8 @@ public sealed class LiveOrderCoordinator : IDisposable
                 [
                     .. recentOrders
                     .Where(order =>
+                        order.ClientReferenceId != Guid.Empty &&
+                        order.ClientReferenceId == _activeIntent.ClientReferenceId &&
                         string.Equals(
                             order.Symbol,
                             _activeIntent.Symbol,

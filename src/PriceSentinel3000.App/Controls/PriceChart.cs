@@ -27,6 +27,7 @@ public sealed class PriceChart : FrameworkElement
     private decimal _lastRenderedMinimum;
     private decimal _lastRenderedMaximum;
     private bool _hasRenderedScale;
+    private IReadOnlyList<decimal?>? _cachedRsiValues;
 
     public static readonly DependencyProperty PointsProperty = DependencyProperty.Register(
         nameof(Points),
@@ -686,8 +687,8 @@ public sealed class PriceChart : FrameworkElement
         drawingContext.DrawLine(midlinePen, new(bounds.Left, y50), new(bounds.Right, y50));
         drawingContext.DrawLine(guidePen, new(bounds.Left, y30), new(bounds.Right, y30));
 
-        IReadOnlyList<decimal?> rsiValues = SimpleRsiCalculator.CalculateSeries(
-            points.Select(point => point.Close).ToArray());
+        IReadOnlyList<decimal?> rsiValues = _cachedRsiValues ??=
+            SimpleRsiCalculator.CalculateSeries(points.Select(point => point.Close).ToArray());
         List<(DateTimeOffset Timestamp, decimal Value)> samples =
         [
             .. points.Select((point, index) => new
@@ -1112,6 +1113,7 @@ public sealed class PriceChart : FrameworkElement
         }
 
         chart._observedCollection = eventArgs.NewValue as INotifyCollectionChanged;
+        chart._cachedRsiValues = null;
 
         if (chart._observedCollection is not null)
         {
@@ -1194,7 +1196,11 @@ public sealed class PriceChart : FrameworkElement
 
     private void OnCollectionChanged(
         object? sender,
-        NotifyCollectionChangedEventArgs eventArgs) => InvalidateVisual();
+        NotifyCollectionChangedEventArgs eventArgs)
+    {
+        _cachedRsiValues = null;
+        InvalidateVisual();
+    }
 
     private void ResetManualScale()
     {

@@ -65,6 +65,9 @@ public sealed class PaperTradingEngine
     private decimal? _lastExitPrice;
     private DateTimeOffset? _lastEvaluatedUtc;
     private decimal _realizedProfitLoss;
+    private decimal _dailyStartingEquity;
+    private decimal _lastObservedMark;
+    private DateOnly? _tradingDate;
     private int _entriesToday;
     private bool _riskLocked;
 
@@ -78,6 +81,7 @@ public sealed class PaperTradingEngine
         _settings = settings;
         _strategy = strategy ?? new PriceActionSignalEngine(settings.BufferMinutes);
         _cash = settings.StartingBalance;
+        _dailyStartingEquity = settings.StartingBalance;
     }
 
     public PaperTradeResult Process(IReadOnlyList<MarketQuote> quotes)
@@ -107,6 +111,16 @@ public sealed class PaperTradingEngine
         }
 
         _lastEvaluatedUtc = latest.SourceTimestampUtc;
+        DateOnly tradingDate = EasternTradingDay.GetDate(latest.SourceTimestampUtc);
+        if (_tradingDate is not null && tradingDate > _tradingDate.Value)
+        {
+            _dailyStartingEquity = Snapshot(_lastObservedMark).Equity;
+            _entriesToday = 0;
+            _riskLocked = false;
+        }
+
+        _tradingDate = tradingDate;
+        _lastObservedMark = mark;
         StrategyDecision decision = EvaluateRisk(latest, mark) ?? _strategy.Evaluate(
             quotes,
             _positionQuantity > 0m && _openedAtUtc is not null
@@ -183,7 +197,7 @@ public sealed class PaperTradingEngine
         }
 
         decimal equity = Snapshot(mark).Equity;
-        decimal dailyLoss = Math.Max(0m, _settings.StartingBalance - equity);
+        decimal dailyLoss = Math.Max(0m, _dailyStartingEquity - equity);
         decimal dailyLimit = DailyLossLimit();
 
         if (dailyLoss >= dailyLimit)
@@ -197,7 +211,7 @@ public sealed class PaperTradingEngine
                 [$"Paper-account drawdown ${dailyLoss:0.00} reached the ${dailyLimit:0.00} daily limit."],
                 null,
                 0m,
-                _settings.StartingBalance == 0m ? 0m : -dailyLoss / _settings.StartingBalance * 100m);
+                _dailyStartingEquity == 0m ? 0m : -dailyLoss / _dailyStartingEquity * 100m);
         }
 
         return null;
@@ -208,10 +222,10 @@ public sealed class PaperTradingEngine
         decimal mark,
         decimal entryPrice)
     {
-        if (_riskLocked || Math.Max(0m, _settings.StartingBalance - Snapshot(mark).Equity) >= DailyLossLimit())
+        if (_riskLocked || Math.Max(0m, _dailyStartingEquity - Snapshot(mark).Equity) >= DailyLossLimit())
         {
             _riskLocked = true;
-            return "Maximum daily paper loss reached; new entries are locked for this session.";
+            return "Maximum daily paper loss reached; new entries are locked for this trading day.";
         }
 
         if (!_settings.UnlimitedEntries && _entriesToday >= _settings.MaximumEntriesPerDay)
@@ -246,12 +260,14 @@ public sealed class PaperTradingEngine
             _ => equity * _settings.PositionSizeValue / 100m,
         };
         allocation = Math.Min(allocation, _cash);
-        decimal quantity = FloorQuantity(allocation / fillPrice);
+        decimal quantity = allocation / fillPrice;
 
         if (_settings.QuantityLimitMode is QuantityLimitMode.NoMoreThan)
         {
             quantity = Math.Min(quantity, _settings.MaximumQuantity);
         }
+
+        quantity = FloorQuantity(quantity);
 
         if (quantity <= 0m)
         {
@@ -317,7 +333,7 @@ public sealed class PaperTradingEngine
         _lastExitPrice = fillPrice;
 
         if (decision.Signal is StrategySignalKind.DailyLoss ||
-            Math.Max(0m, _settings.StartingBalance - Snapshot(fillPrice).Equity) >= DailyLossLimit())
+            Math.Max(0m, _dailyStartingEquity - Snapshot(fillPrice).Equity) >= DailyLossLimit())
         {
             _riskLocked = true;
         }
@@ -361,7 +377,7 @@ public sealed class PaperTradingEngine
     private decimal DailyLossLimit() => _settings.MaximumDailyLossBasis switch
     {
         AmountBasis.FixedAmount => _settings.MaximumDailyLossValue,
-        _ => _settings.StartingBalance * _settings.MaximumDailyLossValue / 100m,
+        _ => _dailyStartingEquity * _settings.MaximumDailyLossValue / 100m,
     };
 
     private void ReleaseSettledProceeds(DateTimeOffset nowUtc)
