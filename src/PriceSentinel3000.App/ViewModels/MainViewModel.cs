@@ -345,7 +345,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
     }
     public int ChartScaleResetVersion => _chartScaleResetVersion;
     public string VersionDisplay { get; } =
-        $"VERSION {typeof(MainViewModel).Assembly.GetName().Version?.ToString(3) ?? "1.0.0"}";
+        $"VERSION {PriceSentinel3000.Application.BuildVersion.Display(typeof(MainViewModel).Assembly)}";
     public bool HasMarketData => _hasMarketData;
     public string StrategyMessage => _strategyMessage;
     public string StrategyStateLabel => _strategyStateLabel;

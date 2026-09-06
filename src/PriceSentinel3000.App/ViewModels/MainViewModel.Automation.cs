@@ -310,6 +310,7 @@ public sealed partial class MainViewModel
     private object AutomationStatus() => new
     {
         protocolVersion = 1,
+        appVersion = PriceSentinel3000.Application.BuildVersion.Display(typeof(MainViewModel).Assembly),
         processId = Environment.ProcessId,
         operationId = _automationOperationId,
         operationState = _automationOperationState,

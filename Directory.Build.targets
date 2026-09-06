@@ -1,0 +1,16 @@
+<Project>
+  <Target Name="SetPriceSentinelGitVersion"
+          BeforeTargets="GetAssemblyVersion"
+          Condition="'$(PriceSentinelDeriveGitVersion)' == 'true' and '$(PriceSentinelPackageVersion)' == '' and ('$(MSBuildProjectName)' == 'PriceSentinel3000.App' or '$(MSBuildProjectName)' == 'PriceSentinel3000.Control')">
+    <Exec Command="powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)tools\get-build-version.ps1&quot; -RepositoryRoot &quot;$(MSBuildThisFileDirectory).&quot;"
+          ConsoleToMSBuild="true" StandardOutputImportance="Low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_PriceSentinelVersionParts" />
+    </Exec>
+    <PropertyGroup>
+      <Version>$(_PriceSentinelVersionParts.Split('|')[0])</Version>
+      <AssemblyVersion Condition="'$(AssemblyVersion)' == ''">$(_PriceSentinelVersionParts.Split('|')[1])</AssemblyVersion>
+      <FileVersion Condition="'$(FileVersion)' == ''">$(_PriceSentinelVersionParts.Split('|')[1])</FileVersion>
+      <InformationalVersion Condition="'$(InformationalVersion)' == ''">$(_PriceSentinelVersionParts.Split('|')[2])</InformationalVersion>
+    </PropertyGroup>
+  </Target>
+</Project>

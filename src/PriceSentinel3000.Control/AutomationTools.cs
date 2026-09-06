@@ -20,7 +20,11 @@ public sealed class AutomationTools(AutomationPipeClient client)
         var tools = new AutomationTools(client);
         return new McpServerOptions
         {
-            ServerInfo = new Implementation { Name = "PriceSentinel3000", Version = "1.0.0" },
+            ServerInfo = new Implementation
+            {
+                Name = "PriceSentinel3000",
+                Version = PriceSentinel3000.Application.BuildVersion.Display(typeof(AutomationTools).Assembly),
+            },
             ServerInstructions = "Control the same visible PriceSentinel3000 app, which must already be open with --automation. " +
                 "Only Replay and PaperTrader are supported. This bridge never launches the app or authenticates a broker. " +
                 "Start and resume return promptly; use status to observe completion, errors, and pause boundaries. " +

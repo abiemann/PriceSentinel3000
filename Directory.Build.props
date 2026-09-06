@@ -3,5 +3,6 @@
     <LangVersion>14.0</LangVersion>
     <AnalysisLevel>10.0</AnalysisLevel>
     <Deterministic>true</Deterministic>
+    <PriceSentinelDeriveGitVersion Condition="'$(Version)' == '' and '$(VersionPrefix)' == '' and '$(VersionSuffix)' == '' and '$(InformationalVersion)' == '' and '$(PriceSentinelPackageVersion)' == ''">true</PriceSentinelDeriveGitVersion>
   </PropertyGroup>
 </Project>

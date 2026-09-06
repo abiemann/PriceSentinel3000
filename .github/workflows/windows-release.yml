@@ -202,7 +202,8 @@ jobs:
               --self-contained true --output artifacts\publish\automation `
               -p:PublishSingleFile=false -p:PublishTrimmed=false -p:PublishReadyToRun=false `
               -p:DebugType=None -p:DebugSymbols=false `
-              -p:Version=$env:PACKAGE_VERSION -p:FileVersion=$env:WINDOWS_VERSION
+              -p:Version=$env:PACKAGE_VERSION -p:FileVersion=$env:WINDOWS_VERSION `
+              -p:InformationalVersion=$env:DISPLAY_VERSION -p:IncludeSourceRevisionInInformationalVersion=false
             if ($LASTEXITCODE -ne 0) { throw 'Automation companion publish failed.' }
             if (-not (Test-Path -LiteralPath 'artifacts\publish\automation\PriceSentinel3000.Control.exe')) {
               throw 'Automation companion executable was not created.'

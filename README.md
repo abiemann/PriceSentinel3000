@@ -421,6 +421,14 @@ The Windows CI workflow runs the same Release build with warnings promoted to
 errors and executes the complete test suite on every pull request and push to
 `main`.
 
+The app footer and MCP companion use the version embedded at build time.
+GitHub release builds display their release tag without a leading `v`, including
+any prerelease suffix (for example, `1.2` or `1.3.0-beta.1`). Local builds derive
+their version from the nearest numeric Git tag; commits after that tag are
+marked as development builds. Fetch new tags with `git fetch origin --tags`
+before building locally. The installed app keeps its own build version when a
+new release is published; installing that release updates the footer.
+
 Publishing a numeric GitHub release tag such as `1.1` or `v1.1.0` starts the
 Windows release workflow. It builds and tests the exact tagged source, creates a
 self-contained x64 publish, compiles the Inno Setup installer, and attaches the
