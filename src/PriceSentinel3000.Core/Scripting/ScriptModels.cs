@@ -16,11 +16,20 @@ public sealed record StrategyBar(
 
 public sealed record ScriptDiagnostic(int Line, string Message, bool IsError = true);
 
+public sealed record ScriptIndicatorValue(string Name, string Kind, decimal? Value, string State);
+
 public sealed record ScriptProposal(
     ScriptAction Action,
     string State,
     string Reason,
-    IReadOnlyDictionary<string, decimal?> Plots);
+    IReadOnlyDictionary<string, decimal?> Plots)
+{
+    public const int MaximumIndicatorValues = 64;
+    public IReadOnlyList<ScriptIndicatorValue> Indicators { get; init; } = [];
+    public int IndicatorCount { get; init; }
+    public bool IndicatorsTruncated => IndicatorCount > Indicators.Count;
+    public int IndicatorLimit => MaximumIndicatorValues;
+}
 
 public sealed class CompiledThinkScript
 {

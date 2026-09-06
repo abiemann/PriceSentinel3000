@@ -12,6 +12,48 @@ public sealed class ThinkScriptSignalEngineTests
     private static readonly DateTimeOffset Start = new(2026, 9, 3, 16, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public void EvaluationSnapshotRetainsExactCompletedCandleAndWarmupUntilNextActualEvaluation()
+    {
+        var engine = new ThinkScriptSignalEngine(ThinkScriptCompiler.Compile(
+            "def averagePrice = Average(close, 2); AddOrder(OrderType.BUY_TO_OPEN, close > averagePrice);"), 15);
+        engine.Bars.ObserveHistoricalBar(Quote(0, 10));
+        engine.Evaluate([Quote(0, 10)], StrategyPositionContext.Flat);
+        Assert.Null(engine.LastEvaluation);
+
+        engine.Evaluate([Quote(15, 10)], StrategyPositionContext.Flat);
+        ScriptEvaluationSnapshot warmup = Assert.IsType<ScriptEvaluationSnapshot>(engine.LastEvaluation);
+        Assert.Equal(Start.AddSeconds(15), warmup.EvaluatedAtUtc);
+        Assert.Equal(1, warmup.RetainedBars);
+        Assert.Equal(1, warmup.CompletedBarCount);
+        Assert.Equal(2, warmup.RequiredWarmupBars);
+        Assert.Equal(engine.RequiredWarmupBars, warmup.RequiredWarmupBars);
+        Assert.Equal(engine.Bars.Version, warmup.BarVersion);
+        Assert.True(warmup.IsWarmingUp);
+        Assert.Equal("WARMING UP", warmup.State);
+        Assert.Equal(new StrategyBar(Start, Start.AddSeconds(15), 10, 10, 10, 10, 0), warmup.LatestBar);
+
+        engine.Evaluate([Quote(16, 10)], StrategyPositionContext.Flat);
+        Assert.Same(warmup, engine.LastEvaluation);
+        engine.Bars.ObserveHistoricalBar(Quote(15, 12));
+        engine.Evaluate([Quote(29, 12)], StrategyPositionContext.Flat);
+        Assert.Same(warmup, engine.LastEvaluation);
+
+        engine.Evaluate([Quote(30, 12)], StrategyPositionContext.Flat);
+        ScriptEvaluationSnapshot evaluated = Assert.IsType<ScriptEvaluationSnapshot>(engine.LastEvaluation);
+        Assert.NotSame(warmup, evaluated);
+        Assert.Equal(Start.AddSeconds(30), evaluated.EvaluatedAtUtc);
+        Assert.Equal(2, evaluated.RetainedBars);
+        Assert.Equal(2, evaluated.CompletedBarCount);
+        Assert.Equal(engine.Bars.Version, evaluated.BarVersion);
+        Assert.False(evaluated.IsWarmingUp);
+        Assert.Equal(ScriptAction.Buy, evaluated.Proposal.Action);
+        Assert.Equal(11, Assert.Single(evaluated.Proposal.Indicators).Value);
+        Assert.Equal(12, evaluated.LatestBar!.Close);
+        Assert.Equal(1, warmup.RetainedBars);
+        Assert.Null(Assert.Single(warmup.Proposal.Indicators).Value);
+    }
+
+    [Fact]
     public void StrategyCannotEvaluateBeforeItsCandleEndsOrConsumeThatVersionEarly()
     {
         var engine = new ThinkScriptSignalEngine(

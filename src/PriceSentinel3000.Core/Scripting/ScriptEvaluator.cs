@@ -16,6 +16,20 @@ internal sealed class ScriptEvaluator(
 
     internal ScriptProposal Evaluate(StrategyPositionContext position)
     {
+        ScriptProposal proposal;
+        try
+        {
+            proposal = EvaluateStrategy(position);
+        }
+        catch (ScriptException exception)
+        {
+            proposal = CompiledThinkScript.Hold("SCRIPT ERROR", $"Line {exception.Line}: {exception.Message}");
+        }
+        return CaptureIndicators(proposal);
+    }
+
+    private ScriptProposal EvaluateStrategy(StrategyPositionContext position)
+    {
         if (bars.Count > ThinkScriptCompiler.MaximumBars)
             throw new ScriptException(1, $"Evaluation exceeds the {ThinkScriptCompiler.MaximumBars}-bar history limit.");
         ValidateBars();
@@ -43,6 +57,30 @@ internal sealed class ScriptEvaluator(
             : sell ? "Exit condition is true, but there is no long position to close."
             : "No entry or exit condition is true on the completed bar.";
         return new(action, action == ScriptAction.Hold ? "HOLD" : action == ScriptAction.Buy ? "BUY SIGNAL" : "SELL SIGNAL", reason, immutablePlots);
+    }
+
+    private ScriptProposal CaptureIndicators(ScriptProposal proposal)
+    {
+        var indicators = new List<ScriptIndicatorValue>();
+        int count = 0;
+        foreach (Declaration declaration in program.Declarations.Values.Where(item => !item.IsInput))
+        {
+            count++;
+            if (indicators.Count == ScriptProposal.MaximumIndicatorValues) continue;
+            decimal? value = null;
+            string state = proposal.State == "WARMING UP" ? "warming_up" : "not_evaluated";
+            // Read only completed cache entries. Telemetry must never evaluate an
+            // unused declaration or consume the strategy's operation budget.
+            if (_cache.TryGetValue(declaration.Value, out double[]? cached) && cached.Length > 0)
+            {
+                double current = cached[^1];
+                if (double.IsFinite(current) && current < (double)decimal.MaxValue && current > (double)decimal.MinValue)
+                    value = (decimal)current;
+                state = value.HasValue ? "available" : "unavailable";
+            }
+            indicators.Add(new(declaration.Name, declaration.IsPlot ? "plot" : "def", value, state));
+        }
+        return proposal with { Indicators = indicators.AsReadOnly(), IndicatorCount = count };
     }
 
     private void ValidateBars()

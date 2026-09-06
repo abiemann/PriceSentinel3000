@@ -43,7 +43,12 @@ public sealed record PaperTradeResult(
     StrategyDecision Decision,
     PaperOrder? Order,
     PaperFill? Fill,
-    PaperAccountSnapshot Account);
+    PaperAccountSnapshot Account)
+{
+    public StrategyDecision? StrategyProposal { get; init; }
+    public string? RiskOverride { get; init; }
+    public bool StrategyEvaluated => StrategyProposal is not null;
+}
 
 /// <summary>
 /// Executes strategy decisions against an in-memory paper account. This class
@@ -121,11 +126,20 @@ public sealed class PaperTradingEngine
 
         _tradingDate = tradingDate;
         _lastObservedMark = mark;
-        StrategyDecision decision = EvaluateRisk(latest, mark) ?? _strategy.Evaluate(
+        StrategyDecision? riskDecision = EvaluateRisk(latest, mark);
+        StrategyDecision? strategyProposal = riskDecision is null ? _strategy.Evaluate(
             quotes,
             _positionQuantity > 0m && _openedAtUtc is not null
                 ? new(_positionQuantity, _averagePrice, _openedAtUtc.Value)
-                : StrategyPositionContext.Flat);
+                : StrategyPositionContext.Flat) : null;
+        StrategyDecision decision = riskDecision ?? strategyProposal!;
+        string? riskOverride = riskDecision?.State;
+
+        PaperTradeResult WithTelemetry(PaperTradeResult result) => result with
+        {
+            StrategyProposal = strategyProposal,
+            RiskOverride = riskOverride ?? result.RiskOverride,
+        };
 
         if (decision.Signal is StrategySignalKind.Buy)
         {
@@ -136,6 +150,7 @@ public sealed class PaperTradingEngine
 
             if (blocked is not null)
             {
+                riskOverride = "RISK BLOCKED";
                 decision = decision with
                 {
                     Signal = StrategySignalKind.Hold,
@@ -146,7 +161,7 @@ public sealed class PaperTradingEngine
             }
             else
             {
-                return FillBuy(latest, decision);
+                return WithTelemetry(FillBuy(latest, decision));
             }
         }
         else if (decision.Signal is StrategySignalKind.Sell or
@@ -155,11 +170,11 @@ public sealed class PaperTradingEngine
         {
             if (_positionQuantity > 0m)
             {
-                return FillSell(latest, decision);
+                return WithTelemetry(FillSell(latest, decision));
             }
         }
 
-        return new(decision, null, null, Snapshot(mark));
+        return WithTelemetry(new(decision, null, null, Snapshot(mark)));
     }
 
     private StrategyDecision? EvaluateRisk(MarketQuote latest, decimal mark)
@@ -286,7 +301,7 @@ public sealed class PaperTradingEngine
                 Confidence = 0m,
                 Reasons = [reason],
             };
-            return new(blocked, null, null, Snapshot(quote.Last));
+            return new(blocked, null, null, Snapshot(quote.Last)) { RiskOverride = "NO BUYING POWER" };
         }
 
         decimal cost = quantity * fillPrice;

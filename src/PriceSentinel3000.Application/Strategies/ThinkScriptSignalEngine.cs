@@ -20,6 +20,8 @@ public sealed class ThinkScriptSignalEngine : IPriceActionSignalEngine
 
     public ScriptBarSeries Bars { get; }
     public string? Fault { get; private set; }
+    public int RequiredWarmupBars => _program.RequiredWarmupBars;
+    public ScriptEvaluationSnapshot? LastEvaluation { get; private set; }
 
     public StrategyDecision Evaluate(IReadOnlyList<MarketQuote> quotes, StrategyPositionContext position)
     {
@@ -35,6 +37,8 @@ public sealed class ThinkScriptSignalEngine : IPriceActionSignalEngine
         try
         {
             ScriptProposal proposal = _program.Evaluate(bars, position);
+            LastEvaluation = new(at, Bars.Version, Bars.CompletedBarCount, bars.Count,
+                RequiredWarmupBars, bars.Count == 0 ? null : bars[^1], proposal);
             if (proposal.State == "SCRIPT ERROR")
                 return Fail(at, proposal.Reason);
             StrategySignalKind signal = proposal.Action switch
@@ -47,6 +51,10 @@ public sealed class ThinkScriptSignalEngine : IPriceActionSignalEngine
         }
         catch (Exception exception) when (exception is not OutOfMemoryException)
         {
+            LastEvaluation = new(at, Bars.Version, Bars.CompletedBarCount, bars.Count,
+                RequiredWarmupBars, bars.Count == 0 ? null : bars[^1],
+                new(ScriptAction.Hold, "SCRIPT ERROR", exception.Message,
+                    System.Collections.ObjectModel.ReadOnlyDictionary<string, decimal?>.Empty));
             return Fail(at, exception.Message);
         }
     }
