@@ -14,6 +14,10 @@ See [Architecture](docs/architecture.md) for the project boundaries, runtime
 flows, and LIVE safety invariants. Security concerns should follow the private
 reporting guidance in [Security](SECURITY.md).
 
+For assistant-driven Replay and Paper tests, see [Local app control](docs/automation.md).
+The optional MCP/CLI companion controls the visible app and supports exact Replay
+pause/step boundaries and fast playback.
+
 ## Reviewer tour
 
 A Robinhood Agentic Trading account is required to run the connected workspace,
@@ -29,7 +33,7 @@ credentials. For a quick code review:
 4. Review `PriceSentinel3000.Infrastructure` for Robinhood MCP/OAuth, DPAPI,
    SQLite, and JSON adapter implementations.
 5. Review the WPF `Views`, `Styles`, and `Themes` folders for the modular desktop
-   presentation, then run the four boundary-specific test projects for executable
+   presentation, then run the boundary-specific test projects for executable
    safety examples.
 
 > [!WARNING]

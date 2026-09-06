@@ -447,8 +447,11 @@ public sealed partial class MainViewModel
             }
             ProcessPaperObservation(replayed, allowHistoricalSource: true);
             RefreshMarketView();
+            string pacing = _replaySessionRunner.Fast
+                ? "without playback delays"
+                : $"at {settings.ReplaySpeed:0.#}x speed";
             StatusMessage =
-                $"Replaying {update.Index + 1}/{update.Total} real {instrument.Symbol} observations from {firstSource.ToLocalTime():g} at {settings.ReplaySpeed:0.#}x speed.";
+                $"Replaying {update.Index + 1}/{update.Total} real {instrument.Symbol} observations from {firstSource.ToLocalTime():g} {pacing}.";
             AutomationReplayBoundary(update.Index + 1, update.Total);
             if (_replaySessionRunner.Fast && update.Index % 32 == 31)
                 await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.Background);

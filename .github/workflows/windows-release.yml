@@ -195,6 +195,20 @@ jobs:
             throw 'The native SQLite library e_sqlite3.dll is missing from the publish output.'
           }
 
+          # Older release tags predate the optional local automation companion.
+          $controlProject = 'source\src\PriceSentinel3000.Control\PriceSentinel3000.Control.csproj'
+          if (Test-Path -LiteralPath $controlProject) {
+            dotnet publish $controlProject --configuration Release --runtime win-x64 `
+              --self-contained true --output artifacts\publish\automation `
+              -p:PublishSingleFile=false -p:PublishTrimmed=false -p:PublishReadyToRun=false `
+              -p:DebugType=None -p:DebugSymbols=false `
+              -p:Version=$env:PACKAGE_VERSION -p:FileVersion=$env:WINDOWS_VERSION
+            if ($LASTEXITCODE -ne 0) { throw 'Automation companion publish failed.' }
+            if (-not (Test-Path -LiteralPath 'artifacts\publish\automation\PriceSentinel3000.Control.exe')) {
+              throw 'Automation companion executable was not created.'
+            }
+          }
+
       - name: Compile installer with pinned Inno Setup
         id: installer
         shell: pwsh
