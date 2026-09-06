@@ -131,6 +131,36 @@ public sealed class PaperTradingEngineTests
     }
 
     [Fact]
+    public void Engine_RepeatedBuyWhileHoldingPreservesCashAndOriginalPosition()
+    {
+        var engine = new PaperTradingEngine(
+            new("SOFI"),
+            TradingSessionSettings.Default with
+            {
+                PositionSizeBasis = AmountBasis.FixedAmount,
+                PositionSizeValue = 1_000m,
+            },
+            new ScriptedStrategy(
+                StrategySignalKind.Buy,
+                StrategySignalKind.Buy,
+                StrategySignalKind.Sell));
+        DateTimeOffset now = new(2026, 9, 3, 16, 0, 0, TimeSpan.Zero);
+        PaperTradeResult first = engine.Process([Bar(now, 10m)]);
+
+        PaperTradeResult repeated = engine.Process([Bar(now.AddSeconds(5), 10m)]);
+        PaperTradeResult exit = engine.Process([Bar(now.AddSeconds(10), 10.2m)]);
+
+        Assert.Null(repeated.Order);
+        Assert.Null(repeated.Fill);
+        Assert.Equal("RISK BLOCKED", repeated.Decision.State);
+        Assert.Contains("already open", repeated.Decision.Reasons[0]);
+        Assert.Equal(first.Account, repeated.Account);
+        Assert.Equal(100m, exit.Fill?.Quantity);
+        Assert.Equal(10_020m, exit.Account.Cash);
+        Assert.Equal(1, exit.Account.EntriesToday);
+    }
+
+    [Fact]
     public void Engine_ResetsEntryLimitAtEasternMidnightInsteadOfUtcMidnight()
     {
         var engine = new PaperTradingEngine(

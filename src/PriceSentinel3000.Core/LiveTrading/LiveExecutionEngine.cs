@@ -162,6 +162,16 @@ public sealed class LiveExecutionEngine
                         _positionOpenedAtUtc!.Value)
                     : StrategyPositionContext.Flat);
 
+        if (_requiresInheritedPositionExit &&
+            decision.Signal is StrategySignalKind.Sell &&
+            exitMark <= broker.Position.AverageBuyPrice)
+        {
+            return Hold(
+                latest.SourceTimestampUtc,
+                "INHERITED PROFIT MONITOR",
+                "The inherited position is being monitored for profit; a strategy exit must have an estimated sell price above its average purchase price. Host stop-loss and daily-loss exits remain active.");
+        }
+
         if (decision.Signal is StrategySignalKind.Buy)
         {
             decimal entryPrice = latest.HasTwoSidedMarket ? latest.Ask : latest.Last;

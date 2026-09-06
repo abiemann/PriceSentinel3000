@@ -490,6 +490,71 @@ public sealed class LiveExecutionEngineTests
         Assert.Equal(BrokerOrderSide.Buy, released.Intent.Side);
     }
 
+    [Theory]
+    [InlineData(9.99)]
+    [InlineData(10.005)]
+    [InlineData(10.01)]
+    public void Evaluate_InheritedProfitMonitoringBlocksUnprofitableScriptExit(decimal last)
+    {
+        var engine = new LiveExecutionEngine(
+            Settings(),
+            10_000m,
+            new ScriptedStrategy(StrategySignalKind.Sell),
+            requireInheritedPositionExit: true);
+        BrokerPosition inherited = new("SOFI", 4m, 10m, 4m, 0m);
+
+        LiveTradeEvaluation result = engine.Evaluate([Quote(last)], Snapshot(position: inherited));
+
+        Assert.Null(result.Intent);
+        Assert.Equal(StrategySignalKind.Hold, result.Decision.Signal);
+        Assert.Equal("INHERITED PROFIT MONITOR", result.Decision.State);
+        Assert.Contains("average purchase price", result.Decision.Reasons[0]);
+    }
+
+    [Fact]
+    public void Evaluate_InheritedProfitMonitoringAllowsProfitableExitAndReleasesAfterClosure()
+    {
+        var engine = new LiveExecutionEngine(
+            Settings(),
+            10_000m,
+            new ScriptedStrategy(StrategySignalKind.Sell, StrategySignalKind.Sell),
+            requireInheritedPositionExit: true);
+        BrokerPosition position = new("SOFI", 4m, 10m, 4m, 0m);
+
+        LiveTradeEvaluation inheritedExit = engine.Evaluate(
+            [Quote(10.02m)], Snapshot(position: position));
+
+        Assert.Equal(BrokerOrderSide.Sell, inheritedExit.Intent?.Side);
+        engine.ConfirmInheritedPositionClosed();
+        LiveTradeEvaluation laterScriptExit = engine.Evaluate(
+            [Quote(9.99m, secondsOffset: 5)], Snapshot(position: position));
+
+        Assert.Equal(BrokerOrderSide.Sell, laterScriptExit.Intent?.Side);
+        Assert.Equal(StrategySignalKind.Sell, laterScriptExit.Decision.Signal);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Evaluate_InheritedProfitMonitoringPreservesHostRiskExits(bool dailyLoss)
+    {
+        var engine = new LiveExecutionEngine(
+            Settings() with { StopLossValue = 1m },
+            10_000m,
+            new ScriptedStrategy(StrategySignalKind.Hold),
+            requireInheritedPositionExit: true);
+        BrokerPosition inherited = new("SOFI", 4m, 10m, 4m, 0m);
+
+        LiveTradeEvaluation result = engine.Evaluate(
+            [Quote(dailyLoss ? 9.99m : 9.50m)],
+            Snapshot(totalValue: dailyLoss ? 9_900m : 10_000m, position: inherited));
+
+        Assert.Equal(BrokerOrderSide.Sell, result.Intent?.Side);
+        Assert.Equal(4m, result.Intent?.Quantity);
+        Assert.Equal(dailyLoss ? StrategySignalKind.DailyLoss : StrategySignalKind.StopLoss,
+            result.Decision.Signal);
+    }
+
     private static TradingSessionSettings Settings() => TradingSessionSettings.Default with
     {
         Symbol = "SOFI",

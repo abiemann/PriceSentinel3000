@@ -222,6 +222,11 @@ public sealed class PaperTradingEngine
         decimal mark,
         decimal entryPrice)
     {
+        if (_positionQuantity > 0m)
+        {
+            return "A paper position is already open for this symbol.";
+        }
+
         if (_riskLocked || Math.Max(0m, _dailyStartingEquity - Snapshot(mark).Equity) >= DailyLossLimit())
         {
             _riskLocked = true;
