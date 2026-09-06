@@ -116,6 +116,51 @@ public sealed class ReplaySessionRunnerTests
             pending.WaitAsync(TimeSpan.FromSeconds(5)));
     }
 
+    [Fact]
+    public async Task RunAsync_FastPreservesEveryObservationAcrossLargeSourceGaps()
+    {
+        var runner = new ReplaySessionRunner { Fast = true };
+        MarketQuote[] quotes = Enumerable.Range(0, 100).Select(index =>
+            Quote(10m + index) with { SourceTimestampUtc = Start.AddHours(index) }).ToArray();
+        var updates = new List<ReplaySessionUpdate>();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await foreach (ReplaySessionUpdate update in runner.RunAsync(quotes, 1m, cancellation.Token))
+            updates.Add(update);
+        Assert.Equal(quotes, updates.Select(update => update.Quote));
+        Assert.Equal(Enumerable.Range(0, 100), updates.Select(update => update.Index));
+    }
+
+    [Fact]
+    public async Task RunAsync_FastHonorsPauseAndCancellationBeforeNextObservation()
+    {
+        var runner = new ReplaySessionRunner { Fast = true };
+        using var cancellation = new CancellationTokenSource();
+        await using IAsyncEnumerator<ReplaySessionUpdate> enumerator = runner
+            .RunAsync([Quote(10m), Quote(11m)], 1m, cancellation.Token).GetAsyncEnumerator();
+        Assert.True(await enumerator.MoveNextAsync());
+        runner.Pause();
+        Task<bool> pending = enumerator.MoveNextAsync().AsTask();
+        Assert.False(pending.IsCompleted);
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
+    }
+
+    [Fact]
+    public async Task RunAsync_CanSwitchAnExistingSourceDelayToFastPlayback()
+    {
+        var runner = new ReplaySessionRunner();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await using IAsyncEnumerator<ReplaySessionUpdate> enumerator = runner
+            .RunAsync([Quote(10m), Quote(11m) with { SourceTimestampUtc = Start.AddHours(1) }], 1m, cancellation.Token)
+            .GetAsyncEnumerator();
+        Assert.True(await enumerator.MoveNextAsync());
+        Task<bool> pending = enumerator.MoveNextAsync().AsTask();
+        Assert.False(pending.IsCompleted);
+        runner.Fast = true;
+        Assert.True(await pending);
+        Assert.Equal(1, enumerator.Current.Index);
+    }
+
     private static MarketQuote Quote(decimal last) =>
         new(
             Instrument,

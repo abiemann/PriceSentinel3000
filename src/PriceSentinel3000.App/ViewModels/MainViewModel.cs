@@ -1049,7 +1049,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
             return false;
         }
 
-        SavePreferences();
+        if (!_applyingAutomationConfiguration) SavePreferences();
         return true;
     }
 

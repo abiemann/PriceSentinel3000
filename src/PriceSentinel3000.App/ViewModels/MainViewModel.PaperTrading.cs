@@ -40,6 +40,7 @@ public sealed partial class MainViewModel
 
         if (result.Order is null || result.Fill is null)
         {
+            CaptureAutomationDecision(result);
             return;
         }
 
@@ -49,6 +50,7 @@ public sealed partial class MainViewModel
             result.Order,
             result.Fill,
             result.Account);
+        CaptureAutomationDecision(result);
         _tradeMarkers[result.Fill.FilledAtUtc] = result.Fill.Side is PaperOrderSide.Buy
             ? ChartTradeMarker.Buy
             : ChartTradeMarker.Sell;

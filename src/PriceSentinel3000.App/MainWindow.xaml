@@ -63,7 +63,7 @@
                                Foreground="{StaticResource SupportingTextBrush}"
                                FontSize="11"
                                FontWeight="SemiBold"
-                               Text="PriceSentinel 3000" />
+                               Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" />
                 </StackPanel>
                 <StackPanel Grid.Column="1"
                             Orientation="Horizontal">

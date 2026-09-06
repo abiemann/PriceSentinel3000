@@ -10,12 +10,14 @@ namespace PriceSentinel3000.App;
 public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
+    private readonly IAsyncDisposable? _automationServer;
     private bool _closeAfterShutdown;
     private bool _shutdownInProgress;
 
-    internal MainWindow(MainViewModel viewModel)
+    internal MainWindow(MainViewModel viewModel, IAsyncDisposable? automationServer = null)
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+        _automationServer = automationServer;
         _viewModel.ExistingLivePositionPrompt = ShowExistingLivePositionDialog;
         _viewModel.ExistingLivePositionWarning = ShowExistingLivePositionWarning;
         _viewModel.ExternalScriptApprovalPrompt = message => MessageBox.Show(
@@ -119,6 +121,7 @@ public partial class MainWindow : Window
         }
 
         _shutdownInProgress = true;
+        _viewModel.AutomationClosing = true;
         try
         {
             if (Keyboard.FocusedElement is TextBox textBox)
@@ -148,8 +151,14 @@ public partial class MainWindow : Window
                 if (choice is not MessageBoxResult.Yes)
                 {
                     _shutdownInProgress = false;
+                    _viewModel.AutomationClosing = false;
                     return;
                 }
+            }
+
+            if (_automationServer is not null)
+            {
+                await _automationServer.DisposeAsync();
             }
 
             await _viewModel.ShutdownAsync(
@@ -166,6 +175,7 @@ public partial class MainWindow : Window
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
             _shutdownInProgress = false;
+            _viewModel.AutomationClosing = false;
         }
     }
 }

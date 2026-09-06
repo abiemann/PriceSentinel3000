@@ -38,6 +38,7 @@ public sealed partial class MainViewModel
 
     private async Task StartSelectedSessionAsync()
     {
+        ResetAutomationForUiStart();
         if (ValidateConfigurationInputs?.Invoke() is false || HasConfigurationErrors)
         {
             StatusMessage = "Cannot start: correct the highlighted configuration inputs.";
@@ -334,6 +335,7 @@ public sealed partial class MainViewModel
             else
             {
                 ProcessPaperObservation(update.Quote);
+                _automationProcessedObservations++;
             }
 
             RefreshMarketView();
@@ -447,6 +449,9 @@ public sealed partial class MainViewModel
             RefreshMarketView();
             StatusMessage =
                 $"Replaying {update.Index + 1}/{update.Total} real {instrument.Symbol} observations from {firstSource.ToLocalTime():g} at {settings.ReplaySpeed:0.#}x speed.";
+            AutomationReplayBoundary(update.Index + 1, update.Total);
+            if (_replaySessionRunner.Fast && update.Index % 32 == 31)
+                await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.Background);
         }
 
         JournalSummary summary = _journal.GetSummary(_activeSession!.Id);
@@ -517,6 +522,7 @@ public sealed partial class MainViewModel
             settingsJson,
             _timeProvider.GetUtcNow());
         IsSessionRunning = true;
+        CaptureAutomationSession();
         OnPropertyChanged(nameof(SymbolDisplay));
     }
 
@@ -542,6 +548,7 @@ public sealed partial class MainViewModel
         StatusMessage =
             "Replay paused. Resume continues with the next historical observation.";
         AddActivity("Historical Replay paused.");
+        if (_automationOperationId.HasValue) _automationOperationState = "paused";
     }
 
     private void ResumeReplay()
@@ -559,6 +566,7 @@ public sealed partial class MainViewModel
         NotifyStrategyProperties();
         StatusMessage = "Replay resumed from the next historical observation.";
         AddActivity("Historical Replay resumed.");
+        if (_automationOperationId.HasValue) _automationOperationState = "running";
     }
 
     private void ReleaseReplayPause()
@@ -569,6 +577,7 @@ public sealed partial class MainViewModel
 
     private async Task StopSessionAsync()
     {
+        if (_automationOperationId.HasValue) _automationStopRequested = true;
         bool wasLive = EffectiveMode is TradingMode.Live;
         bool hadLiveOrderContext = _liveOrderCoordinator.HasActiveContext;
         _sessionCoordinator.Cancel();
@@ -635,6 +644,7 @@ public sealed partial class MainViewModel
                 _activeSession.Id,
                 _timeProvider.GetUtcNow(),
                 outcome);
+            CompleteAutomationSession(outcome);
             _activeSession = null;
         }
 

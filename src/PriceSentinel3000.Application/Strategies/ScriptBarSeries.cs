@@ -26,6 +26,7 @@ public sealed class ScriptBarSeries
     }
 
     public long Version { get; private set; }
+    public long CompletedBarCount { get; private set; }
     public IReadOnlyList<StrategyBar> Snapshot() => _bars.ToArray();
 
     public void SeedHistory(IEnumerable<MarketQuote> history, DateTimeOffset availableAtUtc)
@@ -129,6 +130,7 @@ public sealed class ScriptBarSeries
 
     private void Complete(StrategyBar bar)
     {
+        CompletedBarCount++;
         _bars.Add(bar);
         if (_bars.Count > _capacity)
             _bars.RemoveAt(0);

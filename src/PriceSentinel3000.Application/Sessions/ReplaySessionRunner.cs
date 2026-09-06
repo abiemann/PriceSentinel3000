@@ -14,6 +14,9 @@ public sealed class ReplaySessionRunner(TimeProvider? timeProvider = null)
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     private TaskCompletionSource? _resumeSource;
 
+    /// <summary>Process every source observation without source-time delays.</summary>
+    public bool Fast { get; set; }
+
     public bool IsPaused
     {
         get
@@ -61,7 +64,14 @@ public sealed class ReplaySessionRunner(TimeProvider? timeProvider = null)
 
         for (int index = 0; index < quotes.Count; index++)
         {
-            if (index > 0)
+            cancellationToken.ThrowIfCancellationRequested();
+            if (Fast)
+            {
+                // Let the caller receive startup and remain cancellable during large replays.
+                if (index % 32 == 0) await Task.Yield();
+                await WaitWhilePausedAsync(cancellationToken);
+            }
+            else if (index > 0)
             {
                 await DelayAsync(
                     CalculateDelay(
@@ -75,6 +85,7 @@ public sealed class ReplaySessionRunner(TimeProvider? timeProvider = null)
                 await WaitWhilePausedAsync(cancellationToken);
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             yield return new(index, quotes.Count, quotes[index]);
         }
     }
@@ -104,6 +115,7 @@ public sealed class ReplaySessionRunner(TimeProvider? timeProvider = null)
         while (remaining > TimeSpan.Zero)
         {
             await WaitWhilePausedAsync(cancellationToken);
+            if (Fast) break;
             TimeSpan slice = remaining < maximumSlice ? remaining : maximumSlice;
             await Task.Delay(slice, _timeProvider, cancellationToken);
             remaining -= slice;
