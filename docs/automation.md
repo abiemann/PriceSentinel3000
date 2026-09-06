@@ -131,6 +131,10 @@ not relax its pipe permissions for a sandbox account.
 
 ## Testing limits
 
+The [September 6 MCP Replay validation](automation-validation-2026-09-06.md)
+records ten passing test groups against the running desktop app, including risk
+exits, exact Replay boundaries, source pinning, and startup recovery.
+
 The automated suite uses fake market/broker ports, temporary journals, the actual
 WPF dispatcher, named pipes, and an official MCP client. It checks exact Replay
 boundaries, normal/fast equivalence, lifecycle cancellation, malformed requests,
