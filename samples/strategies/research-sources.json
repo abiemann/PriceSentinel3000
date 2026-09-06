@@ -1,0 +1,43 @@
+[
+  {
+    "file": "mocnarf1-sma9-post7.thinkscript",
+    "sourceUrl": "https://usethinkscript.com/threads/price-crossing-moving-average-for-thinkorswim.10161/#post-107994",
+    "author": "Mocnarf1",
+    "version": "2022-09-13 post #7",
+    "sourceSha256": "a81c43bec08483a2ef118f33f910667ce4cc8bf02453ab2ee734b94cdef74294",
+    "sourceBytes": 393,
+    "retrievedUtc": "2026-09-05T21:19:42.0554877-07:00",
+    "extraction": "HTML entity decoding of exact posted code block; no code edits or newline normalization",
+    "sourceForum": "Questions",
+    "redistribution": "No explicit license found; local research copy only",
+    "expectedCompatible": true
+  },
+  {
+    "file": "pensar-spy-post2.thinkscript",
+    "sourceUrl": "https://usethinkscript.com/threads/spy-trading-strategy-script-help.9886/#post-88914",
+    "author": "Pensar",
+    "version": "2022-01-28 post #2",
+    "sourceSha256": "6bb591e0780f9e46c873014af384aa791d0cdf4863c0cfe2c7ed8e2af0e2f5ae",
+    "sourceBytes": 637,
+    "retrievedUtc": "2026-09-05T21:19:42.0859375-07:00",
+    "extraction": "HTML entity decoding of exact posted code block; no code edits or newline normalization",
+    "sourceForum": "Questions",
+    "redistribution": "No explicit license found; local research copy only",
+    "expectedCompatible": true
+  },
+  {
+    "file": "christopher84-c3-max-v2.thinkscript",
+    "sourceUrl": "https://usethinkscript.com/threads/confirmation-candles-indicator-for-thinkorswim.6316/#post-61246",
+    "author": "Christopher84",
+    "version": "C3_Max_v2 header 2021-12-14; header last modified 2022-04-11",
+    "sourceSha256": "1fb649752e64e492e4d81339d8ca4981c9928277d69ff76387cb2b6752d77124",
+    "sourceBytes": 33778,
+    "retrievedUtc": "2026-09-05T21:21:52.2791899-07:00",
+    "extraction": "Exact first C3_Max_v2 code block text after HTML markup removal and entity decoding; no code edits",
+    "sourceForum": "Strategies & Chart Setups",
+    "redistribution": "No explicit license found; local research copy only",
+    "containsAddOrder": false,
+    "intendedResult": "reject unsupported study; no inferred orders",
+    "expectedCompatible": false
+  }
+]

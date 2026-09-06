@@ -6,9 +6,11 @@ This interpreter is not the thinkorswim strategy engine. A script passing compat
 
 ## Loading a strategy
 
-Use **Open Scripts Folder** to open `%LOCALAPPDATA%\PriceSentinel3000\Strategies`. Place UTF-8 `.thinkscript`, `.ts`, or `.txt` source files directly in that folder, then refresh the list while the session is stopped. Subdirectories are not searched. The filename supplies the display name. The folder supports at most 128 files, and each source file is limited to 256 KiB before decoding.
+Use **SCRIPTS FOLDER** to open `%LOCALAPPDATA%\PriceSentinel3000\Strategies`. Place UTF-8 `.thinkscript`, `.ts`, or `.txt` source files directly in that folder, then refresh the list while the session is stopped. Subdirectories are not searched. The filename supplies the display name; the bundled example additionally displays `(experimental)`. The folder supports at most 128 files, including its sample-seeding marker, and each source file is limited to 256 KiB before decoding.
 
 The bundled `OriginalConfirmation.thinkscript` is an original educational example using EMA trend, price recovery, and RSI conditions. It is separate from the compiled built-in default. Start with Paper/Replay to inspect its decisions; synthetic validation fixtures demonstrate language behavior and make no performance claim.
+
+The example is installed once. Refresh never overwrites edits or restores a deliberately deleted copy. The packaged source remains in the application's `Strategies` subfolder if you want to copy it back. Compatibility errors are shown for excluded files; explanatory notes are shown for the selected external script.
 
 Edit numeric `input` defaults in the source file to change parameters. Boolean defaults use `yes`/`no`; source inputs such as `input price = close;` select a series. The current application uses the source defaults. The compiler API also accepts numeric overrides during evaluation and validates affected lengths and warmup again.
 

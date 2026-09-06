@@ -1,0 +1,197 @@
+{
+  "Runtime": "thinkscript-subset-v1",
+  "TestedAtUtc": "2026-09-06T04:51:35.0976615+00:00",
+  "Purpose": "Synthetic language and decision checks; not historical market backtests or evidence of profitability.",
+  "Passed": true,
+  "Results": [
+    {
+      "File": "OriginalConfirmation.thinkscript",
+      "SourceSha256": "753badb011266ef7e7dcdc2bea8c39b4999b3d7ae23481873f510019b66a9676",
+      "ExpectedCompatible": true,
+      "IsCompatible": true,
+      "RequiredWarmupBars": 85,
+      "Diagnostics": [
+        {
+          "Line": 19,
+          "Message": "Smoothing uses deterministic supplied-history seeds and explicit warmup; thinkorswim prefetch outside the supplied history is unavailable.",
+          "IsError": false
+        },
+        {
+          "Line": 20,
+          "Message": "Smoothing uses deterministic supplied-history seeds and explicit warmup; thinkorswim prefetch outside the supplied history is unavailable.",
+          "IsError": false
+        },
+        {
+          "Line": 21,
+          "Message": "Smoothing uses deterministic supplied-history seeds and explicit warmup; thinkorswim prefetch outside the supplied history is unavailable.",
+          "IsError": false
+        },
+        {
+          "Line": 30,
+          "Message": "AddOrder proposes a long-only action after the completed bar. The host owns execution price and quantity; script price, tradeSize and decorations are ignored.",
+          "IsError": false
+        },
+        {
+          "Line": 31,
+          "Message": "AddOrder proposes a long-only action after the completed bar. The host owns execution price and quantity; script price, tradeSize and decorations are ignored.",
+          "IsError": false
+        }
+      ],
+      "Passed": true
+    },
+    {
+      "Fixture": "Original waits for warmup",
+      "File": "OriginalConfirmation.thinkscript",
+      "Bars": 20,
+      "Holding": false,
+      "Expected": "Hold",
+      "Actual": "Hold",
+      "State": "WARMING UP",
+      "Reason": "Script requires 85 completed bars; received 20.",
+      "Passed": true
+    },
+    {
+      "Fixture": "Original flat market stays flat",
+      "File": "OriginalConfirmation.thinkscript",
+      "Bars": 100,
+      "Holding": false,
+      "Expected": "Hold",
+      "Actual": "Hold",
+      "State": "HOLD",
+      "Reason": "No entry or exit condition is true on the completed bar.",
+      "Passed": true
+    },
+    {
+      "Fixture": "Original trend pullback recovery enters",
+      "File": "OriginalConfirmation.thinkscript",
+      "Bars": 103,
+      "Holding": false,
+      "Expected": "Buy",
+      "Actual": "Buy",
+      "State": "BUY SIGNAL",
+      "Reason": "Trend pullback entry",
+      "Passed": true
+    },
+    {
+      "Fixture": "Original downtrend exits an existing long",
+      "File": "OriginalConfirmation.thinkscript",
+      "Bars": 100,
+      "Holding": true,
+      "Expected": "Sell",
+      "Actual": "Sell",
+      "State": "SELL SIGNAL",
+      "Reason": "Trend or momentum exit",
+      "Passed": true
+    },
+    {
+      "Fixture": "Original downtrend never opens a short",
+      "File": "OriginalConfirmation.thinkscript",
+      "Bars": 100,
+      "Holding": false,
+      "Expected": "Hold",
+      "Actual": "Hold",
+      "State": "HOLD",
+      "Reason": "Exit condition is true, but there is no long position to close.",
+      "Passed": true
+    },
+    {
+      "File": "mocnarf1-sma9-post7.thinkscript",
+      "SourceSha256": "a81c43bec08483a2ef118f33f910667ce4cc8bf02453ab2ee734b94cdef74294",
+      "ExpectedCompatible": true,
+      "IsCompatible": true,
+      "RequiredWarmupBars": 21,
+      "Diagnostics": [
+        {
+          "Line": 13,
+          "Message": "AddOrder proposes a long-only action after the completed bar. The host owns execution price and quantity; script price, tradeSize and decorations are ignored.",
+          "IsError": false
+        },
+        {
+          "Line": 14,
+          "Message": "AddOrder proposes a long-only action after the completed bar. The host owns execution price and quantity; script price, tradeSize and decorations are ignored.",
+          "IsError": false
+        }
+      ],
+      "Passed": true
+    },
+    {
+      "Fixture": "SMA9 offset pullback enters unchanged",
+      "File": "mocnarf1-sma9-post7.thinkscript",
+      "Bars": 22,
+      "Holding": false,
+      "Expected": "Buy",
+      "Actual": "Buy",
+      "State": "BUY SIGNAL",
+      "Reason": "Buy",
+      "Passed": true
+    },
+    {
+      "Fixture": "SMA9 offset recovery exits unchanged",
+      "File": "mocnarf1-sma9-post7.thinkscript",
+      "Bars": 22,
+      "Holding": true,
+      "Expected": "Sell",
+      "Actual": "Sell",
+      "State": "SELL SIGNAL",
+      "Reason": "Sell",
+      "Passed": true
+    },
+    {
+      "File": "pensar-spy-post2.thinkscript",
+      "SourceSha256": "6bb591e0780f9e46c873014af384aa791d0cdf4863c0cfe2c7ed8e2af0e2f5ae",
+      "ExpectedCompatible": true,
+      "IsCompatible": true,
+      "RequiredWarmupBars": 66,
+      "Diagnostics": [
+        {
+          "Line": 14,
+          "Message": "AddOrder proposes a long-only action after the completed bar. The host owns execution price and quantity; script price, tradeSize and decorations are ignored.",
+          "IsError": false
+        },
+        {
+          "Line": 15,
+          "Message": "AddOrder proposes a long-only action after the completed bar. The host owns execution price and quantity; script price, tradeSize and decorations are ignored.",
+          "IsError": false
+        }
+      ],
+      "Passed": true
+    },
+    {
+      "Fixture": "SPY SMA66 pullback enters unchanged",
+      "File": "pensar-spy-post2.thinkscript",
+      "Bars": 67,
+      "Holding": false,
+      "Expected": "Buy",
+      "Actual": "Buy",
+      "State": "BUY SIGNAL",
+      "Reason": "buy",
+      "Passed": true
+    },
+    {
+      "Fixture": "SPY prior19 high exits unchanged",
+      "File": "pensar-spy-post2.thinkscript",
+      "Bars": 67,
+      "Holding": true,
+      "Expected": "Sell",
+      "Actual": "Sell",
+      "State": "SELL SIGNAL",
+      "Reason": "sell",
+      "Passed": true
+    },
+    {
+      "File": "christopher84-c3-max-v2.thinkscript",
+      "SourceSha256": "1fb649752e64e492e4d81339d8ca4981c9928277d69ff76387cb2b6752d77124",
+      "ExpectedCompatible": false,
+      "IsCompatible": false,
+      "RequiredWarmupBars": 0,
+      "Diagnostics": [
+        {
+          "Line": 108,
+          "Message": "Unsupported character \u0027{\u0027.",
+          "IsError": true
+        }
+      ],
+      "Passed": true
+    }
+  ]
+}

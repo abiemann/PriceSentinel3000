@@ -1,10 +1,17 @@
 # External strategy design
 
 This specification incorporates the September 5, 2026 decisions. Implementation
-is delivered in validated milestones; the release notes and compatibility guide
-identify the implemented subset. The existing compiled price-action strategy
+has been delivered in validated milestones. The [compatibility guide](docs/strategy-scripting.md)
+identifies the implemented subset and resource limits; [research results](docs/strategy-research.md)
+record the unchanged-source checks and original example fixtures. The existing compiled price-action strategy
 remains enabled by default and appears as **Built-In**. Converting it to an
 external script is future work.
+
+V1 includes folder discovery, the shared selector, completed-candle interpretation,
+session source/parameter provenance, per-session LIVE version approval, and one
+original experimental example. Tests cover parser restrictions, indicator values,
+host position/risk safeguards, history availability, immutable artifacts, WPF
+selection, and sample seeding. Windows publication includes the original source.
 
 ## Product scope
 

@@ -287,6 +287,43 @@ them later; they are not a promise that the labeled regions can be captured live
 Replay does not depend on a previously recorded Paper Trader session and never
 uses the former synthetic data.
 
+## Strategy scripts
+
+The shared **Strategy** selector applies to Paper Trader, LIVE, and Replay.
+**Built-In** remains selected by default and uses the existing compiled strategy.
+One original, experimental example, **OriginalConfirmation**, is packaged with the app.
+
+1. Click **SCRIPTS FOLDER** to open `%LOCALAPPDATA%\PriceSentinel3000\Strategies`.
+2. Copy a thinkScript strategy into that folder as `.thinkscript`, `.ts`, or `.txt`.
+3. Open the selector or click **REFRESH**. Compatible scripts appear; excluded files
+   have diagnostics explaining the unsupported syntax or missing trading rules.
+4. Select a script and candle interval, then test in Paper or Replay. The interval
+   is independent of the chart display. Inputs use the defaults in the script;
+   edit its `input` declarations before starting to change them.
+
+This release interprets a documented subset of thinkScript. It accepts explicit
+long-only `AddOrder` strategies; chart studies do not acquire invented trading
+rules. Volume, secondary timeframes, custom functions, shorting, and other unsupported
+features are rejected. Two small public forum strategies have passed unchanged-source
+compatibility checks. That does not imply every thinkScript works unchanged.
+See the [compatibility guide](docs/strategy-scripting.md) and
+[research and validation results](docs/strategy-research.md).
+
+Paper and LIVE evaluate the same completed price candles built from incoming quotes.
+These sampled candles can differ from exchange tick candles. Initial history can
+warm the script only when its source bars have completed; later history corrections
+do not rewrite finalized script candles. Replay uses completed historical candles
+and simulated close-price fills. Replay results can therefore differ from Paper/LIVE.
+
+Session startup revalidates and freezes the source, SHA-256, runtime, input defaults,
+and candle interval in the journal. Missing or incompatible selections block startup.
+LIVE additionally asks for approval of that exact script version at every start.
+All existing execution and risk controls apply. A script fault disables script
+proposals for that session while host risk checks continue on fresh quotes.
+
+The original sample is seeded once without overwriting user files. It is an
+independently written example, not a claim of profitable performance.
+
 ## Authentication and local data
 
 Robinhood is connected through the official Streamable HTTP MCP endpoint and OAuth
@@ -349,6 +386,7 @@ tests/
   PriceSentinel3000.Core.Tests/            Deterministic domain and strategy tests
   PriceSentinel3000.Application.Tests/     Session and LIVE order workflow tests
   PriceSentinel3000.Infrastructure.Tests/  Robinhood, OAuth, preferences, and SQLite tests
+  PriceSentinel3000.App.Tests/             WPF workflows with fake broker ports
 ~~~
 
 Dependencies point inward: App composes Application with Infrastructure,
