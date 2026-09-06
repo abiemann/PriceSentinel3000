@@ -283,3 +283,55 @@ configuration, LIVE rejection, startup cancellation, exact pause/step boundaries
 normal-versus-fast Replay equivalence, completed-result retention, and an actual
 MCP client round trip. Use fake market/broker ports for automated tests; inspect
 the connected visible app separately for the final control smoke test.
+
+## MCP strategy research observability
+
+Provide read-only `candles`, `indicators`, `events`, and `capture_chart` tools
+against the same Replay/Paper session and app visual. Observations must describe
+what the strategy could know at that point in market time. Never return future
+loaded Replay history, synthesize missing indicator values, or reevaluate a
+script solely to satisfy an inspection request.
+
+Expose separate processed-source and finalized-strategy candle streams. Replay
+source records preserve provider 15-second OHLC and timestamps; Paper sampled
+quotes must remain labeled as samples. Strategy candles preserve exact decimal
+OHLC, start/end times, availability, bar version, and observation correlation at
+the configured script interval. Forming chart candles are a separate visual
+representation, and Built-In has no script candle stream.
+
+Retain pinned input defaults and actual named definitions/plots evaluated by the
+interpreter, with null values and availability reasons for unavailable
+expressions. Bound the indicator list to 64 declarations with explicit total
+count and truncation. Do not evaluate unused or unreached expressions for
+diagnostics. Report required,
+retained, and remaining warmup bars alongside the history version/start and
+completed-bar count. Distinguish the latest evaluation from current warmup after
+gaps, waiting observations, or host risk preemption. Keep Built-In indicator
+readouts and chart RSI separate from external-script indicators.
+
+Decision events connect the original strategy proposal, whether it was evaluated,
+the final host decision, risk override, order, fill, and numeric account state.
+Host risk checks can preempt evaluation; record that fact without inventing a
+proposal. Embed script values only when an evaluation actually occurred, then
+use evaluation and observation sequences to correlate subsequent events.
+
+Research streams retain at most 4,096 records and 12 MiB each in memory, preserve
+completed-session data, and reset for a new simulation. Page at most 100 records
+and 600 KiB of record data per response. Return explicit cursor, retention, and
+omission metadata rather than silently truncating. Accept an expected session
+ID to reject comparisons that cross sessions. Existing SQLite journal retention
+remains separate from these bounded research windows.
+
+Optional chart captures render the actual WPF chart visual to a bounded PNG,
+with session, capture time, visible range, display interval, and chart RSI
+metadata. The default and maximum bounds are 1280 by 900 pixels, preserving
+aspect ratio and reducing size further if required by the byte limit. Capture
+only the chart, without credentials, account panels, or other desktop windows.
+Return native MCP image content with separate metadata and no duplicate base64
+payload. Visual checks complement exact numeric research and use the chart's
+independent interval/indicator settings.
+
+Verification must cover actual values and warmup transitions, no future-data
+exposure, event correlation and risk preemption, pagination/retention and session
+guards, and a native image round trip through an official MCP client. Compare
+normal and fast Replay outcomes to ensure telemetry does not change behavior.

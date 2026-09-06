@@ -8,7 +8,8 @@ public sealed partial class MainViewModel
 {
     private void ProcessPaperObservation(
         MarketQuote trigger,
-        bool allowHistoricalSource = false)
+        bool allowHistoricalSource = false,
+        MarketQuote? source = null)
     {
         if (_ringBuffer is null ||
             _paperTradingEngine is null ||
@@ -17,6 +18,7 @@ public sealed partial class MainViewModel
             return;
         }
 
+        CaptureAutomationObservation(trigger, source ?? trigger, allowHistoricalSource);
         if (!allowHistoricalSource && !IsFreshObservation(trigger))
         {
             _strategyStateLabel = "MARKET CLOSED";

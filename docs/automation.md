@@ -68,6 +68,10 @@ MCP tools expose the same inputs as named parameters.
 | `stop` | Stop the simulated session, including startup or paused Replay. |
 | `run_to_end` | Remove pause boundaries and playback delays for the active Replay. |
 | `results` | Read current/last simulated session identity, outcome, settings/provenance, numeric account, journal summary, and bounded recent decisions/fills. |
+| `candles` | Page exact processed source observations or finalized strategy candles, with UTC timestamps and availability times. |
+| `indicators` | Read actual strategy indicator values, evaluation identity, and current warmup state. |
+| `events` | Page strategy proposals, host risk overrides, decisions, fills, and numeric account state in processing order. |
+| `capture_chart` | Return the actual simulation chart as a PNG image with its visible range, display interval, RSI, and session metadata. |
 
 The pipe protocol uses `strategies` internally; the command line accepts
 `list_strategies`. Unknown commands, arguments, settings, and invalid values are
@@ -129,7 +133,102 @@ On Windows, a coding sandbox may run under a separate user identity. It must use
 the ordinary Windows user context to connect to the desktop app; the bridge does
 not relax its pipe permissions for a sandbox account.
 
+## Research data and chart images
+
+The four research tools are read-only. They observe the same Replay or Paper
+session that the app processes; requesting data never runs the strategy again.
+Prices and indicator values are JSON numbers at their stored decimal precision,
+not rounded display strings. Timestamps include UTC offsets. Replay's loaded but
+unprocessed future history is never included.
+
+`candles` accepts `kind` (`strategy`, the default, or `source`), `afterSequence`
+(default `0`), `limit` (default `50`, range `1`–`100`), and optional `sessionId`.
+The two streams have different meanings:
+
+- **Source:** Replay records contain the provider's 15-second OHLC and original
+  source timestamp. `availableAtUtc` is the candle end; `evaluationTimestampUtc`
+  is the execution timestamp actually used (the end for scripts; the original
+  source timestamp for the existing Built-In replay path). Paper records are
+  labeled `sampled_quote`; they do not claim to be authoritative OHLC candles or
+  have a completed candle end time. Bid/ask and freshness remain explicit.
+- **Strategy:** Finalized candles use the selected script interval and contain
+  exact open, high, low, close, volume, start/end times, bar version, and the
+  source observation sequence that made them available. The stream never includes
+  a forming script candle. Built-In does not use script candles, so this stream
+  is empty for Built-In.
+
+`events` accepts the same paging arguments except `kind`. Each event links to
+the source `observationSequence` and, when applicable, `evaluationSequence`.
+`strategyProposal` is the actual decision from the strategy adapter before host
+risk handling; `decision` is the final host decision. `riskOverride` explains
+host intervention. A risk check can preempt the strategy entirely, in which case
+`strategyEvaluated` is false and no proposal is invented. `scriptEvaluated`
+distinguishes a new script calculation from waiting for another completed bar.
+Only the event that actually ran the script embeds `scriptEvaluation`; waiting
+events can reference its evaluation sequence. Orders, fills, and account state
+remain attached to their actual processing event.
+
+`indicators` accepts optional `sessionId` and returns the pinned strategy
+identity, the latest actual evaluation, and `currentWarmup`. For scripts, warmup
+reports required/retained/remaining bars, readiness, monotonic completed-bar
+count, bar version, and the retained history start. A gap can reset the history
+used for warmup even though the completed-bar count continues increasing. Input
+defaults are included in the pinned strategy identity. Named script values cover
+definitions/plots actually evaluated by the interpreter; an unused or unreached
+expression is not calculated just for inspection. The indicator list is limited
+to 64 declarations and reports its total count and truncation. Values carry
+`available`, `unavailable`, `warming_up`, or `not_evaluated` state; unavailable
+values stay null.
+The pinned metadata includes the source hash, runtime, inputs, and candle
+interval; the full source remains in `results` instead of being duplicated here.
+An indicator snapshot exceeding 900 KiB returns warmup/timing metadata with
+`omitted: true` and an explanation.
+The latest evaluation can precede the newest source observation or current
+warmup state when the engine is waiting or host risk handling preempts it.
+Built-In reports its own RSI/momentum values and warmup state separately.
+
+Both page tools return `records`, `nextSequence`, `hasMore`,
+`firstAvailableSequence`, `truncated`, and `sessionId`. Pass `nextSequence` as
+the next request's `afterSequence` and keep the same session ID. A mismatched
+session ID fails instead of mixing runs. Each stream retains at most 4,096
+records and 12 MiB in memory; pages also have a 600 KiB record-data limit, so a
+page may contain fewer than `limit` records. An individual oversized record is
+replaced with an explicit `omitted` placeholder. `truncated` means the requested
+cursor predates the retained window. Completion preserves the window; a new
+simulation replaces it. These pages are not an unbounded journal export.
+Pause Replay while collecting a stable comparison across tools.
+
+For example, inspect a paused run using the same retained session ID:
+
+```powershell
+$sessionId = (& $control --command results | ConvertFrom-Json).result.sessionId
+$pageArgs = @{ kind = 'strategy'; afterSequence = 0; limit = 50; sessionId = $sessionId } | ConvertTo-Json -Compress
+& $control --command candles --arguments $pageArgs
+$readArgs = @{ sessionId = $sessionId } | ConvertTo-Json -Compress
+& $control --command indicators --arguments $readArgs
+& $control --command events --arguments $readArgs
+```
+
+`capture_chart` accepts optional `maxWidth` and `maxHeight`. Their default and
+maximum values are 1280 and 900 pixels; both must be positive. The app preserves
+aspect ratio and may reduce the image further to meet its transport byte limit.
+The capture contains the actual chart visual, including its independently
+selected candle interval and RSI panel, rather than surrounding account panels
+or desktop windows. Metadata identifies the capture time, session, symbol,
+visible time range, chart interval, RSI period/value, and dimensions.
+
+MCP returns a native image content block and separate structured metadata; it
+does not duplicate the base64 image in its text or structured response. The JSON
+CLI returns the PNG as base64 in `result.data` with `result.mimeType`. Chart RSI
+can use a different period and interval from the script's indicators, and the
+image can include forming/display candles. Use `candles` and `indicators` for
+exact strategy inputs; use captures to check drawing, clipping, and labels.
+
 ## Testing limits
+
+The [MCP research validation](automation-research-validation-2026-09-06.md)
+records exact candle aggregation, indicator warmup, event correlation, host
+risk overrides, and native chart captures against the running app.
 
 The [September 6 MCP Replay validation](automation-validation-2026-09-06.md)
 records ten passing test groups against the running desktop app, including risk

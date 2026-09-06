@@ -44,7 +44,7 @@ public sealed partial class MainViewModel
         {
             if (_disposed) return AutomationResponse.Fail("closed", "The application is closed.");
             string command = request.Command;
-            bool readOnly = command is "status" or "results" ||
+            bool readOnly = command is "status" or "results" or "candles" or "indicators" or "events" or "capture_chart" ||
                             command == "strategies" && !ReadArguments<StrategyArguments>(request).Refresh;
             if (!readOnly)
             {
@@ -64,6 +64,14 @@ public sealed partial class MainViewModel
                 case "results":
                     ReadArguments<EmptyArguments>(request);
                     return AutomationResponse.Ok(AutomationResults());
+                case "candles":
+                    return ReadAutomationCandles(ReadArguments<CandleArguments>(request));
+                case "indicators":
+                    return ReadAutomationIndicators(ReadArguments<ResearchArguments>(request));
+                case "events":
+                    return ReadAutomationEvents(ReadArguments<ResearchPageArguments>(request));
+                case "capture_chart":
+                    return CaptureAutomationChart(request.Arguments);
                 case "strategies":
                     StrategyArguments scripts = ReadArguments<StrategyArguments>(request);
                     if (scripts.Refresh)
@@ -351,6 +359,7 @@ public sealed partial class MainViewModel
 
     private void CaptureAutomationSession()
     {
+        RecordAutomationChartSession();
         if (_activeSession?.Mode is not (TradingMode.Replay or TradingMode.PaperTrader)) return;
         _automationSession = _activeSession;
         _automationOperationSessionId = _automationOperationId.HasValue ? _activeSession.Id : null;
@@ -361,11 +370,13 @@ public sealed partial class MainViewModel
         _automationTotalObservations = 0;
         _automationDecisions.Clear();
         _automationFills.Clear();
+        ResetAutomationResearch();
         if (_automationOperationId.HasValue) _automationOperationState = "running";
     }
 
     private void CaptureAutomationDecision(PaperTradeResult result)
     {
+        CaptureAutomationResearchDecision(result);
         _automationAccount = result.Account;
         _automationDecisions.Enqueue(result.Decision);
         if (_automationDecisions.Count > AutomationResultLimit) _automationDecisions.Dequeue();

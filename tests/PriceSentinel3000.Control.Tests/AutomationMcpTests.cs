@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using ModelContextProtocol.Client;
+using ModelContextProtocol.Protocol;
 using PriceSentinel3000.Application.Automation;
 using PriceSentinel3000.Infrastructure.Automation;
 
@@ -30,8 +31,15 @@ public sealed class AutomationMcpTests
         }), cancellationToken: timeout.Token);
 
         var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
-        Assert.Equal(new[] { "configure", "list_strategies", "pause", "results", "resume", "run_to_end", "start", "status", "step", "stop" },
+        Assert.Equal(new[] { "candles", "capture_chart", "configure", "events", "indicators", "list_strategies", "pause", "results", "resume", "run_to_end", "start", "status", "step", "stop" },
             tools.Select(tool => tool.Name).OrderBy(name => name));
+        foreach (string name in new[] { "candles", "indicators", "events", "capture_chart" })
+        {
+            Assert.True(tools.Single(tool => tool.Name == name).ProtocolTool.Annotations!.ReadOnlyHint);
+        }
+        Assert.Equal(new[] { "strategy", "source" }, tools.Single(tool => tool.Name == "candles")
+            .JsonSchema.GetProperty("properties").GetProperty("kind").GetProperty("enum")
+            .EnumerateArray().Select(value => value.GetString()));
 
         var status = await client.CallToolAsync("status", cancellationToken: timeout.Token);
         Assert.False(status.IsError);
@@ -69,9 +77,113 @@ public sealed class AutomationMcpTests
         Assert.True(invalidMode.IsError);
         Assert.Equal(countBeforeInvalidMode, requests.Count);
 
+        await client.CallToolAsync("candles", new Dictionary<string, object?>
+        {
+            ["kind"] = "source",
+            ["afterSequence"] = 4_000_000_000L,
+            ["limit"] = 25,
+            ["sessionId"] = "simulation-one",
+        }, cancellationToken: timeout.Token);
+        var candles = requests.Last();
+        Assert.Equal("candles", candles.Command);
+        Assert.Equal("source", candles.Arguments.GetProperty("kind").GetString());
+        Assert.Equal(4_000_000_000L, candles.Arguments.GetProperty("afterSequence").GetInt64());
+        Assert.Equal(25, candles.Arguments.GetProperty("limit").GetInt32());
+        Assert.Equal("simulation-one", candles.Arguments.GetProperty("sessionId").GetString());
+
+        await client.CallToolAsync("candles", cancellationToken: timeout.Token);
+        Assert.Equal("strategy", requests.Last().Arguments.GetProperty("kind").GetString());
+        Assert.Equal(0, requests.Last().Arguments.GetProperty("afterSequence").GetInt64());
+        Assert.Equal(50, requests.Last().Arguments.GetProperty("limit").GetInt32());
+        Assert.False(requests.Last().Arguments.TryGetProperty("sessionId", out _));
+
+        await client.CallToolAsync("indicators", cancellationToken: timeout.Token);
+        Assert.Equal("indicators", requests.Last().Command);
+        Assert.Empty(requests.Last().Arguments.EnumerateObject());
+
+        await client.CallToolAsync("events", new Dictionary<string, object?>
+        {
+            ["afterSequence"] = 100,
+            ["limit"] = 10,
+            ["sessionId"] = "simulation-one",
+        }, cancellationToken: timeout.Token);
+        Assert.Equal("events", requests.Last().Command);
+        Assert.Equal(100, requests.Last().Arguments.GetProperty("afterSequence").GetInt64());
+        Assert.Equal(10, requests.Last().Arguments.GetProperty("limit").GetInt32());
+        Assert.Equal("simulation-one", requests.Last().Arguments.GetProperty("sessionId").GetString());
+
+        int countBeforeInvalidKind = requests.Count;
+        var invalidKind = await client.CallToolAsync("candles", new Dictionary<string, object?>
+        {
+            ["kind"] = "future",
+        }, cancellationToken: timeout.Token);
+        Assert.True(invalidKind.IsError);
+        Assert.Equal(countBeforeInvalidKind, requests.Count);
+
         var stop = await client.CallToolAsync("stop", cancellationToken: timeout.Token);
         Assert.True(stop.IsError);
         Assert.Equal("invalid_state", stop.StructuredContent!.Value.GetProperty("errorCode").GetString());
+    }
+
+    [Fact]
+    public async Task ChartCaptureReturnsNativeMcpImageWithMetadataAndPreservesAppErrors()
+    {
+        const string png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0V8AAAAASUVORK5CYII=";
+        string pipeName = $"PriceSentinel3000.McpTests.{Guid.NewGuid():N}";
+        var requests = new ConcurrentQueue<AutomationRequest>();
+        await using var app = new AutomationPipeServer((request, _) =>
+        {
+            requests.Enqueue(request);
+            return Task.FromResult(request.Arguments.TryGetProperty("maxWidth", out var width) && width.GetInt32() == 0
+                ? AutomationResponse.Fail("invalid_arguments", "maxWidth must be positive.")
+                : AutomationResponse.Ok(new
+                {
+                    data = png,
+                    mimeType = "image/png",
+                    width = 1,
+                    height = 1,
+                    sessionId = "chart-session",
+                    candleIntervalSeconds = 15,
+                    rsiLatestValue = 57.712345m,
+                }));
+        }, pipeName);
+        app.Start();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        await using var client = await McpClient.CreateAsync(new StdioClientTransport(new StdioClientTransportOptions
+        {
+            Command = "dotnet",
+            Arguments = [typeof(Program).Assembly.Location, "--mcp", "--pipe", pipeName],
+            Name = "PriceSentinel3000 image test bridge",
+        }), cancellationToken: timeout.Token);
+
+        var captured = await client.CallToolAsync("capture_chart", new Dictionary<string, object?>
+        {
+            ["maxWidth"] = 800,
+            ["maxHeight"] = 600,
+        }, cancellationToken: timeout.Token);
+        Assert.False(captured.IsError);
+        Assert.Equal("capture_chart", requests.Last().Command);
+        Assert.Equal(800, requests.Last().Arguments.GetProperty("maxWidth").GetInt32());
+        Assert.Equal(600, requests.Last().Arguments.GetProperty("maxHeight").GetInt32());
+        var image = Assert.Single(captured.Content.OfType<ImageContentBlock>());
+        Assert.Equal("image/png", image.MimeType);
+        Assert.Equal(Convert.FromBase64String(png), image.DecodedData.ToArray());
+        var metadata = captured.StructuredContent!.Value.GetProperty("result");
+        Assert.False(metadata.TryGetProperty("data", out _));
+        Assert.Equal("chart-session", metadata.GetProperty("sessionId").GetString());
+        Assert.Equal(57.712345m, metadata.GetProperty("rsiLatestValue").GetDecimal());
+        Assert.DoesNotContain(png, Assert.Single(captured.Content.OfType<TextContentBlock>()).Text);
+
+        await client.CallToolAsync("capture_chart", cancellationToken: timeout.Token);
+        Assert.Empty(requests.Last().Arguments.EnumerateObject());
+
+        var rejected = await client.CallToolAsync("capture_chart", new Dictionary<string, object?>
+        {
+            ["maxWidth"] = 0,
+        }, cancellationToken: timeout.Token);
+        Assert.True(rejected.IsError);
+        Assert.Empty(rejected.Content.OfType<ImageContentBlock>());
+        Assert.Equal("invalid_arguments", rejected.StructuredContent!.Value.GetProperty("errorCode").GetString());
     }
 
     public static TheoryData<string[]> InvalidInvocations => new()
@@ -96,4 +208,12 @@ public sealed class AutomationMcpTests
         Assert.Equal("strategies", options.Command);
         Assert.True(options.Arguments.GetProperty("refresh").GetBoolean());
     }
+
+    [Theory]
+    [InlineData("candles")]
+    [InlineData("indicators")]
+    [InlineData("events")]
+    [InlineData("capture_chart")]
+    public void CliAcceptsResearchCommands(string command) =>
+        Assert.Equal(command, ControlOptions.Parse(["--command", command]).Command);
 }

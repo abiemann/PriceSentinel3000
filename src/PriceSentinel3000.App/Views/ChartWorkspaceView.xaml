@@ -9,7 +9,8 @@
             <RowDefinition Height="120" />
         </Grid.RowDefinitions>
 
-        <Border Padding="12"
+        <Border x:Name="ChartCard"
+                Padding="12"
                 Style="{StaticResource CardStyle}">
             <Grid>
                 <Grid.RowDefinitions>
@@ -79,7 +80,8 @@
                         BorderThickness="1"
                         CornerRadius="8">
                     <Grid>
-                        <controls:PriceChart Margin="1"
+                        <controls:PriceChart x:Name="Chart"
+                                             Margin="1"
                                              CandleIntervalSeconds="{Binding ChartCandleIntervalSeconds}"
                                              IsManualScale="{Binding IsChecked, ElementName=ChartScaleToggle}"
                                              Points="{Binding ChartPoints}"

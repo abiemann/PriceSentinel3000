@@ -226,7 +226,7 @@
                 </StackPanel>
             </ScrollViewer>
 
-            <views:ChartWorkspaceView Grid.Column="2" />
+            <views:ChartWorkspaceView x:Name="ChartWorkspace" Grid.Column="2" />
             <views:SessionSidebarView Grid.Column="4" />
         </Grid>
 

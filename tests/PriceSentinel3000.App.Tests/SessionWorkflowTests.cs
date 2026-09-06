@@ -143,7 +143,7 @@ public sealed partial class SessionWorkflowTests(WpfTestHost host) : IClassFixtu
         buffer.Merge([trigger with { Bid = 0m, Ask = 0m }]);
         buffer.Merge([trigger with { SourceTimestampUtc = trigger.SourceTimestampUtc.AddSeconds(15), Bid = 0m, Ask = 0m, Last = 90m }]);
 
-        workspace.Invoke("ProcessPaperObservation", trigger, false);
+        workspace.Invoke("ProcessPaperObservation", trigger, false, null!);
 
         Assert.True(workspace.Get<decimal>("_paperPositionQuantity") > 0m);
         Assert.Equal(trigger.Ask, workspace.Get<decimal>("_paperAveragePrice"));
@@ -156,7 +156,7 @@ public sealed partial class SessionWorkflowTests(WpfTestHost host) : IClassFixtu
         workspace.Prepare();
         MarketQuote[] quotes = BottomPattern(workspace.Clock.Now.AddMinutes(-3));
         workspace.Get<PriceRingBuffer>("_ringBuffer").Merge(quotes);
-        workspace.Invoke("ProcessPaperObservation", quotes[^1], false);
+        workspace.Invoke("ProcessPaperObservation", quotes[^1], false, null!);
         Assert.Equal("MARKET CLOSED", workspace.ViewModel.StrategyStateLabel);
         Assert.Equal(0m, workspace.Get<decimal>("_paperPositionQuantity"));
     });
@@ -167,7 +167,7 @@ public sealed partial class SessionWorkflowTests(WpfTestHost host) : IClassFixtu
         await using var workspace = new TestWorkspace();
         workspace.Prepare();
         MarketQuote invalid = BottomPattern(workspace.Clock.Now)[^1] with { Last = 0m };
-        TargetInvocationException exception = Assert.Throws<TargetInvocationException>(() => workspace.Invoke("ProcessPaperObservation", invalid, false));
+        TargetInvocationException exception = Assert.Throws<TargetInvocationException>(() => workspace.Invoke("ProcessPaperObservation", invalid, false, null!));
         Assert.IsType<InvalidOperationException>(exception.InnerException);
     });
 
@@ -290,7 +290,7 @@ public sealed partial class SessionWorkflowTests(WpfTestHost host) : IClassFixtu
         chart.Merge(quotes);
         workspace.Invoke("RefreshMarketView");
         int originalCount = vm.ChartPoints.Count;
-        workspace.Invoke("ProcessPaperObservation", quotes[^1], false);
+        workspace.Invoke("ProcessPaperObservation", quotes[^1], false, null!);
         workspace.Invoke("RefreshMarketView");
         Assert.Equal(ChartTradeMarker.Buy, vm.ChartPoints[^1].Marker);
 

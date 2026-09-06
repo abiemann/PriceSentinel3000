@@ -25,6 +25,7 @@ public partial class MainWindow : Window
             MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
         InitializeComponent();
         DataContext = _viewModel;
+        _viewModel.AutomationChartCaptureRequested = ChartWorkspace.CaptureChart;
     }
 
     private ExistingLivePositionChoice ShowExistingLivePositionDialog(

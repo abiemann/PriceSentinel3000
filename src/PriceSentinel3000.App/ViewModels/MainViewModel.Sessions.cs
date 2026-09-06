@@ -439,13 +439,14 @@ public sealed partial class MainViewModel
                     "Robinhood returned historical bars, but the replay buffer could not accept them.");
             }
 
+            MarketQuote sourceObservation = replayed;
             if (_scriptSignalEngine is not null && _ringBuffer.IsValidQuote(replayed))
             {
                 _scriptSignalEngine.Bars.ObserveHistoricalBar(replayed);
                 // A historical candle's close is first available at its end.
                 replayed = replayed with { SourceTimestampUtc = replayed.SourceTimestampUtc.AddSeconds(15) };
             }
-            ProcessPaperObservation(replayed, allowHistoricalSource: true);
+            ProcessPaperObservation(replayed, allowHistoricalSource: true, source: sourceObservation);
             RefreshMarketView();
             string pacing = _replaySessionRunner.Fast
                 ? "without playback delays"
