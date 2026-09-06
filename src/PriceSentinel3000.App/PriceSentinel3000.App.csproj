@@ -23,4 +23,11 @@
     <Version Condition="'$(PriceSentinelPackageVersion)' == ''">1.0.0</Version>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Content Include="..\..\samples\strategies\OriginalConfirmation.thinkscript"
+             Link="Strategies\OriginalConfirmation.thinkscript"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

@@ -32,6 +32,7 @@ public sealed partial class MainViewModel
         _strategyStateLabel = result.Decision.State;
         _strategyMessage = result.Decision.Reasons.FirstOrDefault() ?? "Observing price action.";
         _strategyMetrics =
+            _scriptSignalEngine is not null ? ScriptMetrics :
             $"RSI {(result.Decision.SimpleRsi is null ? "--" : result.Decision.SimpleRsi.Value.ToString("0.0", CultureInfo.InvariantCulture))}" +
             $"  |  MOM {result.Decision.MomentumPercent:+0.000;-0.000;0.000}%" +
             $"  |  CONF {result.Decision.Confidence:P0}";

@@ -23,4 +23,7 @@ public static class AppDataPaths
 
     public static string UserPreferences =>
         Path.Combine(ApplicationDirectory, "preferences.json");
+
+    public static string StrategiesDirectory =>
+        Path.Combine(ApplicationDirectory, "Strategies");
 }

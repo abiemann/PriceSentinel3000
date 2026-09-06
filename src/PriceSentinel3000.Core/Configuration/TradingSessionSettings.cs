@@ -20,6 +20,8 @@ public sealed record TradingSessionSettings
     public decimal StopLossValue { get; init; } = 1m;
     public int BufferMinutes { get; init; } = 7;
     public int QuotePollingSeconds { get; init; } = 5;
+    public string StrategyId { get; init; } = "builtin";
+    public int ScriptBarIntervalSeconds { get; init; } = 60;
     public int ChartCandleIntervalSeconds { get; init; } = 15;
     public int ReconciliationSeconds { get; init; } = 45;
     public int ReconciliationLookbackSeconds { get; init; } = 300;

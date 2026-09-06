@@ -36,6 +36,9 @@ public partial class TradingConfigurationPanel : UserControl
         UpdateConfigurationErrors();
     }
 
+    private void StrategySelector_DropDownOpened(object? sender, EventArgs e) =>
+        (DataContext as MainViewModel)?.RefreshScripts();
+
     private bool CommitInputs()
     {
         foreach (TextBox input in FindInputs(SessionInputs).Where(input => input.IsEnabled))

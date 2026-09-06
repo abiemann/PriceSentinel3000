@@ -89,6 +89,7 @@ public sealed partial class MainViewModel
 
         try
         {
+            PinSelectedStrategy(settings, EffectiveMode);
             if (EffectiveMode is TradingMode.Replay)
             {
                 await StartReplayAsync(instrument, settings, cancellationToken);
@@ -229,6 +230,7 @@ public sealed partial class MainViewModel
             _liveExecutionEngine = new(
                 sessionSettings,
                 dailyStartingEquity,
+                strategy: CreateSessionSignalEngine(sessionSettings),
                 initialEntriesToday: initialEntriesToday,
                 initialLastExitUtc: latestSell?.UpdatedAtUtc,
                 initialLastExitPrice: latestSell?.EffectiveAveragePrice,
@@ -277,6 +279,11 @@ public sealed partial class MainViewModel
         }
         TimeSpan warmStart = GetMaximumChartHistoryDuration(
             settings.BufferMinutes);
+        if (_pinnedStrategy?.Program is { } program)
+        {
+            warmStart = TimeSpan.FromSeconds(Math.Max(warmStart.TotalSeconds,
+                (program.RequiredWarmupBars + 2) * settings.ScriptBarIntervalSeconds));
+        }
         _marketDataRequest = new(
             instrument,
             TimeSpan.FromSeconds(settings.QuotePollingSeconds),
@@ -319,6 +326,7 @@ public sealed partial class MainViewModel
             }
 
             SetQuoteMarketState(update.Quote);
+            ObserveScriptQuote(update.Quote, isFirstUpdate ? update.WarmStart : null);
             if (isLive)
             {
                 await ProcessLiveObservationAsync(update.Quote, token);
@@ -429,6 +437,12 @@ public sealed partial class MainViewModel
                     "Robinhood returned historical bars, but the replay buffer could not accept them.");
             }
 
+            if (_scriptSignalEngine is not null && _ringBuffer.IsValidQuote(replayed))
+            {
+                _scriptSignalEngine.Bars.ObserveHistoricalBar(replayed);
+                // A historical candle's close is first available at its end.
+                replayed = replayed with { SourceTimestampUtc = replayed.SourceTimestampUtc.AddSeconds(15) };
+            }
             ProcessPaperObservation(replayed, allowHistoricalSource: true);
             RefreshMarketView();
             StatusMessage =
@@ -458,7 +472,7 @@ public sealed partial class MainViewModel
             GetMaximumChartHistoryDuration(settings.BufferMinutes));
         _paperTradingEngine = mode is TradingMode.Live
             ? null
-            : new(instrument, settings);
+            : new(instrument, settings, CreateSessionSignalEngine(settings));
         _liveOrderCoordinator.Reset();
 
         if (mode is not TradingMode.Live)
@@ -490,6 +504,7 @@ public sealed partial class MainViewModel
         OnPropertyChanged(nameof(BidAskDisplay));
 
         var settingsNode = JsonSerializer.SerializeToNode(settings)!;
+        AddStrategyProvenance(settingsNode, settings);
         if (mode is TradingMode.Live)
         {
             settingsNode["LiveAccountNumber"] = _liveAccount!.AccountNumber;

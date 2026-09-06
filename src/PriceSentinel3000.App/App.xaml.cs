@@ -3,6 +3,7 @@ using PriceSentinel3000.App.Dialogs;
 using PriceSentinel3000.App.ViewModels;
 using PriceSentinel3000.Infrastructure.MarketData;
 using PriceSentinel3000.Infrastructure.Storage;
+using PriceSentinel3000.Infrastructure.Strategies;
 
 namespace PriceSentinel3000.App;
 
@@ -21,7 +22,8 @@ public partial class App : System.Windows.Application
             robinhoodGateway,
             new SqliteTradingJournal(AppDataPaths.JournalDatabase),
             new JsonUserPreferencesStore(AppDataPaths.UserPreferences),
-            TimeProvider.System);
+            TimeProvider.System,
+            FileSystemStrategyCatalog.CreateDefault());
         using var restoreCancellation =
             new CancellationTokenSource(TimeSpan.FromSeconds(15));
         bool restored = await viewModel.TryRestoreRobinhoodAtStartupAsync(

@@ -70,6 +70,23 @@ public static class TradingSessionSettingsValidator
             errors.Add("Chart candle interval must be 15, 30, 60, or 120 seconds.");
         }
 
+        if (string.IsNullOrWhiteSpace(settings.StrategyId))
+        {
+            errors.Add("Select Built-In or an available compatible script.");
+        }
+
+        if (settings.StrategyId != "builtin")
+        {
+            if (settings.ScriptBarIntervalSeconds is not (15 or 30 or 60 or 120 or 300))
+            {
+                errors.Add("Script candles must be 15, 30, 60, 120, or 300 seconds.");
+            }
+            else if (settings.QuotePollingSeconds > settings.ScriptBarIntervalSeconds)
+            {
+                errors.Add("Quote polling must be no slower than the script candle interval.");
+            }
+        }
+
         if (settings.ReconciliationSeconds is < 15 or > 300)
         {
             errors.Add("Historical reconciliation must be between 15 and 300 seconds.");

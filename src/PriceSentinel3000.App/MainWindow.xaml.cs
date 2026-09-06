@@ -18,6 +18,9 @@ public partial class MainWindow : Window
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _viewModel.ExistingLivePositionPrompt = ShowExistingLivePositionDialog;
         _viewModel.ExistingLivePositionWarning = ShowExistingLivePositionWarning;
+        _viewModel.ExternalScriptApprovalPrompt = message => MessageBox.Show(
+            this, message, "Review script for LIVE", MessageBoxButton.YesNo,
+            MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
         InitializeComponent();
         DataContext = _viewModel;
     }

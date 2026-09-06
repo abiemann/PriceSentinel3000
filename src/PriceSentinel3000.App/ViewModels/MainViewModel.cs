@@ -6,6 +6,7 @@ using System.Windows.Threading;
 using PriceSentinel3000.Application.Configuration;
 using PriceSentinel3000.Application.LiveTrading;
 using PriceSentinel3000.Application.Sessions;
+using PriceSentinel3000.Application.Strategies;
 using PriceSentinel3000.Core.Configuration;
 using PriceSentinel3000.Core.Journaling;
 using PriceSentinel3000.Core.LiveTrading;
@@ -104,7 +105,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
         IInstrumentSearchSource instrumentSearchSource,
         ITradingJournal journal,
         IUserPreferencesStore preferencesStore,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        IStrategyCatalog? strategyCatalog = null)
     {
         _marketDataSource = marketDataSource ??
             throw new ArgumentNullException(nameof(marketDataSource));
@@ -131,6 +133,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
 
         TradingSessionSettings defaults =
             _preferencesStore.Load() ?? TradingSessionSettings.Default;
+        _strategyCatalog = strategyCatalog ?? new BuiltInOnlyStrategyCatalog();
+        _selectedStrategyId = defaults.StrategyId ?? StrategyDescriptor.BuiltInId;
+        _scriptBarIntervalSeconds = defaults.ScriptBarIntervalSeconds;
         _symbol = defaults.Symbol;
         _startingBalance = defaults.StartingBalance;
         _tradesSettleImmediately = defaults.TradesSettleImmediately;
@@ -212,6 +217,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
             ExecuteSecondarySessionActionAsync,
             () => IsSessionRunning || _isStartingSession);
         ClearActivityLogCommand = new RelayCommand(ActivityLog.Clear);
+        RefreshScriptsCommand = new RelayCommand(RefreshScripts);
+        OpenScriptsFolderCommand = new RelayCommand(OpenScriptsFolder);
+        RefreshScripts();
 
         InitializeJournal();
         AddActivity("Application started with operating mode OFF.");
@@ -974,6 +982,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
         StopLossValue = StopLossValue,
         BufferMinutes = BufferMinutes,
         QuotePollingSeconds = QuotePollingSeconds,
+        StrategyId = SelectedStrategyId,
+        ScriptBarIntervalSeconds = ScriptBarIntervalSeconds,
         ChartCandleIntervalSeconds = ChartCandleIntervalSeconds,
         ReconciliationSeconds = ReconciliationSeconds,
         ReconciliationLookbackSeconds = ReconciliationLookbackSeconds,

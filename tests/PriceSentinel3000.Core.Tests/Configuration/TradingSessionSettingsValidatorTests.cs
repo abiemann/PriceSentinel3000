@@ -14,6 +14,29 @@ public sealed class TradingSessionSettingsValidatorTests
     }
 
     [Theory]
+    [InlineData(15, 15, true)]
+    [InlineData(15, 16, false)]
+    [InlineData(300, 60, true)]
+    [InlineData(10, 5, false)]
+    public void ExternalScriptInterval_RequiresSupportedCandlesAndSufficientPolling(int interval, int polling, bool valid)
+    {
+        var settings = TradingSessionSettings.Default with
+        {
+            StrategyId = "custom.thinkscript", ScriptBarIntervalSeconds = interval, QuotePollingSeconds = polling,
+        };
+        Assert.Equal(valid, TradingSessionSettingsValidator.Validate(settings).Count == 0);
+    }
+
+    [Fact]
+    public void BuiltIn_DefaultAndLegacyJsonRemainSelected()
+    {
+        TradingSessionSettings settings = System.Text.Json.JsonSerializer.Deserialize<TradingSessionSettings>("{\"Symbol\":\"SOFI\"}")!;
+        Assert.Equal("builtin", settings.StrategyId);
+        Assert.Equal(60, settings.ScriptBarIntervalSeconds);
+        Assert.Empty(TradingSessionSettingsValidator.Validate(settings));
+    }
+
+    [Theory]
     [InlineData("")]
     [InlineData("sofi")]
     [InlineData("BAD SYMBOL")]

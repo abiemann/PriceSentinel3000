@@ -13,7 +13,7 @@ using PriceSentinel3000.Core.Modes;
 
 namespace PriceSentinel3000.App.Tests;
 
-public sealed class SessionWorkflowTests(WpfTestHost host) : IClassFixture<WpfTestHost>
+public sealed partial class SessionWorkflowTests(WpfTestHost host) : IClassFixture<WpfTestHost>
 {
     [Fact]
     public Task Startup_EnablesStopAndLocksInputsBeforeConnectionCompletes() => host.RunAsync(async () =>

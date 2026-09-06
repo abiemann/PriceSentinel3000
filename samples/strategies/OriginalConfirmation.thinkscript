@@ -1,0 +1,31 @@
+# OriginalConfirmation - PriceSentinel3000 original example, 2026-09-05.
+# Educational long-only trend/pullback strategy; no profitability claim.
+# PriceSentinel evaluates this on completed one-minute bars.
+# Periods below count bars, not days. The host determines order size/fills
+# and retains its position, stop-loss, daily-loss, and re-entry protections.
+#
+# Entry: EMA8 is above a non-falling EMA21; price recovers above EMA8 after
+# closing at/below it; RSI7 is at least 50 and rising. All must agree.
+# Exit: close falls below EMA21, EMA8 falls below EMA21, or RSI7 falls below 45.
+# Exits can realize a loss. This script does not promise a profitable exit.
+#
+# These are starting parameters for replay inspection, not fitted parameters.
+input fastLength = 8;
+input slowLength = 21;
+input momentumLength = 7;
+input entryStrength = 50;
+input exitStrength = 45;
+
+def fastTrend = ExpAverage(close, fastLength);
+def slowTrend = ExpAverage(close, slowLength);
+def strength = RSI(length = momentumLength, price = close);
+
+def trendUp = fastTrend > slowTrend and slowTrend >= slowTrend[1];
+def recoveredFast = close > fastTrend and close[1] <= fastTrend[1];
+def strengthImproving = strength >= entryStrength and strength > strength[1];
+
+def enterLong = trendUp and recoveredFast and strengthImproving;
+def exitLong = close < slowTrend or fastTrend < slowTrend or strength < exitStrength;
+
+AddOrder(OrderType.BUY_TO_OPEN, enterLong, name = "Trend pullback entry");
+AddOrder(OrderType.SELL_TO_CLOSE, exitLong, name = "Trend or momentum exit");

@@ -2,6 +2,7 @@ using System.IO;
 using System.Reflection;
 using PriceSentinel3000.App.ViewModels;
 using PriceSentinel3000.Application.Configuration;
+using PriceSentinel3000.Application.Strategies;
 using PriceSentinel3000.Core.Configuration;
 using PriceSentinel3000.Core.LiveTrading;
 using PriceSentinel3000.Core.MarketData;
@@ -12,10 +13,10 @@ namespace PriceSentinel3000.App.Tests;
 
 internal sealed class TestWorkspace : IAsyncDisposable
 {
-    public TestWorkspace()
+    public TestWorkspace(IStrategyCatalog? strategyCatalog = null, TradingSessionSettings? preferences = null)
     {
         Journal = new SqliteTradingJournal(Path.Combine(Path.GetTempPath(), $"pricesentinel-ui-{Guid.NewGuid():N}.db"));
-        ViewModel = new(Broker, Broker, Broker, Broker, Journal, new Preferences(), Clock);
+        ViewModel = new(Broker, Broker, Broker, Broker, Journal, new Preferences(preferences), Clock, strategyCatalog);
     }
 
     public FakeBroker Broker { get; } = new();
@@ -52,9 +53,9 @@ internal sealed class TestWorkspace : IAsyncDisposable
         }
     }
 
-    private sealed class Preferences : IUserPreferencesStore
+    private sealed class Preferences(TradingSessionSettings? settings) : IUserPreferencesStore
     {
-        public TradingSessionSettings? Load() => TradingSessionSettings.Default;
+        public TradingSessionSettings? Load() => settings ?? TradingSessionSettings.Default;
         public bool Save(TradingSessionSettings settings) => true;
     }
 }
@@ -68,6 +69,8 @@ internal sealed class TestClock : TimeProvider
 internal sealed class FakeBroker : IMarketDataSource, ICachedAuthenticationMarketDataSource, IInstrumentSearchSource, ILiveBrokerGateway
 {
     public bool HoldConnection { get; set; }
+    public IReadOnlyList<MarketQuote> History { get; set; } = [];
+    public IReadOnlyList<MarketQuote> ReplayHistory { get; set; } = [];
     public int Connections { get; private set; }
     public BrokerAccount Account { get; } = new("test-account", true, true, "individual");
     public BrokerPortfolio Portfolio { get; set; } = new(10_000m, 0m, 10_000m, 10_000m, "USD");
@@ -82,9 +85,9 @@ internal sealed class FakeBroker : IMarketDataSource, ICachedAuthenticationMarke
         return HoldConnection ? Task.Delay(Timeout.Infinite, cancellationToken) : Task.CompletedTask;
     }
 
-    public Task<IReadOnlyList<MarketQuote>> GetHistoryAsync(MarketDataRequest request, DateTimeOffset fromUtc, DateTimeOffset throughUtc, DateTimeOffset observedAtUtc, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<MarketQuote>>([]);
+    public Task<IReadOnlyList<MarketQuote>> GetHistoryAsync(MarketDataRequest request, DateTimeOffset fromUtc, DateTimeOffset throughUtc, DateTimeOffset observedAtUtc, CancellationToken cancellationToken) => Task.FromResult(History);
     public Task<MarketQuote> GetQuoteAsync(MarketDataRequest request, DateTimeOffset observedAtUtc, CancellationToken cancellationToken) => Task.FromResult(new MarketQuote(request.Instrument, observedAtUtc, observedAtUtc, 9.99m, 10.01m, 10m, 0m));
-    public Task<IReadOnlyList<MarketQuote>> GetReplayHistoryAsync(Instrument instrument, DateTimeOffset fromUtc, DateTimeOffset throughUtc, DateTimeOffset observedAtUtc, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<MarketQuote>>([]);
+    public Task<IReadOnlyList<MarketQuote>> GetReplayHistoryAsync(Instrument instrument, DateTimeOffset fromUtc, DateTimeOffset throughUtc, DateTimeOffset observedAtUtc, CancellationToken cancellationToken) => Task.FromResult(ReplayHistory);
     public Task<IReadOnlyList<InstrumentSearchResult>> SearchAsync(string query, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<InstrumentSearchResult>>([]);
     public Task<BrokerAccount> GetAgenticAccountAsync(CancellationToken cancellationToken) => Task.FromResult(Account);
     public Task<BrokerPortfolio> GetPortfolioAsync(string accountNumber, CancellationToken cancellationToken) => Task.FromResult(Portfolio);
