@@ -220,3 +220,66 @@ with decision-equivalence tests.
 Future work includes arbitrary C# plugins, secondary timeframes and external data,
 volume-aware authoritative bars, richer indicator studies, and strategy pipelines.
 Those capabilities must not be implied by a successful v1 compatibility check.
+
+## Local automation and MCP control
+
+Expose the running desktop application's Replay and Paper workflows through a
+local control interface. This allows an assistant to reproduce the manual test
+sequence without relying on timely mouse clicks. The existing Robinhood MCP
+client remains the market-data/broker adapter; the new interface makes
+PriceSentinel itself an MCP server through a small companion executable.
+
+Launch the desktop app with `--automation` to opt in. A current-Windows-user-only
+named pipe connects the companion to that exact app instance. The app owns the
+pipe exclusively; a second instance cannot silently replace its target. An
+explicit pipe name can isolate separate test instances. There is no listening
+TCP port, automatic app launch, or credential exchange through this interface.
+The visible window identifies that automation is enabled. Closing it stops the
+server before disposing the session and journal.
+
+The companion supports both MCP over standard input/output and a JSON command
+line interface. Both transports use the same bounded request/response protocol.
+Commands execute on the WPF dispatcher against the existing view model and
+session engines, so automated actions update the visible controls and chart.
+They do not create a second account or a separate strategy implementation.
+
+Supported operations are status, strategy discovery/refresh, validated idle
+configuration, start, pause, resume, one-observation step, explicit stop,
+Replay run-to-end, and structured results. Configuration is checked before any
+settings are applied. Startup returns an operation identifier promptly; callers
+then inspect status for readiness, failure, pause, or completion. An accepted
+start request is not a claim that historical data has finished loading.
+
+Automation mutations are restricted to Replay and Paper. Reject them whenever
+the selected, effective, or active session is LIVE, including attempts to stop
+or change that session. Do not expose LIVE selection, risk acknowledgments,
+arming, broker orders, login secrets, or arbitrary code/method invocation.
+Existing host sizing, entry limits, stop loss, daily loss, source validation,
+script pinning, and journal rules also apply to automated sessions.
+
+Replay can pause after a requested number of additional observations or completed
+strategy candles. Check the boundary inside the processing loop after the
+observation, strategy evaluation, fills, and journal writes finish, before the
+next observation. A step consumes exactly one source observation and pauses again
+unless that was the final observation. Pause and Stop have explicit meanings,
+independent of the overloaded button actions used in the interactive UI.
+
+An optional fast Replay removes playback delays, preserving chronological source
+events and their timestamps. It must still process every observation and yield
+to the UI so status, pause, stop, and closing remain responsive. Paper continues
+to use real market data at real-world speed. Historical-data loading and source
+availability are separate from Replay pacing.
+
+Structured results include the operation/session identity, progress counts,
+strategy provenance, numeric paper account state, journal summary, and bounded
+decision/fill records. Preserve the completed session's results for inspection.
+Expose failures explicitly rather than treating a rejected or missing strategy
+as a successful run. Repeatability comparisons use the same settings, source
+history, and pinned strategy; MCP does not imply that separately fetched history
+is identical or prove that WPF pixels render correctly.
+
+Verification covers protocol framing/disconnects, duplicate ownership, invalid
+configuration, LIVE rejection, startup cancellation, exact pause/step boundaries,
+normal-versus-fast Replay equivalence, completed-result retention, and an actual
+MCP client round trip. Use fake market/broker ports for automated tests; inspect
+the connected visible app separately for the final control smoke test.
