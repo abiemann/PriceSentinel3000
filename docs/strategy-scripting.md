@@ -18,7 +18,11 @@ Refresh reads and compiles source without evaluating it. A session pins the comp
 
 ## Data and order timing
 
-Periods count **completed strategy candles**, not calendar days. Select 15, 30, 60, 120, or 300 seconds; the default is 60 seconds. Warm-start candles are aggregated from available consecutive 15-second historical OHLC observations. Subsequent candles use sampled live quote prices, so their highs and lows describe observed samples and may differ from a venue's full trade feed. Replay uses its available historical OHLC candles.
+Periods count **completed strategy candles**, not calendar days. Select 15, 30, 60, 120, or 300 seconds; the default is 60 seconds. Paper/LIVE warm-start candles are aggregated from available consecutive 15-second historical OHLC observations. Subsequent candles use sampled live quote prices, so their highs and lows describe observed samples and may differ from a venue's full trade feed.
+
+Replay tries 15-second, then 30-second, then one-minute history for the requested range, advancing only when no usable complete source candles remain. It keeps the first usable resolution for the whole run, including any gaps. The script interval must be an exact multiple of that source interval; an incompatible selection blocks startup rather than changing the script's timing. Chart choices are filtered independently to compatible intervals. Session Status and MCP report the actual source duration. See [Replay workflow](../README.md#replay-workflow).
+
+Historical OHLC becomes available at the source candle's close. Replay checks risk and simulates fills at that close; it does not invent intrabar prices or infer when a stop was crossed within a candle. A one-minute script can aggregate complete 15-second source candles, but one- or two-minute sources cannot supply a 15-second script. Changing source resolution can change observed risk and fills; changing the strategy interval also changes the time represented by indicator periods.
 
 An incomplete startup candle is excluded. Gaps reset the continuous history and restart warmup. Delayed chart corrections do not rewrite the frozen strategy history or retroactively create signals. The host evaluates each newly completed candle once, after its end is available to the triggering observation. Execution uses the current eligible quote and existing host rules.
 
@@ -78,7 +82,9 @@ thinkorswim can prefetch data beyond the visible history. This runtime uses only
 
 `AddOrder(type, condition, price = open[-1], tradeSize = 1, tickColor = Color.MAGENTA, arrowColor = Color.MAGENTA, name = "Script signal")` accepts the long-only order types above. Only the condition proposes an action. Literal names become proposal reasons. Price, quantity, dynamic names, and colors are ignored with a warning; their expressions must still pass capability/history validation. Price and quantity arguments must be numeric expressions.
 
-`plot` values are available in the evaluation result, but the application does not render custom script plots. Supported visual statements are checked for recognized targets, argument signatures, identifiers, and expression/history restrictions, then ignored with a warning:
+`plot` values are available in the evaluation result, but the application does not render custom script plots. MCP's [indicator telemetry](automation.md) exposes up to 64 `def`/`plot` declarations with `available`, `unavailable`, `warming_up`, or `not_evaluated` states. Inspection does not evaluate unused expressions merely to obtain values; a missing value is not zero.
+
+Supported visual statements are checked for recognized targets, argument signatures, identifiers, and expression/history restrictions, then ignored with a warning:
 
 - Plot methods: `SetDefaultColor(color)`, `AssignValueColor(color)`, `SetPaintingStrategy(paintingStrategy)`, `SetLineWeight(weight)`, `SetStyle(curve)`, `SetHiding(condition)`, `Hide()`, `HideBubble()`, `HideTitle()`.
 - `AddLabel(visible, text, color = Color.RED)`.

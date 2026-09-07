@@ -13,6 +13,7 @@ and guarded live execution of a user-selected stock or ETF.
 See [Architecture](docs/architecture.md) for the project boundaries, runtime
 flows, and LIVE safety invariants. Security concerns should follow the private
 reporting guidance in [Security](SECURITY.md).
+Pending work is tracked in [TODO](TODO.md).
 
 For assistant-driven Replay and Paper tests, see [Local app control](docs/automation.md).
 The optional MCP/CLI companion controls the visible app and supports exact Replay
@@ -68,9 +69,10 @@ execution path to the authenticated Robinhood data foundation:
 
 - OFF / Replay / Paper Trader / LIVE rotary mode selection, with OFF at startup
 - Paper Trader polls real Robinhood quotes at the configured interval, evaluates
-  a deterministic reactionary strategy, and can never submit a real order
+  the selected Built-In or folder script strategy, and can never submit a real order
 - Warm-start history covers the chart window plus the RSI(14) lookback required
-  by every selectable candle interval; configurable delayed-lookback
+  by every selectable chart candle interval, expanding for a selected script's
+  warmup when needed; configurable delayed-lookback
   reconciliation uses real 15-second Robinhood equity bars
 - Replay accepts a ticker plus an exact local date/time and tries 15-second,
   30-second, then one-minute history until usable data is returned. It preserves
@@ -78,12 +80,13 @@ execution path to the authenticated Robinhood data foundation:
   captured chart and paper-account state
 - Replay local start/end range (up to 24 hours) and playback speed (1x-100x)
   are tunable
-- A tunable 5-15 minute rolling buffer is analyzed as individual one-minute
-  blocks and as a whole; the strategy retains at least 16 observations for RSI
-  when slow polling would otherwise leave too little history
-- Bottom detection combines a meaningful decline, lingering or separated
+- Built-In analyzes a tunable 5-15 minute rolling buffer as individual one-minute
+  blocks and as a whole, retaining at least 16 observations for RSI when slow
+  polling would otherwise leave too little history. Scripts use completed candles
+  at their selected strategy interval with their own indicator lookbacks
+- Built-In bottom detection combines a meaningful decline, lingering or separated
   low-zone touches, a confirmed positive turn, and simple-average RSI(14)
-- Peak detection combines open-position profit, repeated peak or pullback
+- Built-In peak detection combines open-position profit, repeated peak or pullback
   evidence, negative momentum, RSI context, and a five-minute profitable-stall exit
 - Live-price paper buys fill at the observed ask and sells at the observed bid.
   Historical Replay has no bid/ask series, so its simulated fills use the bar
@@ -142,19 +145,22 @@ execution path to the authenticated Robinhood data foundation:
   AUTHORIZING, and OFFLINE states
 
 Paper Trader and Replay now create simulated trades from real Robinhood prices.
-The current thresholds are documented research defaults inferred from the example
+The Built-In thresholds are documented research defaults inferred from the example
 charts; they are a premise to test, not evidence of profitability. LIVE can submit
 real equity orders only after the warning is accepted and the user explicitly
 starts a fully reconciled LIVE session.
 
 ## Shared strategy, guarded execution
 
-Replay, Paper Trader, and LIVE feed their rolling `MarketQuote` history and current
-position context into the same deterministic
-[`PriceActionSignalEngine`](src/PriceSentinel3000.Core/Strategy/PriceActionSignalEngine.cs).
-It produces the shared `BOTTOM CONFIRMED` buy and `PEAK CONFIRMED` or
-`PROFIT STALLED` sell decisions. The selectable chart candle interval is a display
-setting and does not select a different trading strategy.
+Replay, Paper Trader, and LIVE use the strategy selected for the session.
+**Built-In** evaluates rolling `MarketQuote` history and position context through
+[`PriceActionSignalEngine`](src/PriceSentinel3000.Core/Strategy/PriceActionSignalEngine.cs),
+producing `BOTTOM CONFIRMED` buys and `PEAK CONFIRMED` or `PROFIT STALLED` sells.
+A compatible folder script instead uses
+[`ThinkScriptSignalEngine`](src/PriceSentinel3000.Application/Strategies/ThinkScriptSignalEngine.cs)
+to evaluate its pinned rules once per newly completed strategy candle after
+warmup. The chart candle interval controls the display; a script's separate
+candle interval controls its calculations.
 
 What happens after a decision depends on the operating mode:
 
@@ -171,8 +177,9 @@ What happens after a decision depends on the operating mode:
   cancellation. A LIVE chart marker appears only after Robinhood reports an
   actual fill; a valid strategy signal can be blocked without producing a marker.
 
-Replay and LIVE should therefore make logically consistent decisions from
-equivalent observations, but they need not fill at the same price or timestamp.
+With the same selected strategy, settings, and equivalent available history,
+Replay and LIVE use the same decision rules, but need not fill at the same price
+or timestamp.
 Replay uses historical bar closes, while LIVE uses fresh bid/ask data and adds
 market-hours, tradability, broker-state, fractional-share, and pre-trade-review
 gates. Executable examples live in
@@ -188,22 +195,28 @@ and
    PriceSentinel never asks for or stores a Robinhood password. Later launches
    silently restore the encrypted saved session and open the workspace directly.
 2. Select **Paper Trader**, enter a stock or ETF symbol and paper starting balance,
-   configure the risk and timing settings, then click **Start Paper Trader**.
-3. When available, the app requests 33–43 minutes of real 15-second warm-start
-   history: the configured 5–15 minute buffer plus 28 minutes needed to warm
-   RSI(14) for the longest selectable candle interval. It then obtains the current
-   quote and polls it at the configured interval.
+   choose **Built-In** or a compatible script, configure the risk and timing
+   settings, then click **Start Paper Trader**.
+3. The app requests real 15-second warm-start history covering at least the
+   configured 5–15 minute buffer plus 28 minutes for chart RSI(14). For a script,
+   it requests the longer of that duration and the script's required warmup plus
+   two candles at the selected strategy interval. A script history requirement
+   over 24 hours blocks startup. Available completed history seeds the script;
+   it waits for enough consecutive candles before proposing trades. The app
+   obtains the current quote and polls it at the configured interval.
 4. At each reconciliation interval, the app requests the configured lookback
    window ending behind real time by the completion delay. This avoids treating a
    still-forming historical bar as final. Matching timestamps are verified,
    corrections replace old values, and missing bars are added to the ring buffer.
    One history request can run alongside quote polling, so slow reconciliation
    does not hold up delivery of fresh quotes.
-5. Each fresh quote evaluates the block/whole-buffer strategy. Confirmed entries
-   and exits update only the in-memory paper account, then persist the decision,
-   order, fill, and position snapshot to SQLite. Execution uses that quote's
-   bid/ask and checks its age against the current clock, even when history
-   reconciliation changes a bar at the same timestamp.
+5. Each fresh quote evaluates Built-In's block/whole-buffer rules, or supplies
+   the selected script with completed strategy candles. Scripts propose an action
+   only once per newly completed candle; host risk checks still run on fresh
+   quotes. Entries and exits that pass host checks update the in-memory paper
+   account, then persist the decision, order, fill, and position snapshot to SQLite.
+   Execution uses the current quote's bid/ask and checks its age against the
+   current clock. Reconciliation does not rewrite finalized script candles.
 6. If the newest venue timestamp is old, the app says **MARKET CLOSED** and pauses
    strategy decisions and paper fills.
 
@@ -260,8 +273,11 @@ monitoring. Market orders prioritize speed but do not guarantee an execution pri
 
 ## Strategy research defaults
 
-The first deterministic detector uses the supplied labeled screenshots as a
-starting hypothesis:
+The compiled **Built-In** detector uses the supplied labeled screenshots as a
+starting hypothesis. Folder scripts define their own entry, exit, and indicator
+rules; host risk and re-entry controls still apply to every selection.
+
+Built-In defaults:
 
 - simple-average RSI period: 14 observations
 - low/high touch-zone tolerance: 0.06%
@@ -270,10 +286,12 @@ starting hypothesis:
 - bottom RSI confirmation: at or below 48 and no longer falling
 - minimum profitable peak exit: 0.04% before bid-side spread impact
 - profitable-stall fallback: five minutes with non-positive momentum
-- minimum movement from the previous sell before re-entry: 0.10% in either direction
 
-These constants deliberately live in the strategy core and every decision stores
-its confidence and human-readable evidence. Replay results should be used to tune
+The shared host requires at least 0.10% price movement in either direction from
+the previous sell before re-entry, as well as its 30-second cooldown.
+
+The Built-In constants live in the strategy core, and its decisions store
+confidence and human-readable evidence. Replay results should be used to tune
 them later; they are not a promise that the labeled regions can be captured live.
 
 ## Replay workflow
@@ -292,8 +310,9 @@ them later; they are not a promise that the labeled regions can be captured live
    offers compatible display intervals.
 4. **Pause** freezes playback while preserving the chart, buffer, strategy, and
    paper account. **Resume** continues with the next historical observation.
-5. Replay uses the same paper account, strategy, risk controls, fill model, chart
-   markers, and journal as Paper Trader, making a historical run reproducible.
+5. Replay uses the same selected strategy, paper account, risk controls, chart
+   markers, and journal as Paper Trader. Its simulated fills use historical
+   source closes, making a run reproducible from the captured observations.
 
 The source limit is two minutes, but Robinhood MCP currently supports no
 two-minute request; its next interval after one minute is five minutes and is
@@ -336,7 +355,7 @@ compatibility checks. That does not imply every thinkScript works unchanged.
 See the [compatibility guide](docs/strategy-scripting.md) and
 [research and validation results](docs/strategy-research.md).
 
-Paper and LIVE evaluate the same completed price candles built from incoming quotes.
+For scripts, Paper and LIVE evaluate completed price candles built from incoming quotes.
 These sampled candles can differ from exchange tick candles. Initial history can
 warm the script only when its source bars have completed; later history corrections
 do not rewrite finalized script candles. Replay uses completed historical candles

@@ -20,15 +20,20 @@ flowchart LR
 | Project | Owns | Does not own |
 | --- | --- | --- |
 | `PriceSentinel3000.App` | WPF views, controls, view models, commands, dialogs, composition, mode routing, and workspace-state coordination | Deterministic strategy rules or broker protocol implementations |
-| `PriceSentinel3000.Application` | Session cancellation lifetime, real-time ingestion timing, Replay pacing, LIVE order coordination, and app-facing ports | WPF controls, Robinhood payload parsing, SQLite, or encryption details |
+| `PriceSentinel3000.Application` | Session cancellation lifetime, real-time ingestion timing, Replay pacing, completed-candle script adapters, LIVE order coordination, and app-facing ports | WPF controls, Robinhood payload parsing, SQLite, or encryption details |
 | `PriceSentinel3000.Core` | Market and account models, candle aggregation, indicator/chart calculations, strategy decisions, paper fills, risk gates, and LIVE execution rules | WPF, networking, filesystem access, Robinhood, or SQLite |
 | `PriceSentinel3000.Infrastructure` | Robinhood MCP/OAuth, broker response parsing, DPAPI-protected authentication state, SQLite journaling, and JSON preferences | Presentation behavior or trading strategy |
+| `PriceSentinel3000.Control` | Optional JSON CLI and stdio MCP companion forwarding bounded commands to the running app's named pipe | A separate trading engine, app launch, authentication UI, or LIVE execution control |
 
 `Core` has no dependency on the other projects. `Application` depends only on
 `Core`. `Infrastructure` implements ports declared by Core and Application and
 translates external data into Core models. `App` is the composition root and is
 the only production project that decides which concrete adapters satisfy each
 port.
+
+The Control companion communicates with an app explicitly opened using
+`--automation`. It controls the same visible Replay/Paper session, exposes
+research telemetry, and rejects LIVE mutations. See [Local app control](automation.md).
 
 ## Application orchestration
 
@@ -76,7 +81,7 @@ synchronously blocking the WPF UI thread.
 flowchart TD
     Robinhood[Robinhood MCP] --> Adapter[Infrastructure adapter]
     Adapter --> Observation[Core market observations]
-    Observation --> Buffer[Rolling strategy buffer]
+    Observation --> Buffer[Rolling observations and completed strategy candles]
     Buffer --> Strategy[Deterministic strategy and risk gates]
     Strategy --> Decision[Auditable decision]
     Decision --> Paper[Paper fill model]
@@ -91,11 +96,17 @@ flowchart TD
 
 Chart candle selection is a presentation concern. The 15-, 30-, 60-, and
 120-second display intervals do not change the strategy's source observations or
-risk rules.
+risk rules. Historical chart choices are restricted to exact multiples of the
+actual source interval; smaller candles are never reconstructed from coarse data.
 
-The strategy buffer retains at least 16 observations for RSI and its prior value,
+The Built-In observation buffer retains at least 16 observations for RSI and its prior value,
 even when slow polling puts those observations outside the configured time window.
-Pattern detection still uses only the configured window. Execution receives the
+Its pattern detection still uses only the configured window. External scripts
+use `ThinkScriptSignalEngine` and a separate `ScriptBarSeries` of completed candles
+at the selected strategy interval, with compiled warmup requirements. Gaps reset
+that history; chart reconciliation cannot rewrite previously finalized strategy
+candles or decisions. Host risk checks remain active between script candle closes.
+Execution receives the
 validated triggering quote explicitly, after observations strictly earlier than
 its source timestamp; reconciled OHLC cannot replace its executable bid/ask. Paper
 freshness uses the injected current clock, with an explicit historical Replay
@@ -190,6 +201,8 @@ All mutable application data lives under `%LOCALAPPDATA%\PriceSentinel3000`:
 - The SQLite WAL journal records observations, decisions, simulated and LIVE order
   events and fills, plus paper-account position snapshots. LIVE broker position
   state is queried from Robinhood rather than persisted as a position snapshot.
+  Observation rows include OHLC, source duration, and ingestion kind; session
+  settings pin strategy source/parameters and Replay source-duration provenance.
 - `SqliteJournalSchema` isolates schema creation and migrations from the journal's
   read/write operations. LIVE fills use a unique `(order_id, execution_id)` index;
   distinct broker executions with identical timestamps, prices, and quantities
@@ -202,6 +215,11 @@ All mutable application data lives under `%LOCALAPPDATA%\PriceSentinel3000`:
   the next Eastern day; guessing the account or resetting its risk baseline would
   weaken the limit.
 - JSON preferences contain ordinary UI and research settings only.
+
+Replay currently requests history from the provider, rather than reusing the
+journal as a symbol/date market-data library. The [proposed local history design](../DESIGN.md#proposed-local-market-data-library)
+is not implemented. Sampled quote rows and their default duration must not be
+treated as authoritative historical OHLCV candles.
 
 Passwords are never requested or stored. Runtime databases, token files, and local
 preferences are excluded from source control.
@@ -219,6 +237,8 @@ preferences are excluded from source control.
 - `PriceSentinel3000.App.Tests` exercises actual WPF input bindings, command
   notifications, and view-model workflows on an isolated STA dispatcher, with fake
   broker ports and temporary journals. It does not launch the production app.
+- `PriceSentinel3000.Control.Tests` checks the companion's CLI/MCP transport,
+  protocol handling, and structured responses without enabling broker execution.
 - Application runners accept fakeable ports and `TimeProvider`, keeping orchestration
   tests deterministic and independent of Robinhood or the system clock.
 - The Windows CI workflow restores, builds Release with warnings treated as errors,

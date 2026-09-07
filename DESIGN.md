@@ -12,6 +12,10 @@ session source/parameter provenance, per-session LIVE version approval, and one
 original experimental example. Tests cover parser restrictions, indicator values,
 host position/risk safeguards, history availability, immutable artifacts, WPF
 selection, and sample seeding. Windows publication includes the original source.
+Local MCP control, research telemetry, and source-duration-aware Replay fallback
+are also implemented. Remaining release checks and follow-ups are tracked in
+[TODO.md](TODO.md). The local market-data library described below is a proposal,
+not a current application feature.
 
 ## Product scope
 
@@ -126,6 +130,40 @@ history can legitimately produce different inputs and results.
 Required warm-up comes from the compiled program and the selected interval,
 within a documented maximum. Insufficient or interrupted history produces a
 visible warming-up HOLD. It does not silently use the Built-In strategy.
+
+## Proposed local market-data library
+
+Preserve genuine fine-resolution history for repeatable Replay and script
+analysis after the provider's availability window expires. This feature is not
+implemented. The current SQLite journal records session observations, but Replay
+still downloads its requested history from Robinhood. A sampled live quote or an
+old row's default 15-second duration is not proof of a finalized 15-second OHLCV
+candle; journal rows cannot be blindly reused as such.
+
+Provide an explicit symbol/date download workflow with actual source resolution,
+coverage, and gaps visible before use. A proposed storage location is
+`%LOCALAPPDATA%\PriceSentinel3000\MarketData`, separate from the session journal
+and repository research archives. Preserve exact numeric prices, UTC start/end
+and availability times, volume, provider/instrument identity, adjustment policy,
+fetch time, and dataset hashes/revisions. Deduplicate without silently overwriting
+the dataset pinned by a prior experiment. Validate incomplete or interrupted
+downloads and reject incompatible adjustments or mixed source resolutions.
+
+Replay should prefer complete compatible local history for the requested range
+and support offline use. Report missing coverage explicitly before any provider
+backfill; do not silently switch resolution, invent missing prices, or infer the
+sequence of prices within a candle. Aggregate available fine candles upward using
+first open, maximum high, minimum low, last close, and summed volume. Incomplete
+groups must remain gaps rather than apparently complete candles.
+
+Source resolution and strategy interval remain independent. A one-minute script
+can use one-minute bars aggregated from complete 15-second history while the host
+checks risk at each available source close. Two-minute source data cannot run an
+unchanged one-minute script. Resolution comparisons must hold script source,
+inputs, strategy interval, risk controls, and underlying dataset fixed; changing
+the strategy interval is a separate experiment. Finer observations may reveal
+additional drawdown or different risk exits without improving strategy profits,
+and still cannot reproduce tick-level execution or historical spreads.
 
 ## Strategy and host contract
 
