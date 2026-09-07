@@ -115,7 +115,7 @@ public sealed class AutomationTools(AutomationPipeClient client)
     public Task<CallToolResult> ResultsAsync(CancellationToken cancellationToken) =>
         SendAsync("results", new { }, cancellationToken);
 
-    [Description("Read exact numeric prices and UTC timestamps for already-processed Replay or Paper data. Strategy returns finalized script candles; source returns observed market records, including Replay's 15-second OHLC. Pages expose retention and cursors; future Replay history is never returned.")]
+    [Description("Read exact numeric prices and UTC timestamps for already-processed Replay or Paper data. Strategy returns finalized script candles; source returns observed market records, including Replay OHLC with its actual source interval and closing-time availability. Pages expose retention and cursors; future Replay history is never returned.")]
     public Task<CallToolResult> CandlesAsync(
         [Description("strategy selects completed script candles; source selects processed market observations.")] AutomationCandleKind kind = AutomationCandleKind.Strategy,
         [Description("Return records strictly after this sequence number. Start at zero; continue with nextSequence.")] long afterSequence = 0,

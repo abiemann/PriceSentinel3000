@@ -60,9 +60,24 @@ internal static class RobinhoodMarketDataParser
     public static IReadOnlyList<MarketQuote> ParseHistory(
         JsonElement root,
         Instrument instrument,
-        DateTimeOffset observedAtUtc)
+        DateTimeOffset observedAtUtc,
+        int sourceIntervalSeconds = 15)
     {
         JsonElement result = FindResult(root, instrument.Symbol);
+        string requestedInterval = sourceIntervalSeconds switch
+        {
+            15 => "15second",
+            30 => "30second",
+            60 => "minute",
+            _ => throw new ArgumentOutOfRangeException(nameof(sourceIntervalSeconds)),
+        };
+        if (result.TryGetProperty("interval", out JsonElement intervalNode) &&
+            (intervalNode.ValueKind is not JsonValueKind.String ||
+             intervalNode.GetString() != requestedInterval))
+        {
+            throw new InvalidOperationException(
+                "Robinhood returned a historical interval different from the requested interval.");
+        }
 
         if (!result.TryGetProperty("bars", out JsonElement bars) ||
             bars.ValueKind is not JsonValueKind.Array)
@@ -99,7 +114,8 @@ internal static class RobinhoodMarketDataParser
                 open,
                 high,
                 low,
-                close));
+                close,
+                sourceIntervalSeconds));
         }
 
         return quotes

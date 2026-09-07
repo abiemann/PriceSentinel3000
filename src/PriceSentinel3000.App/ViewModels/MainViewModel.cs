@@ -196,7 +196,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
                 "Total position loss ($)",
                 StopLossBasis.TotalPositionLossAmount),
         ];
-        ChartCandleIntervalOptions =
+        _allChartCandleIntervalOptions =
         [
             new("15 sec", 15),
             new("30 sec", 30),
@@ -237,7 +237,11 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
     public IReadOnlyList<SelectionOption<bool>> EntryLimitOptions { get; }
     public IReadOnlyList<SelectionOption<AmountBasis>> DailyLossOptions { get; }
     public IReadOnlyList<SelectionOption<StopLossBasis>> StopLossOptions { get; }
-    public IReadOnlyList<SelectionOption<int>> ChartCandleIntervalOptions { get; }
+    private readonly IReadOnlyList<SelectionOption<int>> _allChartCandleIntervalOptions;
+    public IReadOnlyList<SelectionOption<int>> ChartCandleIntervalOptions =>
+        _historicalSourceIntervalSeconds is { } sourceInterval
+            ? _allChartCandleIntervalOptions.Where(option => option.Value % sourceInterval == 0).ToArray()
+            : _allChartCandleIntervalOptions;
 
     public ObservableCollection<ActivityEntryViewModel> ActivityLog { get; } = [];
     public ObservableCollection<PricePointViewModel> ChartPoints { get; } = [];
@@ -329,7 +333,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
         : "SCALE: AUTO";
     public int ChartCandleIntervalSeconds
     {
-        get => _chartCandleIntervalSeconds;
+        get => _historicalSourceIntervalSeconds is { } sourceInterval && _chartCandleIntervalSeconds % sourceInterval != 0
+            ? sourceInterval : _chartCandleIntervalSeconds;
         set
         {
             if (value is not (15 or 30 or 60 or 120))
@@ -984,7 +989,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
         QuotePollingSeconds = QuotePollingSeconds,
         StrategyId = SelectedStrategyId,
         ScriptBarIntervalSeconds = ScriptBarIntervalSeconds,
-        ChartCandleIntervalSeconds = ChartCandleIntervalSeconds,
+        ChartCandleIntervalSeconds = _chartCandleIntervalSeconds,
         ReconciliationSeconds = ReconciliationSeconds,
         ReconciliationLookbackSeconds = ReconciliationLookbackSeconds,
         ReconciliationCompletionDelaySeconds =

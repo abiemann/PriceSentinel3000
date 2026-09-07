@@ -227,11 +227,27 @@ public sealed class RobinhoodMcpGateway :
         return RobinhoodInstrumentSearchParser.Parse(root);
     }
 
-    public async Task<IReadOnlyList<MarketQuote>> GetReplayHistoryAsync(
+    public Task<IReadOnlyList<MarketQuote>> GetReplayHistoryAsync(
         Instrument instrument,
         DateTimeOffset fromUtc,
         DateTimeOffset throughUtc,
         DateTimeOffset observedAtUtc,
+        CancellationToken cancellationToken) =>
+        FetchReplayHistoryAsync(
+            instrument,
+            fromUtc,
+            throughUtc,
+            observedAtUtc,
+            (arguments, token) => CallStructuredToolAsync(
+                "get_equity_historicals", arguments, token),
+            cancellationToken);
+
+    internal static async Task<IReadOnlyList<MarketQuote>> FetchReplayHistoryAsync(
+        Instrument instrument,
+        DateTimeOffset fromUtc,
+        DateTimeOffset throughUtc,
+        DateTimeOffset observedAtUtc,
+        Func<IReadOnlyDictionary<string, object?>, CancellationToken, Task<JsonElement>> fetchHistoryAsync,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(instrument);
@@ -244,26 +260,41 @@ public sealed class RobinhoodMcpGateway :
 
         DateTimeOffset start = fromUtc.ToUniversalTime();
         DateTimeOffset end = throughUtc.ToUniversalTime();
-        JsonElement root = await CallStructuredToolAsync(
-            "get_equity_historicals",
-            new Dictionary<string, object?>
+        // Robinhood MCP supports no two-minute source interval. Its next step
+        // after minute is five minutes, outside Replay's two-minute ceiling.
+        (string Name, int Seconds)[] intervals =
+            [("15second", 15), ("30second", 30), ("minute", 60)];
+
+        foreach ((string interval, int seconds) in intervals)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            JsonElement root = await fetchHistoryAsync(new Dictionary<string, object?>
             {
                 ["symbols"] = new[] { instrument.Symbol },
                 ["start_time"] = start.ToString("O"),
                 ["end_time"] = end.ToString("O"),
-                ["interval"] = "15second",
+                ["interval"] = interval,
                 ["bounds"] = EquityHistoricalBounds,
                 ["adjustment_type"] = "split",
             },
             cancellationToken).ConfigureAwait(false);
-        return RobinhoodMarketDataParser.ParseHistory(
-                root,
-                instrument,
-                observedAtUtc)
-            .Where(quote =>
-                quote.SourceTimestampUtc >= start &&
-                quote.SourceTimestampUtc <= end)
-            .ToArray();
+            MarketQuote[] quotes = RobinhoodMarketDataParser.ParseHistory(
+                    root,
+                    instrument,
+                    observedAtUtc,
+                    seconds)
+                .Where(quote =>
+                    quote.SourceTimestampUtc >= start &&
+                    quote.SourceEndsAtUtc <= end &&
+                    quote.SourceEndsAtUtc <= observedAtUtc)
+                .ToArray();
+            if (quotes.Length > 0)
+            {
+                return quotes;
+            }
+        }
+
+        return [];
     }
 
     public async Task<BrokerAccount> GetAgenticAccountAsync(

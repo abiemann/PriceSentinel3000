@@ -50,6 +50,7 @@ public sealed partial class MainViewModel
         {
             sessionId = _automationChartSessionId,
             symbol = _automationSession.Instrument.Symbol,
+            replayHistory = AutomationReplayHistory,
             strategy,
             capture.MimeType,
             capture.Width,

@@ -31,7 +31,7 @@ internal sealed class TestWorkspace : IAsyncDisposable
         {
             Set("_liveAccount", Broker.Account);
         }
-        Invoke("PrepareDataSession", new Instrument("SOFI"), TradingSessionSettings.Default, mode);
+        Invoke("PrepareDataSession", new Instrument("SOFI"), TradingSessionSettings.Default, mode, null!);
     }
 
     public object? Invoke(string method, params object[] args) => typeof(MainViewModel)

@@ -327,6 +327,8 @@ public sealed partial class MainViewModel
         fast = _replaySessionRunner.Fast,
         settings = CreateSettings(),
         strategy = HasAutomationLiveContext ? null : _pinnedStrategy?.Descriptor,
+        replayHistory = HasAutomationLiveContext || _automationOperationId.HasValue && !_automationOperationSessionId.HasValue
+            ? null : AutomationReplayHistory,
         message = HasAutomationLiveContext ? "LIVE cannot be controlled by automation." : StatusMessage,
     };
 
@@ -335,6 +337,7 @@ public sealed partial class MainViewModel
         sessionId = _automationSession?.Id,
         mode = _automationSession?.Mode,
         outcome = _automationOutcome,
+        replayHistory = AutomationReplayHistory,
         settings = _automationSession is null ? (JsonElement?)null : JsonSerializer.Deserialize<JsonElement>(_automationSession.SettingsJson),
         account = _automationAccount,
         summary = _automationSession is null ? null : _journal.GetSummary(_automationSession.Id),

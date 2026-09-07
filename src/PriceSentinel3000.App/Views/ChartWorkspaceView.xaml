@@ -45,7 +45,7 @@
                               DisplayMemberPath="Label"
                               SelectedValuePath="Value"
                               SelectedValue="{Binding ChartCandleIntervalSeconds, Mode=TwoWay}"
-                              ToolTip="Choose the candle duration shown on the chart. Strategy evaluation and quote polling are unchanged." />
+                              ToolTip="Choose the displayed candle duration. Historical charts require an interval that is an exact multiple of the source candles. This control does not change the script interval or quote polling." />
                     <ToggleButton x:Name="RsiToggle"
                                   Grid.Column="3"
                                   Margin="0,0,14,0"

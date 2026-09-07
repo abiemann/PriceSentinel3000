@@ -1,6 +1,6 @@
 # External strategy design
 
-This specification incorporates the September 5, 2026 decisions. Implementation
+This specification incorporates decisions through September 7, 2026. Implementation
 has been delivered in validated milestones. The [compatibility guide](docs/strategy-scripting.md)
 identifies the implemented subset and resource limits; [research results](docs/strategy-research.md)
 record the unchanged-source checks and original example fixtures. The existing compiled price-action strategy
@@ -89,8 +89,28 @@ selected strategy interval. Volume-dependent programs are unavailable until the
 feed can supply authoritative volume consistently. A missed period stays a gap;
 chart-only synthetic flat candles never become strategy data.
 
-Historical 15-second bars have start timestamps. Their OHLC cannot be made
-available before the end of that source bar. Replay honors that distinction and
+Replay first requests 15-second history for the exact selected range. If there
+are no usable, complete observations in that range, it retries at 30 seconds,
+then one minute. These are the Robinhood MCP intervals currently supported within
+the two-minute source limit: the provider does not accept two-minute requests,
+and its next interval, five minutes, exceeds the limit. Null, interpolated,
+incomplete, and out-of-range bars do not satisfy a request. Invalid prices,
+authentication, transport, and malformed responses remain errors. Fallback
+selects the first usable resolution for the entire run; it never widens the range, combines resolutions,
+or fills gaps in strategy history.
+
+Historical bars retain their actual duration and start timestamp. Their OHLC
+becomes available at the source candle's close for both Built-In and scripts.
+Replay evaluates risk and simulates fills at that close; it cannot reconstruct
+intrabar prices, stop crossings, or the order of a candle's high and low. Coarser
+history can therefore change strategy behavior and P&L. No smaller source bars
+are synthesized.
+
+The selected script interval must be an exact multiple of the source interval.
+An incompatible interval blocks Replay before a session starts and is never
+changed automatically. Chart intervals are restricted to compatible choices.
+Session Status shows the actual source duration during and after Replay. The
+user's preferred chart interval remains available for a later finer feed. Replay
 never includes the next bar's close when evaluating a previous decision.
 `open[-1]` may be recognized in an `AddOrder` execution-price argument as the
 thinkScript next-bar convention; it is never accessible in the signal expression.
@@ -168,6 +188,13 @@ orders, and fills already reference:
 - Interpreter/runtime version
 - Input defaults and selected candle interval
 - Data/simulation model version
+
+Replay session settings also pin `ReplayHistory`: `SourceIntervalSeconds`,
+`IsFallback`, `Availability` (`source-candle-close`), `ExecutionModel`
+(`completed-source-candle-close`), and `IntrabarPricesAvailable` (`false`). SQLite
+schema migration 4 stores each observation's source duration; existing rows
+retain their original 15-second default. These metadata changes do not alter
+Paper/LIVE data ingestion or introduce execution costs.
 
 LIVE retains its existing explicit warning, arming, broker reconciliation, and
 review flow. Before arming an external source, show the strategy name and exact
@@ -293,11 +320,16 @@ loaded Replay history, synthesize missing indicator values, or reevaluate a
 script solely to satisfy an inspection request.
 
 Expose separate processed-source and finalized-strategy candle streams. Replay
-source records preserve provider 15-second OHLC and timestamps; Paper sampled
+source records preserve provider OHLC, actual source duration, and timestamps; Paper sampled
 quotes must remain labeled as samples. Strategy candles preserve exact decimal
 OHLC, start/end times, availability, bar version, and observation correlation at
 the configured script interval. Forming chart candles are a separate visual
 representation, and Built-In has no script candle stream.
+
+Status, results, indicators, and chart captures include retained `replayHistory`
+metadata. Source records report their actual interval and close availability.
+These are additive protocol fields; inspection must not relabel completed
+results when the next session's configuration changes.
 
 Retain pinned input defaults and actual named definitions/plots evaluated by the
 interpreter, with null values and availability reasons for unavailable

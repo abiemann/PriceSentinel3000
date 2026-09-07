@@ -72,9 +72,10 @@ execution path to the authenticated Robinhood data foundation:
 - Warm-start history covers the chart window plus the RSI(14) lookback required
   by every selectable candle interval; configurable delayed-lookback
   reconciliation uses real 15-second Robinhood equity bars
-- Replay accepts a ticker plus an exact local date/time and emits that historical
-  15-second window as though each observation has just arrived; it can be paused,
-  resumed, or stopped without losing the captured chart and paper-account state
+- Replay accepts a ticker plus an exact local date/time and tries 15-second,
+  30-second, then one-minute history until usable data is returned. It preserves
+  the source duration and can be paused, resumed, or stopped without losing the
+  captured chart and paper-account state
 - Replay local start/end range (up to 24 hours) and playback speed (1x-100x)
   are tunable
 - A tunable 5-15 minute rolling buffer is analyzed as individual one-minute
@@ -100,8 +101,10 @@ execution path to the authenticated Robinhood data foundation:
   positions and settlement state; LIVE baselines are persisted by account and date
 - The WPF chart renders selectable 15-, 30-, 60-, or 120-second candlesticks.
   Replay preserves Robinhood's true OHLC observations while larger intervals
-  aggregate them into continuous candles; Paper Trader combines incoming quotes
-  with reconciled history. The chart also shows current price and bid/ask
+  aggregate them; display choices remain compatible with the source duration
+  shown in Session Status.
+  Paper Trader combines incoming quotes with reconciled history. The chart also
+  shows current price and bid/ask
 - The chart labels simulated BUY and SELL fills, while Session Status shows paper
   buying power, equity, position, realized/unrealized P&L, and entry count
 - Optional RSI(14), minute-by-minute time labels, cursor crosshairs, and Auto or
@@ -278,18 +281,38 @@ them later; they are not a promise that the labeled regions can be captured live
 1. After the required startup login, select **Replay** and enter the ticker,
    local date (`yyyy-MM-dd`), local start/end times (`HH:mm`), and playback
    speed, then click **Start Replay**.
-2. One bounded request loads actual 15-second Robinhood bars for precisely that
-   start/end window, using Robinhood's `24_5` historical bounds.
+2. The app requests actual 15-second Robinhood bars for precisely that range,
+   using `24_5` historical bounds. If none are usable, it retries at 30 seconds,
+   then one minute. It uses the first resolution with complete bars inside the
+   range after excluding null/interpolated bars; invalid prices remain errors.
+   It never mixes resolutions, widens the range, or fills strategy gaps.
 3. The returned observations are replayed in source-time order. Each historical
-   price enters the normal ring buffer as a newly observed event, with delays
-   compressed by the selected speed.
+   candle becomes available at its actual close, with delays compressed by the
+   selected speed. Session Status labels the source duration, and the chart
+   offers compatible display intervals.
 4. **Pause** freezes playback while preserving the chart, buffer, strategy, and
    paper account. **Resume** continues with the next historical observation.
 5. Replay uses the same paper account, strategy, risk controls, fill model, chart
    markers, and journal as Paper Trader, making a historical run reproducible.
 
-Replay does not depend on a previously recorded Paper Trader session and never
-uses the former synthetic data.
+The source limit is two minutes, but Robinhood MCP currently supports no
+two-minute request; its next interval after one minute is five minutes and is
+not used. An empty result means no usable history was returned at the supported
+intervals, rather than a claim that the stock did not trade. Provider errors
+remain visible and do not trigger a retry at a different resolution.
+
+A script interval must be an exact multiple of the returned source interval.
+For example, one-minute source candles can run a one-minute script, but cannot
+run a 15-second script. An incompatible selection blocks startup without changing
+the script interval. Select a compatible interval deliberately for a separate
+experiment. Changing the chart interval only changes the display.
+
+Both Built-In and scripts see a source candle at its close. Replay risk checks
+and simulated fills use that close; the intervening prices and exact stop-loss
+crossing time are unknown. Results from different source resolutions can differ.
+The journal and MCP results preserve the actual duration and execution model.
+Replay uses real provider history and does not depend on a previously recorded
+Paper Trader session.
 
 ## Strategy scripts
 

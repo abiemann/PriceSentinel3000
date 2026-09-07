@@ -57,7 +57,7 @@ public sealed partial class MainViewModel
     {
         if (_activeSession?.Id != _automationSession?.Id || _automationSession is null) return;
         long sequence = ++_researchObservationSequence;
-        DateTimeOffset availableAt = historical ? source.SourceTimestampUtc.AddSeconds(15) : source.SourceTimestampUtc;
+        DateTimeOffset availableAt = historical ? source.SourceEndsAtUtc : source.SourceTimestampUtc;
         if (_researchObservedThroughUtc is null || availableAt > _researchObservedThroughUtc)
             _researchObservedThroughUtc = availableAt;
         _researchLastStrategyEvaluated = false;
@@ -71,7 +71,7 @@ public sealed partial class MainViewModel
             evaluationTimestampUtc = execution.SourceTimestampUtc,
             startsAtUtc = source.SourceTimestampUtc,
             endsAtUtc = historical ? (DateTimeOffset?)availableAt : null,
-            intervalSeconds = historical ? (int?)15 : null,
+            intervalSeconds = historical ? (int?)source.SourceIntervalSeconds : null,
             finalized = historical,
             open = source.CandleOpen, high = source.CandleHigh, low = source.CandleLow, close = source.CandleClose,
             source.Last, source.Bid, source.Ask, source.Volume,
@@ -156,6 +156,7 @@ public sealed partial class MainViewModel
         AutomationResponse response = AutomationResponse.Ok(new
         {
             sessionId = _automationSession!.Id, _automationSession.Mode,
+            replayHistory = AutomationReplayHistory,
             observedThroughUtc = _researchObservedThroughUtc,
             observationSequence = _researchObservationSequence,
             strategy = _researchStrategy,

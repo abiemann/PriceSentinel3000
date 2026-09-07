@@ -97,5 +97,62 @@ public sealed class RobinhoodMarketDataParserTests
         Assert.Equal(16.40m, quotes[1].ClosePrice);
         Assert.Equal(16.39m, quotes[0].CandleOpen);
         Assert.All(quotes, quote => Assert.Equal(0m, quote.Bid));
+        Assert.All(quotes, quote => Assert.Equal(15, quote.SourceIntervalSeconds));
+    }
+
+    [Theory]
+    [InlineData(30, "30second")]
+    [InlineData(60, "minute")]
+    public void ParseHistory_PreservesSourceDurationAndOneOriginalBar(int seconds, string interval)
+    {
+        JsonElement root = JsonSerializer.SerializeToElement(new
+        {
+            data = new
+            {
+                results = new[]
+                {
+                    new
+                    {
+                        symbol = "NFLX", interval,
+                        bars = new[]
+                        {
+                            new
+                            {
+                                begins_at = "2026-08-24T13:30:00Z",
+                                open_price = "79.89", high_price = "80.0133",
+                                low_price = "79.17", close_price = "79.24", volume = 370827,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        MarketQuote quote = Assert.Single(RobinhoodMarketDataParser.ParseHistory(root,
+            new Instrument("NFLX", AssetClass.Equity), DateTimeOffset.UtcNow, seconds));
+
+        Assert.Equal(seconds, quote.SourceIntervalSeconds);
+        Assert.Equal(DateTimeOffset.Parse("2026-08-24T13:30:00Z"), quote.SourceTimestampUtc);
+        Assert.Equal(quote.SourceTimestampUtc.AddSeconds(seconds), quote.SourceEndsAtUtc);
+        Assert.Equal(79.89m, quote.CandleOpen);
+        Assert.Equal(80.0133m, quote.CandleHigh);
+        Assert.Equal(79.17m, quote.CandleLow);
+        Assert.Equal(79.24m, quote.CandleClose);
+        Assert.Equal(370827m, quote.Volume);
+    }
+
+    [Theory]
+    [InlineData("30second")]
+    [InlineData("5minute")]
+    [InlineData("unexpected")]
+    public void ParseHistory_RejectsResponseIntervalDifferentFromRequested(string interval)
+    {
+        JsonElement root = JsonSerializer.SerializeToElement(new
+        {
+            data = new { results = new[] { new { symbol = "NFLX", interval, bars = Array.Empty<object>() } } },
+        });
+
+        Assert.Throws<InvalidOperationException>(() => RobinhoodMarketDataParser.ParseHistory(
+            root, new Instrument("NFLX", AssetClass.Equity), DateTimeOffset.UtcNow));
     }
 }

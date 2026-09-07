@@ -87,8 +87,9 @@ settings. Strategy compatibility is rechecked when starting the actual session.
   false. `start` defaults to false; `resume` preserves pacing when omitted.
 
 Specify at most one pause counter. For one-minute script candles and contiguous
-15-second history, four observations form a completed script candle. Data gaps
-can change that relationship. Counters are checked after the complete strategy,
+15-second history, four observations form a completed script candle; one-minute
+source history needs one observation. Read the actual source interval instead
+of assuming 15 seconds. Data gaps can change that relationship. Counters are checked after the complete strategy,
 paper-account, and journal update, before reading the next source observation.
 If the requested boundary reaches or exceeds the available history, Replay
 completes. Stepping the final observation also completes the session.
@@ -97,6 +98,25 @@ Fast Replay still processes every observation in order with its source timestamp
 It does not invent ticks, skip risk checks, or expose future bars to a script.
 Historical loading still takes time. Paper Trader remains paced by real market
 data; Replay pacing arguments are rejected in Paper mode.
+
+Replay tries `15second`, `30second`, then `minute` history for the exact requested
+range, advancing only when no complete, usable bars remain. Null/interpolated
+bars are discarded. Invalid prices and provider errors propagate, and the first
+usable resolution is kept for the entire run without combining resolutions or filling strategy
+gaps. The two-minute source limit does not imply a two-minute API request:
+Robinhood MCP currently offers one minute followed by five minutes, so fallback
+stops at one minute. A script interval that is not an exact multiple of the
+source interval blocks startup; automation never changes that interval for you.
+
+`status`, `results`, `indicators`, and `capture_chart` expose retained
+`replayHistory` metadata. The same object is stored as `ReplayHistory` in journal
+session settings, with fields `SourceIntervalSeconds`, `IsFallback`,
+`Availability: "source-candle-close"`,
+`ExecutionModel: "completed-source-candle-close"`, and
+`IntrabarPricesAvailable: false`. These fields are additive to protocol version
+1. Match the session ID before comparing retained results with a new operation.
+Chart choices remain compatible with the actual source duration, including after
+completion; a preferred smaller chart interval can be used with a later finer feed.
 
 ## Example: pause, step, and finish
 
@@ -145,10 +165,11 @@ unprocessed future history is never included.
 (default `0`), `limit` (default `50`, range `1`–`100`), and optional `sessionId`.
 The two streams have different meanings:
 
-- **Source:** Replay records contain the provider's 15-second OHLC and original
-  source timestamp. `availableAtUtc` is the candle end; `evaluationTimestampUtc`
-  is the execution timestamp actually used (the end for scripts; the original
-  source timestamp for the existing Built-In replay path). Paper records are
+- **Source:** Replay records contain the provider's OHLC, original source start,
+  and actual `intervalSeconds`. `endsAtUtc`, `availableAtUtc`, and
+  `evaluationTimestampUtc` use the source candle's actual end for both scripts
+  and Built-In. Risk checks and simulated fills occur at that close; they do not
+  infer intrabar price paths or stop crossings. Paper records are
   labeled `sampled_quote`; they do not claim to be authoritative OHLC candles or
   have a completed candle end time. Bid/ask and freshness remain explicit.
 - **Strategy:** Finalized candles use the selected script interval and contain
@@ -229,6 +250,13 @@ exact strategy inputs; use captures to check drawing, clipping, and labels.
 The [MCP research validation](automation-research-validation-2026-09-06.md)
 records exact candle aggregation, indicator warmup, event correlation, host
 risk overrides, and native chart captures against the running app.
+
+The [September 7 fallback verification](history-fallback-validation-2026-09-07.md)
+retrieved 390 real one-minute NFLX candles
+for August 24, 2026, 06:30–13:00 Pacific, where finer history was unavailable.
+Automated coverage verifies source-close timing, compatible aggregation,
+incompatible-script rejection, source-duration provenance, and migration of
+existing journal observations with their 15-second default.
 
 The [September 6 MCP Replay validation](automation-validation-2026-09-06.md)
 records ten passing test groups against the running desktop app, including risk

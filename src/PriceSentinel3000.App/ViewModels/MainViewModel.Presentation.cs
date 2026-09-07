@@ -14,16 +14,19 @@ public sealed partial class MainViewModel
     private int _tradeMarkerVersion;
     private int _lastProjectedMarkerVersion;
 
-    private IReadOnlyList<MarketQuote> GetExecutionHistory(MarketQuote trigger)
+    private IReadOnlyList<MarketQuote> GetExecutionHistory(MarketQuote trigger, bool historical = false)
     {
         if (!_ringBuffer!.IsValidQuote(trigger))
         {
             throw new InvalidOperationException("The execution quote has invalid prices or a different instrument.");
         }
 
+        IEnumerable<MarketQuote> history = _ringBuffer.Snapshot();
+        if (historical)
+            history = history.Select(quote => quote with { SourceTimestampUtc = quote.SourceEndsAtUtc });
         return
         [
-            .. _ringBuffer.Snapshot().Where(quote => quote.SourceTimestampUtc < trigger.SourceTimestampUtc),
+            .. history.Where(quote => quote.SourceTimestampUtc < trigger.SourceTimestampUtc),
             trigger,
         ];
     }

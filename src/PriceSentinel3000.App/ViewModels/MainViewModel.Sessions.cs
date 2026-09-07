@@ -389,7 +389,7 @@ public sealed partial class MainViewModel
             throw new InvalidOperationException("The Replay date, start, or end time is invalid.");
         }
 
-        StatusMessage = $"Loading real 15-second {instrument.Symbol} history from {replayStart:g}...";
+        StatusMessage = $"Loading {instrument.Symbol} history from {replayStart:g}; trying 15-second candles, then coarser available history...";
         SetMarketDataState("ROBINHOOD LOGIN", "AUTHORIZING", isConnected: false);
         await _marketDataSource.ConnectAsync(token);
         DateTimeOffset observedAt = _timeProvider.GetUtcNow();
@@ -404,21 +404,35 @@ public sealed partial class MainViewModel
         if (historicalQuotes.Count == 0)
         {
             SetMarketDataState("ROBINHOOD READY", "NO HISTORY");
-            StatusMessage = $"Robinhood returned no {instrument.Symbol} trades from {replayStart:g} through {replayEnd:t}.";
-            AddActivity($"Replay found no historical {instrument.Symbol} observations in the requested window.", "WARNING");
+            StatusMessage = $"No usable {instrument.Symbol} Replay history was returned from {replayStart:g} through {replayEnd:t} at the supported intervals up to two minutes.";
+            AddActivity(StatusMessage, "WARNING");
             return;
         }
 
-        PrepareDataSession(instrument, settings, TradingMode.Replay);
+        int sourceInterval = ValidateReplaySourceInterval(historicalQuotes);
+        if (_scriptSignalEngine is not null && settings.ScriptBarIntervalSeconds % sourceInterval != 0)
+        {
+            SetMarketDataState("ROBINHOOD READY", "INTERVAL MISMATCH");
+            _strategyStateLabel = "INTERVAL MISMATCH";
+            StatusMessage = $"History is available as {sourceInterval}-second candles. The selected {settings.ScriptBarIntervalSeconds}-second script needs finer data. Choose a script interval that is a multiple of {sourceInterval} seconds to run a separate experiment; the script interval has not changed.";
+            _strategyMessage = StatusMessage;
+            NotifyStrategyProperties();
+            AddActivity(StatusMessage, "WARNING");
+            return;
+        }
+
+        PrepareDataSession(instrument, settings, TradingMode.Replay, sourceInterval);
         SetMarketDataState("ROBINHOOD HISTORY", "REPLAY");
         _strategyStateLabel = "REPLAYING";
         _strategyMessage = "Historical Robinhood prices are arriving as a new stream. Orders are simulated only.";
         NotifyStrategyProperties();
         DateTimeOffset firstSource = historicalQuotes[0].SourceTimestampUtc;
-        DateTimeOffset lastSource = historicalQuotes[^1].SourceTimestampUtc;
+        DateTimeOffset lastSource = historicalQuotes[^1].SourceEndsAtUtc;
         StatusMessage = $"Replaying {historicalQuotes.Count} real {instrument.Symbol} observations from {firstSource.ToLocalTime():g} at {settings.ReplaySpeed:0.#}x speed.";
         AddActivity(
-            $"Historical Replay loaded {historicalQuotes.Count} Robinhood observations for the requested {replayStart:g} start through {lastSource.ToLocalTime():g}.");
+            $"Historical Replay loaded {historicalQuotes.Count} real {sourceInterval}-second Robinhood candles for the requested {replayStart:g} start through {lastSource.ToLocalTime():g}.");
+        if (sourceInterval > 15)
+            AddActivity($"Historical data fallback: {sourceInterval}-second candles. Signals, risk checks, and simulated fills use completed source candles; intrabar movements are unavailable. Results can differ from a 15-second replay.", "WARNING");
 
         await foreach (ReplaySessionUpdate update in _replaySessionRunner.RunAsync(
                            historicalQuotes,
@@ -443,16 +457,16 @@ public sealed partial class MainViewModel
             if (_scriptSignalEngine is not null && _ringBuffer.IsValidQuote(replayed))
             {
                 _scriptSignalEngine.Bars.ObserveHistoricalBar(replayed);
-                // A historical candle's close is first available at its end.
-                replayed = replayed with { SourceTimestampUtc = replayed.SourceTimestampUtc.AddSeconds(15) };
             }
+            // Both Built-In and scripts can first use this candle's prices at its actual end.
+            replayed = replayed with { SourceTimestampUtc = replayed.SourceEndsAtUtc };
             ProcessPaperObservation(replayed, allowHistoricalSource: true, source: sourceObservation);
             RefreshMarketView();
             string pacing = _replaySessionRunner.Fast
                 ? "without playback delays"
                 : $"at {settings.ReplaySpeed:0.#}x speed";
             StatusMessage =
-                $"Replaying {update.Index + 1}/{update.Total} real {instrument.Symbol} observations from {firstSource.ToLocalTime():g} {pacing}.";
+                $"Replaying {update.Index + 1}/{update.Total} real {sourceInterval}-second {instrument.Symbol} candles from {firstSource.ToLocalTime():g} {pacing}.";
             AutomationReplayBoundary(update.Index + 1, update.Total);
             if (_replaySessionRunner.Fast && update.Index % 32 == 31)
                 await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.Background);
@@ -462,14 +476,15 @@ public sealed partial class MainViewModel
         AddActivity($"Historical Replay completed after {summary.QuoteCount} real observations.");
         StopActiveSession(
             "COMPLETED",
-            $"Replay completed for {instrument.Symbol}. The chart remains available for inspection.",
+            $"Replay completed for {instrument.Symbol} using {sourceInterval}-second candles. The chart remains available for inspection.",
             keepRobinhoodConnected: true);
     }
 
     private void PrepareDataSession(
         Instrument instrument,
         TradingSessionSettings settings,
-        TradingMode mode)
+        TradingMode mode,
+        int? historicalSourceIntervalSeconds = null)
     {
         ReleaseReplayPause();
         _ringBuffer = new(
@@ -494,6 +509,7 @@ public sealed partial class MainViewModel
         _chartScaleResetVersion++;
         OnPropertyChanged(nameof(ChartScaleResetVersion));
         ChartPoints.Clear();
+        SetHistoricalSourceInterval(historicalSourceIntervalSeconds);
         _hasMarketData = false;
         _currentPrice = "--";
         _bidAskDisplay = "-- / --";
@@ -514,6 +530,15 @@ public sealed partial class MainViewModel
 
         var settingsNode = JsonSerializer.SerializeToNode(settings)!;
         AddStrategyProvenance(settingsNode, settings);
+        if (historicalSourceIntervalSeconds is { } sourceInterval)
+            settingsNode["ReplayHistory"] = JsonSerializer.SerializeToNode(new
+            {
+                SourceIntervalSeconds = sourceInterval,
+                IsFallback = sourceInterval > 15,
+                Availability = "source-candle-close",
+                ExecutionModel = "completed-source-candle-close",
+                IntrabarPricesAvailable = false,
+            });
         if (mode is TradingMode.Live)
         {
             settingsNode["LiveAccountNumber"] = _liveAccount!.AccountNumber;

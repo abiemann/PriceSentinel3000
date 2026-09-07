@@ -28,7 +28,7 @@ public sealed partial class MainViewModel
             return;
         }
 
-        PaperTradeResult result = _paperTradingEngine.Process(GetExecutionHistory(trigger));
+        PaperTradeResult result = _paperTradingEngine.Process(GetExecutionHistory(trigger, allowHistoricalSource));
         _journal.AppendDecision(_activeSession.Id, result.Decision);
         UpdatePaperAccount(result.Account);
         _strategyStateLabel = result.Decision.State;
@@ -53,7 +53,7 @@ public sealed partial class MainViewModel
             result.Fill,
             result.Account);
         CaptureAutomationDecision(result);
-        _tradeMarkers[result.Fill.FilledAtUtc] = result.Fill.Side is PaperOrderSide.Buy
+        _tradeMarkers[allowHistoricalSource && source is not null ? source.SourceTimestampUtc : result.Fill.FilledAtUtc] = result.Fill.Side is PaperOrderSide.Buy
             ? ChartTradeMarker.Buy
             : ChartTradeMarker.Sell;
         _tradeMarkerVersion++;
