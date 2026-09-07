@@ -1,0 +1,20 @@
+{
+  "verifiedAtUtc": "2026-09-07 06:49:15 UTC",
+  "script": {
+    "id": "script:united states oil fund (uso) confirmation - experimental.thinkscript",
+    "name": "United States Oil Fund (USO) Confirmation - experimental",
+    "fileName": "United States Oil Fund (USO) Confirmation - experimental.thinkscript",
+    "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+    "runtimeVersion": "thinkscript-subset-v1",
+    "isBuiltIn": false
+  },
+  "scriptCount": 14,
+  "temporaryCandidatesRemaining": 0,
+  "catalogErrors": [],
+  "allOriginalScriptsPreserved": true,
+  "originalSettingsRestored": true,
+  "originalModeRestored": true,
+  "idle": true,
+  "appVersion": "1.2-dev.17",
+  "processId": 30636
+}

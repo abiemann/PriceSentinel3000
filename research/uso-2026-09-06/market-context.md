@@ -8,8 +8,9 @@ uses USO's own reported share-price history, without substituting WTI futures or
 spot oil observations. That choice is a research inference from the fund's
 structure, not a prediction of price direction.
 
-USCF states that the benchmark moved to a five-day monthly roll from ten days
-on January 1, 2026. Exact September roll dates were not verified, so this report
+USCF states that USO changed its portfolio roll from ten days to five days
+on January 1, 2026 without changing its benchmark or objective. Exact September
+roll dates were not verified, so this report
 does not label any tested session a roll day.
 
 Sources: [USCF fund page](https://www.uscfinvestments.com/uso),
