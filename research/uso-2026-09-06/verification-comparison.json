@@ -1,0 +1,40 @@
+{
+  "generatedAtUtc": "2026-09-07T06:42:47.475022+00:00",
+  "comparedRuns": 2,
+  "mismatchedRuns": 0,
+  "comparison": "Exact Decimal semantic equality of all source/strategy/events, cached indicators, settings/runtime/source, results decisions/fills/account. Only source observedAtUtc, generated order IDs (internal correlation checked), session IDs, and renamed strategy identity fields are ignored.",
+  "runs": [
+    {
+      "file": "D:\\Projects\\PriceSentinel3000\\artifacts\\uso-research\\verification\\USO-2026-09-02-C1.json",
+      "reference": "D:\\Projects\\PriceSentinel3000\\artifacts\\uso-research\\development\\USO-2026-09-02-C1.json",
+      "symbol": "USO",
+      "date": "2026-09-02",
+      "profile": "C1",
+      "originalSessionId": "e85ed438-74a9-47c0-9eea-b1606c678b93",
+      "verificationSessionId": "92c4fccd-49d4-44e3-a40c-69ed23f66430",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "sourceRecords": 1369,
+      "strategyRecords": 243,
+      "eventRecords": 1369,
+      "matched": true,
+      "failureCount": 0,
+      "failures": []
+    },
+    {
+      "file": "D:\\Projects\\PriceSentinel3000\\artifacts\\uso-research\\verification\\USO-2026-09-03-C1.json",
+      "reference": "D:\\Projects\\PriceSentinel3000\\artifacts\\uso-research\\development\\USO-2026-09-03-C1.json",
+      "symbol": "USO",
+      "date": "2026-09-03",
+      "profile": "C1",
+      "originalSessionId": "edce27b8-d8e3-43eb-90f8-e4d797e0f815",
+      "verificationSessionId": "1662d60c-c4bd-4d98-ab59-1ffc75c184d0",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "sourceRecords": 1247,
+      "strategyRecords": 185,
+      "eventRecords": 1247,
+      "matched": true,
+      "failureCount": 0,
+      "failures": []
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "generatedAtUtc": "2026-09-07T06:42:48.259269+00:00",
+  "tolerance": "1E-10",
+  "method": "Independent Python binary64 formulas over only retained, completed bars available at each event; Decimal input parsing and absolute-error comparisons",
+  "auditScope": "Indicator formulas, availability, history resets, evaluation identities, and position-aware strategy proposals. Account arithmetic and host risk rules are audited separately.",
+  "auditedRuns": 2,
+  "invalidRuns": 0,
+  "readyEvaluations": 0,
+  "indicatorComparisons": 0,
+  "runs": [
+    {
+      "file": "D:\\Projects\\PriceSentinel3000\\artifacts\\uso-research\\verification\\USO-2026-09-02-C1.json",
+      "symbol": "USO",
+      "date": "2026-09-02",
+      "profile": "C1",
+      "sessionId": "92c4fccd-49d4-44e3-a40c-69ed23f66430",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "eventCount": 1369,
+      "readyEvaluations": 0,
+      "warmupEvaluations": 399,
+      "indicatorComparisons": 0,
+      "maximumIndicatorAbsoluteError": "0",
+      "requiredWarmupBars": 85,
+      "retainedCapacity": 256,
+      "gapResets": 155,
+      "hostPreemptions": 0,
+      "conflictingSignals": 0,
+      "proposedActions": {
+        "Buy": 0,
+        "Sell": 0,
+        "Hold": 0
+      },
+      "firstReady": null,
+      "lastReady": null,
+      "failureCount": 0,
+      "failures": []
+    },
+    {
+      "file": "D:\\Projects\\PriceSentinel3000\\artifacts\\uso-research\\verification\\USO-2026-09-03-C1.json",
+      "symbol": "USO",
+      "date": "2026-09-03",
+      "profile": "C1",
+      "sessionId": "1662d60c-c4bd-4d98-ab59-1ffc75c184d0",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "eventCount": 1247,
+      "readyEvaluations": 0,
+      "warmupEvaluations": 401,
+      "indicatorComparisons": 0,
+      "maximumIndicatorAbsoluteError": "0",
+      "requiredWarmupBars": 85,
+      "retainedCapacity": 256,
+      "gapResets": 215,
+      "hostPreemptions": 0,
+      "conflictingSignals": 0,
+      "proposedActions": {
+        "Buy": 0,
+        "Sell": 0,
+        "Hold": 0
+      },
+      "firstReady": null,
+      "lastReady": null,
+      "failureCount": 0,
+      "failures": []
+    }
+  ]
+}

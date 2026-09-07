@@ -1,0 +1,20 @@
+{
+  "frozenAtUtc": "2026-09-07T06:40:55.1305665+00:00",
+  "symbol": "USO",
+  "profile": "C1",
+  "fileName": "United States Oil Fund (USO) Confirmation - experimental.thinkscript",
+  "strategyId": "script:united states oil fund (uso) confirmation - experimental.thinkscript",
+  "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+  "inputs": {
+    "fastLength": 8,
+    "slowLength": 21,
+    "momentumLength": 7,
+    "entryStrength": 50,
+    "exitStrength": 50
+  },
+  "requiredWarmupBars": 85,
+  "status": "UNVALIDATED_RESEARCH_STARTER",
+  "selectedByPerformance": false,
+  "basis": "Original C1 availability baseline; development data failed frozen eligibility. No winner was selected.",
+  "protocolCommit": "de74456"
+}
