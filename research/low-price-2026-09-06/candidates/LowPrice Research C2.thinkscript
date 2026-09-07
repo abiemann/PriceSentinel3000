@@ -1,0 +1,19 @@
+# Original PriceSentinel research candidate C2, declared 2026-09-06.
+# EMA8/21 pullback recovery with RSI7 entry50/exit45, matching Original logic.
+# Completed one-minute candles. Host controls all execution and risk limits.
+input fastLength = 8;
+input slowLength = 21;
+input momentumLength = 7;
+input entryStrength = 50;
+input exitStrength = 45;
+
+def fastTrend = ExpAverage(close, fastLength);
+def slowTrend = ExpAverage(close, slowLength);
+def strength = RSI(length = momentumLength, price = close);
+def trendUp = fastTrend > slowTrend and slowTrend >= slowTrend[1];
+def recoveredFast = close > fastTrend and close[1] <= fastTrend[1];
+def strengthImproving = strength >= entryStrength and strength > strength[1];
+def enterLong = trendUp and recoveredFast and strengthImproving;
+def exitLong = close < slowTrend or fastTrend < slowTrend or strength < exitStrength;
+AddOrder(OrderType.BUY_TO_OPEN, enterLong, name = "Trend pullback entry");
+AddOrder(OrderType.SELL_TO_CLOSE, exitLong, name = "Trend or momentum exit");
