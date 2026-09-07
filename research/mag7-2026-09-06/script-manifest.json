@@ -1,0 +1,55 @@
+{
+  "selectionCommit": "b323fae",
+  "windowPacific": "06:30–13:00",
+  "strategies": [
+    {
+      "symbol": "AAPL",
+      "id": "script:apple (aapl) confirmation - experimental.thinkscript",
+      "name": "Apple (AAPL) Confirmation - experimental",
+      "fileName": "Apple (AAPL) Confirmation - experimental.thinkscript",
+      "sourceSha256": "047bbc6be841e61c997ba140aff2f54393e048896aa6309c1eec30f6fc203de7"
+    },
+    {
+      "symbol": "MSFT",
+      "id": "script:microsoft (msft) confirmation - experimental.thinkscript",
+      "name": "Microsoft (MSFT) Confirmation - experimental",
+      "fileName": "Microsoft (MSFT) Confirmation - experimental.thinkscript",
+      "sourceSha256": "c52cda0000392d5578a853b3ca8054e361a8d2234727f80407a955fc2f5bf87a"
+    },
+    {
+      "symbol": "GOOGL",
+      "id": "script:alphabet (googl) confirmation - experimental.thinkscript",
+      "name": "Alphabet (GOOGL) Confirmation - experimental",
+      "fileName": "Alphabet (GOOGL) Confirmation - experimental.thinkscript",
+      "sourceSha256": "bfd3036a50998fb19fd8d962fe2253c3840411d605f26032e40b591b3504ee03"
+    },
+    {
+      "symbol": "AMZN",
+      "id": "script:amazon (amzn) confirmation - experimental.thinkscript",
+      "name": "Amazon (AMZN) Confirmation - experimental",
+      "fileName": "Amazon (AMZN) Confirmation - experimental.thinkscript",
+      "sourceSha256": "7b537fcf3e16742c9a11148849f26acd0bb26c3c8303ce2c4b2fb5beee5f96a1"
+    },
+    {
+      "symbol": "NVDA",
+      "id": "script:nvidia (nvda) confirmation - experimental.thinkscript",
+      "name": "NVIDIA (NVDA) Confirmation - experimental",
+      "fileName": "NVIDIA (NVDA) Confirmation - experimental.thinkscript",
+      "sourceSha256": "06a75053b40bae04a41061aae22879063aa781da03cdc5826516f7be820e8b89"
+    },
+    {
+      "symbol": "META",
+      "id": "script:meta (meta) confirmation - experimental.thinkscript",
+      "name": "Meta (META) Confirmation - experimental",
+      "fileName": "Meta (META) Confirmation - experimental.thinkscript",
+      "sourceSha256": "878200713f63946279b4ed89f1a5d4d11e5cc0818a724ee110cb8b45e42e4f16"
+    },
+    {
+      "symbol": "TSLA",
+      "id": "script:tesla (tsla) confirmation - experimental.thinkscript",
+      "name": "Tesla (TSLA) Confirmation - experimental",
+      "fileName": "Tesla (TSLA) Confirmation - experimental.thinkscript",
+      "sourceSha256": "cf842105d9ceb997d8721f181c6eddc0ce685749a3da9fcb39a21c5d02b64da6"
+    }
+  ]
+}

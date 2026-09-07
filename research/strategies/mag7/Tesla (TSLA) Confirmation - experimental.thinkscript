@@ -1,0 +1,29 @@
+# Tesla (TSLA) Confirmation - experimental; research profile, 2026-09-06.
+# Original PriceSentinel EMA8/EMA21/RSI7 trend and pullback logic.
+# Selected only on September 2 and 3, 2026: highest summed development P&L
+# among four predeclared profiles, using the frozen protocol's tie-break rules.
+# Friday, September 4, was held out from selection and parameter tuning.
+# Use completed one-minute candles; requires an 85-bar warmup.
+# The host owns sizing, fills, stop-loss, daily-loss, and re-entry restrictions.
+# Manually match the app's symbol to TSLA; this script does not enforce it.
+# Experimental; no validated stock-specific advantage or profitability claim.
+# Not bundled by default. Copy into the app's Scripts Folder and Refresh to test.
+input fastLength = 8;
+input slowLength = 21;
+input momentumLength = 7;
+input entryStrength = 55;
+input exitStrength = 50;
+
+def fastTrend = ExpAverage(close, fastLength);
+def slowTrend = ExpAverage(close, slowLength);
+def strength = RSI(length = momentumLength, price = close);
+
+def trendUp = fastTrend > slowTrend and slowTrend >= slowTrend[1];
+def recoveredFast = close > fastTrend and close[1] <= fastTrend[1];
+def strengthImproving = strength >= entryStrength and strength > strength[1];
+
+def enterLong = trendUp and recoveredFast and strengthImproving;
+def exitLong = close < slowTrend or fastTrend < slowTrend or strength < exitStrength;
+
+AddOrder(OrderType.BUY_TO_OPEN, enterLong, name = "Trend pullback entry");
+AddOrder(OrderType.SELL_TO_CLOSE, exitLong, name = "Trend or momentum exit");
