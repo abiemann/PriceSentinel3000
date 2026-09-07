@@ -101,11 +101,11 @@ public sealed class SqliteTradingJournal : ITradingJournal
             INSERT INTO quotes(
                 session_id, symbol, asset_class, observed_at_utc,
                 source_at_utc, bid, ask, last, volume,
-                open_price, high_price, low_price, close_price, ingestion_kind)
+                open_price, high_price, low_price, close_price, source_interval_seconds, ingestion_kind)
             VALUES(
                 $session_id, $symbol, $asset_class, $observed_at_utc,
                 $source_at_utc, $bid, $ask, $last, $volume,
-                $open_price, $high_price, $low_price, $close_price, $ingestion_kind);
+                $open_price, $high_price, $low_price, $close_price, $source_interval_seconds, $ingestion_kind);
             """;
         SqliteParameter sessionParameter = command.Parameters.Add("$session_id", SqliteType.Text);
         SqliteParameter symbolParameter = command.Parameters.Add("$symbol", SqliteType.Text);
@@ -120,6 +120,7 @@ public sealed class SqliteTradingJournal : ITradingJournal
         SqliteParameter highParameter = command.Parameters.Add("$high_price", SqliteType.Real);
         SqliteParameter lowParameter = command.Parameters.Add("$low_price", SqliteType.Real);
         SqliteParameter closeParameter = command.Parameters.Add("$close_price", SqliteType.Real);
+        SqliteParameter intervalParameter = command.Parameters.Add("$source_interval_seconds", SqliteType.Integer);
         SqliteParameter kindParameter = command.Parameters.Add("$ingestion_kind", SqliteType.Text);
         command.Prepare();
 
@@ -138,6 +139,7 @@ public sealed class SqliteTradingJournal : ITradingJournal
             highParameter.Value = ToDatabaseValue(quote.HighPrice);
             lowParameter.Value = ToDatabaseValue(quote.LowPrice);
             closeParameter.Value = ToDatabaseValue(quote.ClosePrice);
+            intervalParameter.Value = quote.SourceIntervalSeconds;
             kindParameter.Value = ingestionKind.ToString();
             command.ExecuteNonQuery();
         }
@@ -580,7 +582,7 @@ public sealed class SqliteTradingJournal : ITradingJournal
             """
             SELECT
                 q.observed_at_utc, q.source_at_utc, q.bid, q.ask, q.last, q.volume,
-                q.open_price, q.high_price, q.low_price, q.close_price
+                q.open_price, q.high_price, q.low_price, q.close_price, q.source_interval_seconds
             FROM quotes AS q
             INNER JOIN (
                 SELECT source_at_utc, MAX(id) AS latest_id
@@ -615,7 +617,8 @@ public sealed class SqliteTradingJournal : ITradingJournal
                 ReadNullableDecimal(reader, 6),
                 ReadNullableDecimal(reader, 7),
                 ReadNullableDecimal(reader, 8),
-                ReadNullableDecimal(reader, 9)));
+                ReadNullableDecimal(reader, 9),
+                reader.GetInt32(10)));
         }
 
         return quotes;

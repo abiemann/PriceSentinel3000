@@ -11,7 +11,7 @@ namespace PriceSentinel3000.Infrastructure.Tests.Storage;
 public sealed class SqliteTradingJournalTests
 {
     [Fact]
-    public void Initialize_MigratesLegacyQuoteTableWithOhlcColumns()
+    public void Initialize_MigratesLegacyQuotesAndPreservesTheirFifteenSecondDuration()
     {
         string directory = Path.Combine(
             Path.GetTempPath(),
@@ -47,6 +47,13 @@ public sealed class SqliteTradingJournalTests
                         volume REAL NOT NULL,
                         ingestion_kind TEXT NOT NULL
                     );
+                    INSERT INTO quotes (
+                        session_id, symbol, asset_class, observed_at_utc, source_at_utc,
+                        bid, ask, last, volume, ingestion_kind)
+                    VALUES (
+                        'b2022bca-345e-4bfa-a39c-dc2f850c9414', 'SOFI', 'Equity',
+                        '2026-08-01T16:01:00Z', '2026-08-01T16:00:00Z',
+                        9.99, 10.01, 10, 100, 'Replay');
                     """;
                 legacySchema.ExecuteNonQuery();
             }
@@ -54,6 +61,13 @@ public sealed class SqliteTradingJournalTests
             using (var journal = new SqliteTradingJournal(databasePath))
             {
                 journal.Initialize();
+                journal.Initialize();
+                MarketQuote migrated = Assert.Single(journal.ReadSessionQuotes(
+                    Guid.Parse("b2022bca-345e-4bfa-a39c-dc2f850c9414"), new Instrument("SOFI")));
+                Assert.Equal(15, migrated.SourceIntervalSeconds);
+                Assert.Equal(new DateTimeOffset(2026, 8, 1, 16, 0, 0, TimeSpan.Zero), migrated.SourceTimestampUtc);
+                Assert.Equal(migrated.SourceTimestampUtc.AddSeconds(15), migrated.SourceEndsAtUtc);
+                Assert.Equal(10m, migrated.Last);
             }
 
             using var verification = new SqliteConnection($"Data Source={databasePath}");
@@ -72,6 +86,10 @@ public sealed class SqliteTradingJournalTests
             Assert.Contains("high_price", columns);
             Assert.Contains("low_price", columns);
             Assert.Contains("close_price", columns);
+            Assert.Contains("source_interval_seconds", columns);
+            reader.Close();
+            inspect.CommandText = "SELECT COUNT(*) FROM schema_version WHERE version = 4;";
+            Assert.Equal(1L, inspect.ExecuteScalar());
         }
         finally
         {
@@ -81,6 +99,52 @@ public sealed class SqliteTradingJournalTests
             {
                 Directory.Delete(directory, recursive: true);
             }
+        }
+    }
+
+    [Theory]
+    [InlineData(15)]
+    [InlineData(30)]
+    [InlineData(60)]
+    [InlineData(120)]
+    public void Journal_PreservesHistoricalDurationAndCandleAcrossReopen(int intervalSeconds)
+    {
+        string directory = Path.Combine(
+            Path.GetTempPath(), "PriceSentinel3000.Tests", Guid.NewGuid().ToString("N"));
+        string databasePath = Path.Combine(directory, "journal.db");
+
+        try
+        {
+            var instrument = new Instrument("NFLX");
+            DateTimeOffset start = new(2026, 8, 24, 13, 30, 0, TimeSpan.Zero);
+            MarketQuote source = Quote(instrument, start, 80m) with
+            {
+                ObservedAtUtc = start.AddDays(14),
+                OpenPrice = 79.95m,
+                HighPrice = 80.05m,
+                LowPrice = 79.90m,
+                ClosePrice = 80m,
+                SourceIntervalSeconds = intervalSeconds,
+            };
+            Guid sessionId;
+            using (var journal = new SqliteTradingJournal(databasePath))
+            {
+                journal.Initialize();
+                sessionId = journal.StartSession(instrument, TradingMode.Replay, 1400m, "{}", start).Id;
+                journal.AppendQuotes(sessionId, [source], QuoteIngestionKind.Replay);
+            }
+
+            using var reopened = new SqliteTradingJournal(databasePath);
+            reopened.Initialize();
+            MarketQuote restored = Assert.Single(reopened.ReadSessionQuotes(sessionId, instrument));
+            Assert.Equal(source, restored);
+            Assert.Equal(start.AddSeconds(intervalSeconds), restored.SourceEndsAtUtc);
+            Assert.Equal(1, reopened.GetSummary(sessionId).QuoteCount);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
         }
     }
 

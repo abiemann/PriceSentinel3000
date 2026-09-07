@@ -30,6 +30,41 @@ public sealed class PriceRingBufferTests
     }
 
     [Fact]
+    public void Merge_TreatsChangedHistoricalDurationAsACorrection()
+    {
+        var buffer = new PriceRingBuffer(Instrument, TimeSpan.FromMinutes(7));
+        MarketQuote original = Quote(Start, 10m, Start) with
+        {
+            OpenPrice = 10m, HighPrice = 11m, LowPrice = 9m, ClosePrice = 10m,
+            SourceIntervalSeconds = 30,
+        };
+        buffer.Merge([original]);
+
+        QuoteMergeResult result = buffer.Merge([
+            original with { SourceIntervalSeconds = 60, ObservedAtUtc = Start.AddMinutes(1) },
+        ]);
+
+        Assert.Equal(1, result.Corrected);
+        Assert.Equal(0, result.Duplicates);
+        Assert.Equal(60, Assert.Single(buffer.Snapshot()).SourceIntervalSeconds);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-15)]
+    [InlineData(45)]
+    [InlineData(300)]
+    public void Merge_RejectsUnsupportedSourceDuration(int sourceSeconds)
+    {
+        var buffer = new PriceRingBuffer(Instrument, TimeSpan.FromMinutes(7));
+        MarketQuote quote = Quote(Start, 10m, Start) with { SourceIntervalSeconds = sourceSeconds };
+
+        Assert.False(buffer.IsValidQuote(quote));
+        Assert.Equal(1, buffer.Merge([quote]).Rejected);
+        Assert.Empty(buffer.Snapshot());
+    }
+
+    [Fact]
     public void Merge_TrimsQuotesOutsideRetentionWindow()
     {
         var buffer = new PriceRingBuffer(Instrument, TimeSpan.FromMinutes(2));

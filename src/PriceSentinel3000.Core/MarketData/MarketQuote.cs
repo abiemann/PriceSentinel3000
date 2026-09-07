@@ -11,8 +11,12 @@ public sealed record MarketQuote(
     decimal? OpenPrice = null,
     decimal? HighPrice = null,
     decimal? LowPrice = null,
-    decimal? ClosePrice = null)
+    decimal? ClosePrice = null,
+    int SourceIntervalSeconds = 15)
 {
+    // Historical bars cover this duration from SourceTimestampUtc. Live sampled
+    // quotes are instantaneous; their observation path does not use this value.
+    public DateTimeOffset SourceEndsAtUtc => SourceTimestampUtc.AddSeconds(SourceIntervalSeconds);
     public decimal Spread => Ask - Bid;
     public decimal Midpoint => (Bid + Ask) / 2m;
     public bool HasTwoSidedMarket => Bid > 0m && Ask >= Bid;

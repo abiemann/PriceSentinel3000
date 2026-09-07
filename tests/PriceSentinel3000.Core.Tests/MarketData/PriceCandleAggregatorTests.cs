@@ -32,6 +32,51 @@ public sealed class PriceCandleAggregatorTests
     }
 
     [Fact]
+    public void Aggregate_PreservesCoarseSourcePricesDurationAndVolume()
+    {
+        MarketQuote first = Quote(Start, 130.2m, 200m) with
+        {
+            OpenPrice = 130.1m, HighPrice = 130.5m, LowPrice = 129.9m, ClosePrice = 130.2m,
+            SourceIntervalSeconds = 60,
+        };
+        MarketQuote second = first with
+        {
+            SourceTimestampUtc = Start.AddMinutes(1), OpenPrice = 130.2m, HighPrice = 130.7m,
+            LowPrice = 130.0m, ClosePrice = 130.4m, Last = 130.4m, Volume = 300m,
+        };
+
+        PriceCandle candle = Assert.Single(
+            PriceCandleAggregator.Aggregate([first, second], TimeSpan.FromMinutes(2)));
+
+        Assert.Equal(Start, candle.StartsAtUtc);
+        Assert.Equal(second.SourceEndsAtUtc, candle.EndsAtUtc);
+        Assert.Equal(2, candle.QuoteCount);
+        Assert.Equal((130.1m, 130.7m, 129.9m, 130.4m, 500m),
+            (candle.Open, candle.High, candle.Low, candle.Close, candle.Volume));
+        Assert.False(candle.IsSynthetic);
+    }
+
+    [Theory]
+    [InlineData(15, 120, 0)]
+    [InlineData(60, 120, 0)]
+    [InlineData(300, 120, 0)]
+    [InlineData(60, 0, 0)]
+    [InlineData(60, 45, 0)]
+    [InlineData(60, 30, 15)]
+    public void Aggregate_RejectsShrinkingSplittingOrMisalignedHistoricalBars(
+        int chartSeconds, int sourceSeconds, int sourceStart)
+    {
+        MarketQuote historical = Quote(Start.AddSeconds(sourceStart), 130.2m, 200m) with
+        {
+            OpenPrice = 130.1m, HighPrice = 130.5m, LowPrice = 129.9m, ClosePrice = 130.2m,
+            SourceIntervalSeconds = sourceSeconds,
+        };
+
+        Assert.Throws<InvalidOperationException>(() =>
+            PriceCandleAggregator.Aggregate([historical], TimeSpan.FromSeconds(chartSeconds)));
+    }
+
+    [Fact]
     public void Aggregate_BuildsFifteenSecondCandleFromLiveQuotes()
     {
         MarketQuote[] quotes =

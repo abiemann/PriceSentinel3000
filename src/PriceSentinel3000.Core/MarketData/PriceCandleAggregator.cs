@@ -26,6 +26,21 @@ public static class PriceCandleAggregator
                 "Candle interval must be positive.");
         }
 
+        foreach (MarketQuote quote in quotes)
+        {
+            // Live samples have no candle span and may arrive at any timestamp.
+            if (quote.OpenPrice is null && quote.HighPrice is null &&
+                quote.LowPrice is null && quote.ClosePrice is null)
+                continue;
+            if (quote.SourceIntervalSeconds is not (15 or 30 or 60 or 120))
+                throw new InvalidOperationException("Historical source interval must be 15, 30, 60, or 120 seconds.");
+            TimeSpan sourceInterval = TimeSpan.FromSeconds(quote.SourceIntervalSeconds);
+            if (interval.Ticks % sourceInterval.Ticks != 0)
+                throw new InvalidOperationException("Chart candle interval must be an exact multiple of the historical source interval.");
+            if (AlignToInterval(quote.SourceTimestampUtc, sourceInterval) != quote.SourceTimestampUtc)
+                throw new InvalidOperationException("Historical bars must start on a source interval boundary.");
+        }
+
         PriceCandle[] observedCandles =
         [
             .. quotes

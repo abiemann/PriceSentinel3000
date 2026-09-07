@@ -55,6 +55,7 @@ internal static class SqliteJournalSchema
                 high_price REAL NULL,
                 low_price REAL NULL,
                 close_price REAL NULL,
+                source_interval_seconds INTEGER NOT NULL DEFAULT 15,
                 ingestion_kind TEXT NOT NULL,
                 FOREIGN KEY(session_id) REFERENCES sessions(id)
             );
@@ -183,6 +184,31 @@ internal static class SqliteJournalSchema
         schema.ExecuteNonQuery();
         EnsureQuoteCandleColumns(connection);
         EnsureLiveExecutionIds(connection);
+        EnsureQuoteSourceIntervalColumn(connection);
+    }
+
+    private static void EnsureQuoteSourceIntervalColumn(SqliteConnection connection)
+    {
+        using SqliteTransaction transaction = connection.BeginTransaction();
+        using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            "SELECT COUNT(*) FROM pragma_table_info('quotes') WHERE name = 'source_interval_seconds';";
+        if ((long)command.ExecuteScalar()! == 0)
+        {
+            // All historical observations recorded before this migration used 15-second bars.
+            command.CommandText =
+                "ALTER TABLE quotes ADD COLUMN source_interval_seconds INTEGER NOT NULL DEFAULT 15;";
+            command.ExecuteNonQuery();
+        }
+
+        command.CommandText =
+            """
+            INSERT OR IGNORE INTO schema_version(version, applied_at_utc)
+            VALUES (4, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+            """;
+        command.ExecuteNonQuery();
+        transaction.Commit();
     }
 
     private static void EnsureLiveExecutionIds(SqliteConnection connection)

@@ -79,6 +79,7 @@ public sealed class PriceRingBuffer
     {
         ArgumentNullException.ThrowIfNull(quote);
         return quote.Instrument == Instrument &&
+               quote.SourceIntervalSeconds is (15 or 30 or 60 or 120) &&
                quote.Last > 0m &&
                HasValidMarketPrices(quote);
     }
@@ -91,7 +92,8 @@ public sealed class PriceRingBuffer
         left.OpenPrice == right.OpenPrice &&
         left.HighPrice == right.HighPrice &&
         left.LowPrice == right.LowPrice &&
-        left.ClosePrice == right.ClosePrice;
+        left.ClosePrice == right.ClosePrice &&
+        left.SourceIntervalSeconds == right.SourceIntervalSeconds;
 
     private static bool HasValidMarketPrices(MarketQuote quote) =>
         (quote.HasTwoSidedMarket || quote.Bid == 0m && quote.Ask == 0m) &&

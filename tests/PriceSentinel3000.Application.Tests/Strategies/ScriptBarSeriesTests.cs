@@ -48,6 +48,80 @@ public sealed class ScriptBarSeriesTests
         Assert.Equal(Start.AddSeconds(15), Assert.Single(atEnd.Snapshot()).EndsAtUtc);
     }
 
+    [Theory]
+    [InlineData(30)]
+    [InlineData(60)]
+    [InlineData(120)]
+    public void CoarseHistoricalBarsBecomeAvailableOnlyAtTheirActualClose(int sourceSeconds)
+    {
+        var beforeEnd = new ScriptBarSeries(sourceSeconds, 10);
+        var atEnd = new ScriptBarSeries(sourceSeconds, 10);
+        MarketQuote quote = History(0, 10, 12, 9, 11) with { SourceIntervalSeconds = sourceSeconds };
+
+        beforeEnd.SeedHistory([quote], Start.AddSeconds(sourceSeconds - 1));
+        atEnd.SeedHistory([quote], Start.AddSeconds(sourceSeconds));
+
+        Assert.Empty(beforeEnd.Snapshot());
+        StrategyBar bar = Assert.Single(atEnd.Snapshot());
+        Assert.Equal(Start.AddSeconds(sourceSeconds), bar.EndsAtUtc);
+        Assert.Equal(quote.SourceEndsAtUtc, bar.EndsAtUtc);
+        Assert.Equal((10m, 12m, 9m, 11m, 10m), (bar.Open, bar.High, bar.Low, bar.Close, bar.Volume));
+        Assert.Equal(1, atEnd.CompletedBarCount);
+    }
+
+    [Fact]
+    public void CoarseSourceBarsAggregateWithoutInventingIntermediatePrices()
+    {
+        var series = new ScriptBarSeries(120, 10);
+        series.ObserveHistoricalBar(History(0, 10, 12, 9, 11) with { SourceIntervalSeconds = 60 });
+        Assert.Empty(series.Snapshot());
+
+        series.ObserveHistoricalBar(History(60, 11, 13, 8, 12) with { SourceIntervalSeconds = 60, Volume = 25 });
+
+        StrategyBar bar = Assert.Single(series.Snapshot());
+        Assert.Equal(Start, bar.StartsAtUtc);
+        Assert.Equal(Start.AddSeconds(120), bar.EndsAtUtc);
+        Assert.Equal((10m, 13m, 8m, 12m, 35m), (bar.Open, bar.High, bar.Low, bar.Close, bar.Volume));
+        Assert.Equal(1, series.CompletedBarCount);
+    }
+
+    [Fact]
+    public void CoarseSourceGapResetsWarmupAndExcludesTheIncompleteStrategyCandle()
+    {
+        var series = new ScriptBarSeries(60, 10);
+        foreach (int second in new[] { 0, 30 })
+            series.ObserveHistoricalBar(History(second, 10, 11, 9, 10) with { SourceIntervalSeconds = 30 });
+        Assert.Single(series.Snapshot());
+
+        series.ObserveHistoricalBar(History(90, 10, 11, 9, 10) with { SourceIntervalSeconds = 30 });
+        Assert.Empty(series.Snapshot());
+        foreach (int second in new[] { 120, 150 })
+            series.ObserveHistoricalBar(History(second, 12, 13, 11, 12) with { SourceIntervalSeconds = 30 });
+
+        Assert.Equal(Start.AddSeconds(120), Assert.Single(series.Snapshot()).StartsAtUtc);
+        Assert.Equal(2, series.CompletedBarCount);
+    }
+
+    [Theory]
+    [InlineData(60, 120, 0)]
+    [InlineData(300, 120, 0)]
+    [InlineData(60, 0, 0)]
+    [InlineData(60, -15, 0)]
+    [InlineData(60, 45, 0)]
+    [InlineData(300, 300, 0)]
+    [InlineData(60, 30, 15)]
+    public void UnsupportedOrUnalignedSourceIntervalsCannotEnterStrategyHistory(
+        int strategySeconds, int sourceSeconds, int sourceStart)
+    {
+        var series = new ScriptBarSeries(strategySeconds, 10);
+        MarketQuote quote = History(sourceStart, 10, 12, 9, 11) with { SourceIntervalSeconds = sourceSeconds };
+
+        Assert.Throws<InvalidOperationException>(() => series.ObserveHistoricalBar(quote));
+        Assert.Throws<InvalidOperationException>(() => series.SeedHistory([quote], Start.AddMinutes(10)));
+        Assert.Empty(series.Snapshot());
+        Assert.Equal(0, series.Version);
+    }
+
     [Fact]
     public void DuplicateHistoricalBarAfterSeedingCannotRewriteCompletedHistory()
     {

@@ -35,7 +35,8 @@ public sealed class ScriptBarSeries
             throw new InvalidOperationException("Strategy history can only be seeded before observation starts.");
         foreach (MarketQuote quote in history.OrderBy(item => item.SourceTimestampUtc))
         {
-            if (quote.SourceTimestampUtc.AddSeconds(15) <= availableAtUtc)
+            ValidateHistoricalInterval(quote);
+            if (quote.SourceEndsAtUtc <= availableAtUtc)
                 ObserveHistoricalBar(quote);
         }
         // Retain only history already available at the first quote. Any remaining
@@ -91,6 +92,7 @@ public sealed class ScriptBarSeries
     public void ObserveHistoricalBar(MarketQuote quote)
     {
         Validate(quote);
+        ValidateHistoricalInterval(quote);
         DateTimeOffset at = quote.SourceTimestampUtc;
         if (_lastObservation is not null && at < _lastObservation)
             return;
@@ -118,7 +120,7 @@ public sealed class ScriptBarSeries
                 Volume = _forming.Volume + quote.Volume,
             };
         }
-        _nextHistoricalStart = at.AddSeconds(15);
+        _nextHistoricalStart = quote.SourceEndsAtUtc;
         _lastObservation = _nextHistoricalStart;
         if (_nextHistoricalStart == _forming.EndsAtUtc)
         {
@@ -141,6 +143,18 @@ public sealed class ScriptBarSeries
     {
         _bars.Clear();
         Version++;
+    }
+
+    private void ValidateHistoricalInterval(MarketQuote quote)
+    {
+        ArgumentNullException.ThrowIfNull(quote);
+        if (quote.SourceIntervalSeconds is not (15 or 30 or 60 or 120))
+            throw new InvalidOperationException("Historical source interval must be 15, 30, 60, or 120 seconds.");
+        TimeSpan sourceInterval = TimeSpan.FromSeconds(quote.SourceIntervalSeconds);
+        if (_interval.Ticks % sourceInterval.Ticks != 0)
+            throw new InvalidOperationException("Strategy candle interval must be an exact multiple of the historical source interval.");
+        if (PriceCandleAggregator.AlignToInterval(quote.SourceTimestampUtc, sourceInterval) != quote.SourceTimestampUtc)
+            throw new InvalidOperationException("Historical bars must start on a source interval boundary.");
     }
 
     private static void Validate(MarketQuote quote)
