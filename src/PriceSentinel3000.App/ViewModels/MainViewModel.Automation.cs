@@ -405,8 +405,10 @@ public sealed partial class MainViewModel
     {
         if (_activeSession?.Mode is not (TradingMode.Replay or TradingMode.PaperTrader)) return;
         _automationOutcome = outcome;
-        if (_automationOperationId.HasValue)
-            _automationOperationState = outcome == "COMPLETED" ? "completed" : outcome == "ERROR" ? "failed" : "stopped";
+        // Publish completion only after the start command has fully unwound in
+        // ObserveAutomationSessionAsync, so a completed replay can be restarted.
+        if (_automationOperationId.HasValue && outcome != "COMPLETED")
+            _automationOperationState = outcome == "ERROR" ? "failed" : "stopped";
         if (outcome != "ERROR") _automationOperationError = null;
         _automationStepCompletion?.TrySetResult();
     }

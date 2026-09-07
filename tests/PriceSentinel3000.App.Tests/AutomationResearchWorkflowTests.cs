@@ -74,7 +74,8 @@ public sealed partial class SessionWorkflowTests
         // Selecting another strategy does not relabel retained data.
         Assert.True((await Automate(vm, "configure", new { mode = "Replay", settings = new { strategyId = "builtin" } })).Success);
         Assert.Equal("script", (await Automate(vm, "indicators", new { sessionId = session })).Result!.Value.GetProperty("kind").GetString());
-        await Automate(vm, "start", new { fast = true, pauseAfterObservations = 1 });
+        var restart = await Automate(vm, "start", new { fast = true, pauseAfterObservations = 1 });
+        Assert.True(restart.Success, restart.Error);
         await WaitForAutomation(vm, status => status.GetProperty("paused").GetBoolean());
         Assert.False((await Automate(vm, "events", new { sessionId = session })).Success);
         Assert.Single((await Automate(vm, "events")).Result!.Value.GetProperty("records").EnumerateArray());
