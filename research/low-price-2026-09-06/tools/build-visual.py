@@ -65,12 +65,23 @@ def prepare(source):
         series_out = []
         for stock in stocks:
             series = next(series for series in day["series"] if series["ticker"] == stock["ticker"])
-            if series.get("status") != "complete":
-                raise ValueError("Incomplete or missing sessions cannot be presented as complete paths")
+            if series.get("status") not in ("complete", "partial"):
+                raise ValueError("Missing or unaudited sessions cannot be presented as observed paths")
             gross = finite(series["grossPnl"], "grossPnl")
             adjusted = finite(series["costAdjustedPnl"], "costAdjustedPnl")
             if adjusted > gross + 0.000001:
                 raise ValueError("Cost-adjusted P&L exceeds gross P&L")
+            coverage = {name: series[name] for name in ("entries", "sourceCount", "expectedSourceCount")}
+            if any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in coverage.values()):
+                raise ValueError("Entry and source counts must be nonnegative integers")
+            if not 0 < coverage["sourceCount"] <= coverage["expectedSourceCount"]:
+                raise ValueError("Source coverage must be between zero and the expected count")
+            first_ready = series["firstReady"]
+            if first_ready is not None and not isinstance(first_ready, str):
+                raise ValueError("firstReady must be an actual timestamp or null")
+            exposure = finite(series["endingExposure"], "endingExposure")
+            if exposure < 0:
+                raise ValueError("Ending long exposure cannot be negative")
             points = []
             for point in series["points"]:
                 timestamp = dt.datetime.fromisoformat(point["t"].replace("Z", "+00:00"))
@@ -84,8 +95,9 @@ def prepare(source):
                 raise ValueError("Path endpoint does not reconcile with audited gross P&L")
             retained = retain_extrema(points)
             sampled |= len(retained) != len(points)
-            series_out.append({"ticker": stock["ticker"], "points": retained, "grossPnl": gross,
-                               "costAdjustedPnl": adjusted, "observationCount": len(points)})
+            series_out.append({"ticker": stock["ticker"], "status": series["status"], "points": retained, "grossPnl": gross,
+                               "costAdjustedPnl": adjusted, "observationCount": len(points),
+                               **coverage, "firstReady": first_ready, "endingExposure": exposure})
         days.append({"date": day["date"], "phase": day["phase"], "series": series_out})
     if source["timeZone"] != "America/Los_Angeles":
         raise ValueError("Expected Pacific session labels")

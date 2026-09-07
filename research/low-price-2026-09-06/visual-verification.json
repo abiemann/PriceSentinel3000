@@ -1,0 +1,18 @@
+{
+  "verifiedAtUtc": "2026-09-07T05:08:50.5888499+00:00",
+  "fragmentSha256": "f84d35f635771d05613748d7e804c9fed24670a9d30479d0758bc140a996d0c8",
+  "fragmentBytes": 191240,
+  "testedContentWidths": [
+    360,
+    736
+  ],
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "seriesToggle": "NU line, endpoint, and table rows hide together; restored all three",
+  "tooltip": "Click pins an interpolated cross-series tooltip with all three values and aligned markers",
+  "labels": "NU Friday never-ready is marked unvalidated; SOFI and AAL Friday open positions are labeled",
+  "horizontalOverflowAt736": false,
+  "browserOverridesReset": true
+}

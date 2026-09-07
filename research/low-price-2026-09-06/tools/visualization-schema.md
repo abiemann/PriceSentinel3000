@@ -19,9 +19,17 @@ The top-level fields are:
 - `days`: the three sessions below, each containing a `series` object per stock
 
 Each day has `date` and `phase`: September 2 and 3 use `"development"`;
-September 4 uses `"heldout"`. Each series has `ticker`, `status: "complete"`,
+September 4 uses `"heldout"`. Each series has `ticker`, `status` (`"complete"`
+or `"partial"` for audited observed history below the eligibility threshold),
 `grossPnl`, `costAdjustedPnl`, and `points`. The cost-adjusted endpoint is the
 auditor's 5-bps score including its ending-closing-cost allowance.
+
+Each series also retains `entries`, `sourceCount`, `expectedSourceCount`,
+`firstReady` (an actual timestamp or `null`), and `endingExposure`. The visual
+labels a never-ready strategy as unvalidated rather than interpreting its flat
+zero P&L as successful performance. An incomplete source count and null readiness
+produce a gaps-prevented-warmup label. Positive ending exposure is labeled as an
+open position marked at the session close; it is not shown as a realized exit.
 
 Each point contains `t` (an ISO timestamp with UTC offset) and `equity` (actual
 observed account equity). Monetary values accept JSON numbers or decimal strings.

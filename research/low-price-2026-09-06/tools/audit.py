@@ -555,7 +555,9 @@ def visualization_data(report, equity, frozen):
             row = metrics[path["symbol"], path["profile"], date]
             series.append(dict(ticker=path["symbol"], status="complete" if not row["failures"] and row["dataEligible"] else "partial",
                                points=[dict(t=point["atUtc"], equity=point["equity"]) for point in path["observations"]],
-                               grossPnl=row["grossPnl"], costAdjustedPnl=row["primaryScore"]))
+                               grossPnl=row["grossPnl"], costAdjustedPnl=row["primaryScore"],
+                               entries=row["entries"], sourceCount=row["sourceCount"], expectedSourceCount=EXPECTED,
+                               firstReady=row["firstReady"], endingExposure=row["endingExposure"]))
         if series:
             days.append(dict(date=date, phase="heldout" if date == FRIDAY else "development", series=series))
     selected_symbols = {row["symbol"] for row in report["selections"]}

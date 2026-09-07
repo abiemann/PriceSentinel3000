@@ -112,3 +112,37 @@ source hash against the current catalog. Existing unavailable files still
 require omitting those jobs from a new manifest. Partial or invalid completed
 files are rejected, never overwritten. Before continuing after an uncertain
 failure, inspect the app and construct the next manifest deliberately.
+
+## Independent offline checks
+
+The Python standard-library indicator auditor reconstructs only the completed
+bars retained at each evaluation, including history resets and capacity limits.
+It recomputes EMA, Wilder RSI, means, prior channels, cross conditions, and
+position-aware proposals for the five frozen profiles. Binary64 indicator
+arithmetic follows the interpreter's documented numeric model; comparisons to
+Decimal-parsed exports use an absolute tolerance of `1e-10`. Account and risk
+accounting have a separate Decimal auditor in `audit.py`.
+
+```powershell
+python research/low-price-2026-09-06/tools/audit-indicators.py `
+  --directory artifacts/low-price-research/development `
+  --output research/low-price-2026-09-06/development-indicator-audit.json
+python research/low-price-2026-09-06/tools/compare-replays.py `
+  --reference artifacts/low-price-research/development `
+  --verification artifacts/low-price-research/verification `
+  --output research/low-price-2026-09-06/verification-comparison.json
+```
+
+`compare-replays.py` compares named-script verification runs with their matching
+candidate filenames. It checks every source and strategy record, event,
+indicator snapshot, pinned settings/source, decision, fill, and account. The
+comparison removes only receipt wall times, generated order IDs after checking
+their internal correlations, session IDs, and renamed strategy identity fields.
+
+`export-validation/check.ps1` uses reflection against the built exporter to
+accept all 16 saved C1 runs and reject corrupted completeness, identity,
+settings, and hash fixtures. It also verifies exact serialization of a long
+numeric token. `export-validation/check-indicators.py` accepts an unchanged
+saved fixture and rejects a corrupt indicator and proposed action. Their
+retained JSON results record 23 exporter checks and three indicator fixtures.
+Neither check connects to the app.

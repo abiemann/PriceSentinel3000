@@ -1,0 +1,32 @@
+{
+  "verifiedAtUtc": "2026-09-07T04:51:50.752Z",
+  "restoredSettings": true,
+  "processId": 30636,
+  "named": [
+    {
+      "id": "script:american airlines (aal) confirmation - experimental.thinkscript",
+      "name": "American Airlines (AAL) Confirmation - experimental",
+      "fileName": "American Airlines (AAL) Confirmation - experimental.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "runtimeVersion": "thinkscript-subset-v1",
+      "isBuiltIn": false
+    },
+    {
+      "id": "script:nu holdings (nu) breakout - experimental.thinkscript",
+      "name": "Nu Holdings (NU) Breakout - experimental",
+      "fileName": "Nu Holdings (NU) Breakout - experimental.thinkscript",
+      "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+      "runtimeVersion": "thinkscript-subset-v1",
+      "isBuiltIn": false
+    },
+    {
+      "id": "script:sofi technologies (sofi) breakout - experimental.thinkscript",
+      "name": "SoFi Technologies (SOFI) Breakout - experimental",
+      "fileName": "SoFi Technologies (SOFI) Breakout - experimental.thinkscript",
+      "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+      "runtimeVersion": "thinkscript-subset-v1",
+      "isBuiltIn": false
+    }
+  ],
+  "remainingTemporaries": 0
+}

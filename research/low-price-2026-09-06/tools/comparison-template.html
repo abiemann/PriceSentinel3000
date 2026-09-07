@@ -1,6 +1,6 @@
 <div id="low-price-comparison-20260906" class="tabular-nums">
   <h2>Three stocks, three sessions</h2>
-  <div class="text-small lp-caption">Gross P&amp;L · fresh $1,400 account/day · $500 positions</div>
+  <div class="text-small lp-caption">Gross P&amp;L · fresh $1,400 account per stock per day · $500 positions</div>
   <div class="text-small lp-caption">Mon Aug 31 and Tue Sep 1: history unavailable</div>
   <div class="lp-legend" aria-label="Stock series"></div>
   <div class="lp-days"></div>
@@ -23,6 +23,8 @@
   #low-price-comparison-20260906 .lp-swatch { width: 22px; height: 10px; overflow: visible; }
   #low-price-comparison-20260906 .lp-day { margin-block: 16px; }
   #low-price-comparison-20260906 .lp-day h3 { margin-block: 0 4px; }
+  #low-price-comparison-20260906 .lp-session-note { margin-block: 4px; }
+  #low-price-comparison-20260906 .lp-row-note { display: block; font-weight: 400; }
   #low-price-comparison-20260906 .lp-plot { width: 100%; }
   #low-price-comparison-20260906 .lp-chart { display: block; width: 100%; overflow: visible; }
   #low-price-comparison-20260906 .lp-chart text { fill: var(--foreground); font-size: 12px; }
@@ -107,6 +109,12 @@
       cell.scope = 'row';
       cell.textContent = label;
       cell.setAttribute('aria-label', label + (day.phase === 'heldout' ? ', Friday held out' : ', development'));
+      if (series.firstReady === null || series.endingExposure > 0) {
+        const note = document.createElement('span');
+        note.className = 'text-small lp-row-note';
+        note.textContent = series.firstReady === null ? 'Unvalidated: warmup never ready' : 'Open at close';
+        cell.append(note);
+      }
       row.append(cell);
       [series.grossPnl, series.costAdjustedPnl].forEach(value => {
         const valueCell = document.createElement('td');
@@ -233,7 +241,7 @@
         const name = document.createElement('span');
         name.textContent = series.ticker;
         const amount = document.createElement('span');
-        amount.textContent = value === null ? 'No observation' : money.format(value);
+        amount.textContent = series.firstReady === null ? 'Not evaluated' : value === null ? 'No observation' : money.format(value);
         row.append(swatch, name, amount);
         tooltip.append(row);
       });
@@ -264,9 +272,23 @@
     const container = document.createElement('div');
     container.className = 'lp-plot';
     section.append(heading, container);
+    day.series.filter(series => series.firstReady === null).forEach(series => {
+      const note = document.createElement('div');
+      note.className = 'text-small lp-session-note';
+      const coverage = series.sourceCount.toLocaleString('en-US') + '/' + series.expectedSourceCount.toLocaleString('en-US');
+      note.textContent = series.ticker + ': unvalidated · ' + (series.sourceCount < series.expectedSourceCount ? 'gaps prevented warmup' : 'warmup never ready') + ' · ' + coverage + ' source bars · ' + series.entries + ' entries';
+      section.append(note);
+    });
+    const openStocks = day.series.filter(series => series.endingExposure > 0).map(series => series.ticker);
+    if (openStocks.length) {
+      const note = document.createElement('div');
+      note.className = 'text-small lp-session-note';
+      note.textContent = openStocks.join(', ') + ': open positions marked at close';
+      section.append(note);
+    }
     root.querySelector('.lp-days').append(section);
     const svg = d3.select(container).append('svg').attr('class', 'lp-chart').attr('role', 'img').attr('aria-label', title + ' gross P&L');
-    const plot = {day, title, container, svg, series: day.series.map(series => ({ticker: series.ticker, values: series.points.map(point => ({x: point[0], y: point[1]}))}))};
+    const plot = {day, title, container, svg, series: day.series.map(series => ({ticker: series.ticker, firstReady: series.firstReady, values: series.points.map(point => ({x: point[0], y: point[1]}))}))};
     plots.push(plot);
     new ResizeObserver(() => { hideTooltip(); draw(plot); }).observe(container);
     draw(plot);
