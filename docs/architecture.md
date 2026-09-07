@@ -118,6 +118,16 @@ Symbol entry uses the `IInstrumentSearchSource` port for autocomplete suggestion
 Robinhood tradability capabilities and the Core `EquityMarketSessionEvaluator`
 feed the `24HR` eligibility badge and the current `Tradable now` projection. Those
 presentation states do not expand the broker-execution window described below.
+The projection uses the current New York clock and recurring U.S. exchange
+holidays and early closes, not the historical Replay timestamp. The calendar
+rules are checked against the [NYSE's published 2026-2028 calendar](https://www.nyse.com/trade/hours-calendars).
+Regular sessions end at 13:00 Eastern on half-days; extended and 24-hour sessions
+end at 17:00. Under [Robinhood's 24-hour schedule](https://cdn.robinhood.com/assets/robinhood/legal/ExtendedHoursTradingDisclosure.pdf),
+20:00-midnight belongs to the following trading date. For example, the Sunday
+evening before Labor Day is closed, and Monday at 20:00 reopens for Tuesday.
+The `24HR` badge still indicates symbol eligibility during closures. One-off or
+unscheduled exchange closures, symbol halts, and additional broker restrictions
+are not predicted by this local calendar.
 
 ## LIVE safety invariants
 

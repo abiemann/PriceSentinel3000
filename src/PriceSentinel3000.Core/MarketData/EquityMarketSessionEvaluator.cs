@@ -1,9 +1,9 @@
 namespace PriceSentinel3000.Core.MarketData;
 
 /// <summary>
-/// Evaluates the published weekly equity-session schedule in New York time.
-/// Exchange holidays, unscheduled closures, symbol halts, and broker restrictions
-/// are not represented and must be checked separately.
+/// Evaluates the scheduled equity sessions in New York time, including recurring
+/// exchange holidays and early closes. Unscheduled closures, symbol halts, and
+/// broker restrictions must be checked separately.
 /// </summary>
 public sealed class EquityMarketSessionEvaluator(TimeProvider? timeProvider = null)
 {
@@ -11,7 +11,9 @@ public sealed class EquityMarketSessionEvaluator(TimeProvider? timeProvider = nu
     private static readonly TimeOnly RegularClose = new(16, 0);
     private static readonly TimeOnly ExtendedHoursOpen = new(4, 0);
     private static readonly TimeOnly ExtendedHoursClose = new(20, 0);
-    private static readonly TimeOnly OvernightWeeklyBoundary = new(20, 0);
+    private static readonly TimeOnly EarlyRegularClose = new(13, 0);
+    private static readonly TimeOnly EarlyExtendedHoursClose = new(17, 0);
+    private static readonly TimeOnly OvernightOpen = new(20, 0);
     private static readonly TimeZoneInfo NewYorkTimeZone =
         ResolveNewYorkTimeZone();
 
@@ -31,27 +33,32 @@ public sealed class EquityMarketSessionEvaluator(TimeProvider? timeProvider = nu
         bool isOvernightEligible)
     {
         DateTimeOffset newYork = TimeZoneInfo.ConvertTime(timestamp, NewYorkTimeZone);
+        DateOnly localDate = DateOnly.FromDateTime(newYork.DateTime);
         TimeOnly localTime = TimeOnly.FromDateTime(newYork.DateTime);
 
-        if (isOvernightEligible)
+        // Robinhood's 20:00-midnight session belongs to the following trading
+        // date. A holiday evening can reopen, but the evening before it cannot.
+        // https://cdn.robinhood.com/assets/robinhood/legal/ExtendedHoursTradingDisclosure.pdf
+        if (isOvernightEligible && localTime >= OvernightOpen)
         {
-            return newYork.DayOfWeek switch
-            {
-                DayOfWeek.Sunday => localTime >= OvernightWeeklyBoundary,
-                >= DayOfWeek.Monday and <= DayOfWeek.Thursday => true,
-                DayOfWeek.Friday => localTime < OvernightWeeklyBoundary,
-                _ => false,
-            };
+            return UsEquityTradingCalendar.IsTradingDay(localDate.AddDays(1));
         }
 
-        if (newYork.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+        if (!UsEquityTradingCalendar.IsTradingDay(localDate))
         {
             return false;
         }
 
+        bool earlyClose = UsEquityTradingCalendar.IsEarlyClose(localDate);
+        TimeOnly extendedClose = earlyClose ? EarlyExtendedHoursClose : ExtendedHoursClose;
+        if (isOvernightEligible)
+        {
+            return localTime < extendedClose;
+        }
+
         return isExtendedHoursEligible
-            ? localTime >= ExtendedHoursOpen && localTime < ExtendedHoursClose
-            : localTime >= RegularOpen && localTime < RegularClose;
+            ? localTime >= ExtendedHoursOpen && localTime < extendedClose
+            : localTime >= RegularOpen && localTime < (earlyClose ? EarlyRegularClose : RegularClose);
     }
 
     private static TimeZoneInfo ResolveNewYorkTimeZone()

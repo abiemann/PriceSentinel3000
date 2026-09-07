@@ -117,14 +117,129 @@ public sealed class EquityMarketSessionEvaluatorTests
             isOvernightEligible: false));
     }
 
-    [Fact]
-    public void RegularSchedule_DoesNotApplyAnExchangeHolidayCalendar()
+    [Theory]
+    [InlineData("2026-01-01")]
+    [InlineData("2026-01-19")]
+    [InlineData("2026-02-16")]
+    [InlineData("2026-04-03")]
+    [InlineData("2026-05-25")]
+    [InlineData("2026-06-19")]
+    [InlineData("2026-07-03")]
+    [InlineData("2026-09-07")]
+    [InlineData("2026-11-26")]
+    [InlineData("2026-12-25")]
+    [InlineData("2027-01-01")]
+    [InlineData("2027-01-18")]
+    [InlineData("2027-02-15")]
+    [InlineData("2027-03-26")]
+    [InlineData("2027-05-31")]
+    [InlineData("2027-06-18")]
+    [InlineData("2027-07-05")]
+    [InlineData("2027-09-06")]
+    [InlineData("2027-11-25")]
+    [InlineData("2027-12-24")]
+    [InlineData("2028-01-17")]
+    [InlineData("2028-02-21")]
+    [InlineData("2028-04-14")]
+    [InlineData("2028-05-29")]
+    [InlineData("2028-06-19")]
+    [InlineData("2028-07-04")]
+    [InlineData("2028-09-04")]
+    [InlineData("2028-11-23")]
+    [InlineData("2028-12-25")]
+    public void ExchangeHolidays_CloseRegularExtendedAndOvernightDaytime(string date)
     {
-        DateTimeOffset independenceDayObserved =
-            DateTimeOffset.Parse("2026-07-03T14:00:00Z");
+        DateTimeOffset daytime = DateTimeOffset.Parse($"{date}T16:00:00Z");
+
+        Assert.False(EquityMarketSessionEvaluator.IsTradableAt(
+            daytime,
+            isExtendedHoursEligible: false,
+            isOvernightEligible: false));
+        Assert.False(EquityMarketSessionEvaluator.IsTradableAt(
+            daytime,
+            isExtendedHoursEligible: true,
+            isOvernightEligible: false));
+        Assert.False(EquityMarketSessionEvaluator.IsTradableAt(
+            daytime,
+            isExtendedHoursEligible: true,
+            isOvernightEligible: true));
+    }
+
+    [Theory]
+    [InlineData("2026-09-06T20:00:00-04:00", false)]
+    [InlineData("2026-09-06T20:22:00-07:00", false)]
+    [InlineData("2026-09-07T00:00:00-04:00", false)]
+    [InlineData("2026-09-07T19:59:59-04:00", false)]
+    [InlineData("2026-09-07T20:00:00-04:00", true)]
+    [InlineData("2026-09-08T00:00:00-04:00", true)]
+    [InlineData("2026-07-02T19:59:59-04:00", true)]
+    [InlineData("2026-07-02T20:00:00-04:00", false)]
+    [InlineData("2026-11-26T19:59:59-05:00", false)]
+    [InlineData("2026-11-26T20:00:00-05:00", true)]
+    [InlineData("2026-11-27T00:00:00-05:00", true)]
+    [InlineData("2026-12-23T20:00:00-05:00", true)]
+    public void OvernightSession_BelongsToFollowingTradingDateAfterEightPm(
+        string timestamp,
+        bool expected)
+    {
+        Assert.Equal(expected, EquityMarketSessionEvaluator.IsTradableAt(
+            DateTimeOffset.Parse(timestamp),
+            isExtendedHoursEligible: false,
+            isOvernightEligible: true));
+    }
+
+    [Theory]
+    [InlineData("2026-09-07T20:00:00-04:00", false)]
+    [InlineData("2026-09-08T09:29:59-04:00", false)]
+    [InlineData("2026-09-08T09:30:00-04:00", true)]
+    public void RegularSession_ReopensAtTuesdayOpeningAfterLaborDay(
+        string timestamp,
+        bool expected)
+    {
+        Assert.Equal(expected, EquityMarketSessionEvaluator.IsTradableAt(
+            DateTimeOffset.Parse(timestamp),
+            isExtendedHoursEligible: false,
+            isOvernightEligible: false));
+    }
+
+    [Theory]
+    [InlineData("2026-11-27", "-05:00")]
+    [InlineData("2026-12-24", "-05:00")]
+    [InlineData("2027-11-26", "-05:00")]
+    [InlineData("2028-07-03", "-04:00")]
+    [InlineData("2028-11-24", "-05:00")]
+    public void HalfDays_CloseRegularAtOneAndExtendedAndOvernightAtFiveEastern(
+        string date,
+        string offset)
+    {
+        Assert.True(EquityMarketSessionEvaluator.IsTradableAt(
+            DateTimeOffset.Parse($"{date}T12:59:59{offset}"), false, false));
+        Assert.False(EquityMarketSessionEvaluator.IsTradableAt(
+            DateTimeOffset.Parse($"{date}T13:00:00{offset}"), false, false));
 
         Assert.True(EquityMarketSessionEvaluator.IsTradableAt(
-            independenceDayObserved,
+            DateTimeOffset.Parse($"{date}T16:59:59{offset}"), true, false));
+        Assert.False(EquityMarketSessionEvaluator.IsTradableAt(
+            DateTimeOffset.Parse($"{date}T17:00:00{offset}"), true, false));
+        Assert.True(EquityMarketSessionEvaluator.IsTradableAt(
+            DateTimeOffset.Parse($"{date}T16:59:59{offset}"), false, true));
+        Assert.False(EquityMarketSessionEvaluator.IsTradableAt(
+            DateTimeOffset.Parse($"{date}T17:00:00{offset}"), false, true));
+        Assert.False(EquityMarketSessionEvaluator.IsTradableAt(
+            DateTimeOffset.Parse($"{date}T19:59:59{offset}"), false, true));
+        // Each published half day in 2026–2028 precedes a holiday or weekend.
+        Assert.False(EquityMarketSessionEvaluator.IsTradableAt(
+            DateTimeOffset.Parse($"{date}T20:00:00{offset}"), false, true));
+    }
+
+    [Theory]
+    [InlineData("2026-07-02T15:59:59-04:00")]
+    [InlineData("2027-12-31T15:59:59-05:00")]
+    public void NonHolidayPrecedingObservedIndependenceDayOrSaturdayNewYear_RemainsFullDay(
+        string timestamp)
+    {
+        Assert.True(EquityMarketSessionEvaluator.IsTradableAt(
+            DateTimeOffset.Parse(timestamp),
             isExtendedHoursEligible: false,
             isOvernightEligible: false));
     }

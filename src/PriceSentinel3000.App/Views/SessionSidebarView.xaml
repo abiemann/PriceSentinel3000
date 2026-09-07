@@ -137,12 +137,12 @@
                     </Grid.ColumnDefinitions>
                     <TextBlock Foreground="{StaticResource MutedTextBrush}"
                                Text="Tradable now"
-                               ToolTip="Current Robinhood session availability based on symbol eligibility and the published weekly schedule. Holidays, trading halts, or account restrictions can still prevent an order." />
+                               ToolTip="Current scheduled Robinhood session based on symbol eligibility, exchange holidays, and early closes. Unscheduled closures, trading halts, or account restrictions can still prevent an order." />
                     <TextBlock Grid.Column="1"
                                FontSize="11"
                                FontWeight="Bold"
                                Text="{Binding TradableNowText}"
-                               ToolTip="Current Robinhood session availability based on symbol eligibility and the published weekly schedule. Holidays, trading halts, or account restrictions can still prevent an order.">
+                               ToolTip="Current scheduled Robinhood session based on symbol eligibility, exchange holidays, and early closes. Unscheduled closures, trading halts, or account restrictions can still prevent an order.">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
                                 <Setter Property="Foreground" Value="{StaticResource SubtleTextBrush}" />
