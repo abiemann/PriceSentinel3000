@@ -1,4 +1,6 @@
 using System.Windows;
+using System.Windows.Interop;
+using System.Windows.Media;
 using PriceSentinel3000.App.Dialogs;
 using PriceSentinel3000.App.ViewModels;
 using PriceSentinel3000.Infrastructure.Automation;
@@ -12,6 +14,9 @@ public partial class App : System.Windows.Application
 {
     protected override async void OnStartup(StartupEventArgs e)
     {
+        // Avoid stale/clipped GPU text surfaces when a window moves off-screen and back.
+        // Apply before creating any windows; this preference affects only this process.
+        RenderOptions.ProcessRenderMode = RenderMode.SoftwareOnly;
         base.OnStartup(e);
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
