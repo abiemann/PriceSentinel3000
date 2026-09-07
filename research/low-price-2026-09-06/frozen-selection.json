@@ -1,0 +1,221 @@
+{
+  "frozenAtUtc": "2026-09-07T04:48:04.5732772+00:00",
+  "protocolCommit": "9138edb",
+  "selectionUsesFriday": false,
+  "developmentAuditSha256": "0b2830ae8fda6d46c7427178b7a6d60e40c5c9e8e940ae3f70374149a6d4f33b",
+  "selections": [
+    {
+      "profile": "B1",
+      "days": 2,
+      "totalPrimaryScore": "0.27151502349455",
+      "meanDailyPrimaryScore": "0.135757511747275",
+      "worstDayPrimaryScore": "-2.09411618330815",
+      "maximumDailyDrawdown": "3.205705581000",
+      "entries": 7,
+      "grossPnl": "3.773401670900",
+      "positiveEveryDay": false,
+      "daily": [
+        {
+          "date": "2026-09-02",
+          "primaryScore": "2.3656312068027",
+          "dataSha256": "d5a63ac9053fcce34c5f2bd53453d74bdd4a6e6f4c6600aa234b64a20ebc2c1f",
+          "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+          "file": "artifacts\\low-price-research\\development\\NU-2026-09-02-B1.json"
+        },
+        {
+          "date": "2026-09-03",
+          "primaryScore": "-2.09411618330815",
+          "dataSha256": "40ec8e74fb2c38db3da5ecdb0083278f81f5ef4fd3406e9b064cca67b89c3b19",
+          "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+          "file": "artifacts\\low-price-research\\development\\NU-2026-09-03-B1.json"
+        }
+      ],
+      "symbol": "NU",
+      "rank": 1,
+      "tier": 2
+    },
+    {
+      "profile": "B1",
+      "days": 2,
+      "totalPrimaryScore": "-0.68638100018735",
+      "meanDailyPrimaryScore": "-0.343190500093675",
+      "worstDayPrimaryScore": "-2.75695046868215",
+      "maximumDailyDrawdown": "4.129943348200",
+      "entries": 6,
+      "grossPnl": "2.314776332900",
+      "positiveEveryDay": false,
+      "daily": [
+        {
+          "date": "2026-09-02",
+          "primaryScore": "2.0705694684948",
+          "dataSha256": "2d98454d14cd7495f660b0d018ed2386e1e3c971ee6a6aac0eb8e570bf89dff1",
+          "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+          "file": "artifacts\\low-price-research\\development\\SOFI-2026-09-02-B1.json"
+        },
+        {
+          "date": "2026-09-03",
+          "primaryScore": "-2.75695046868215",
+          "dataSha256": "7f89d2b643b8dbe2745b94d8e7db6e9314c223c3f375de4ae61ffb412cd75494",
+          "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+          "file": "artifacts\\low-price-research\\development\\SOFI-2026-09-03-B1.json"
+        }
+      ],
+      "symbol": "SOFI",
+      "rank": 2,
+      "tier": 2
+    },
+    {
+      "profile": "C1",
+      "days": 2,
+      "totalPrimaryScore": "-2.67024477070935",
+      "meanDailyPrimaryScore": "-1.335122385354675",
+      "worstDayPrimaryScore": "-2.17024477169435",
+      "maximumDailyDrawdown": "5.317128740000",
+      "entries": 4,
+      "grossPnl": "-0.670580082500",
+      "positiveEveryDay": false,
+      "daily": [
+        {
+          "date": "2026-09-02",
+          "primaryScore": "-0.499999999015",
+          "dataSha256": "4a69917b6e7538653ebef9c36a4e8e8adf3d9d40a79e3d335ab22550bbf22161",
+          "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+          "file": "artifacts\\low-price-research\\development\\AAL-2026-09-02-C1.json"
+        },
+        {
+          "date": "2026-09-03",
+          "primaryScore": "-2.17024477169435",
+          "dataSha256": "1033548d1bc9dd4da766ecb0721339b31abf8cddf318f280933c638a4291f8c0",
+          "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+          "file": "artifacts\\low-price-research\\development\\AAL-2026-09-03-C1.json"
+        }
+      ],
+      "symbol": "AAL",
+      "rank": 3,
+      "tier": 2
+    }
+  ],
+  "stockRanking": [
+    {
+      "profile": "B1",
+      "days": 2,
+      "totalPrimaryScore": "0.27151502349455",
+      "meanDailyPrimaryScore": "0.135757511747275",
+      "worstDayPrimaryScore": "-2.09411618330815",
+      "maximumDailyDrawdown": "3.205705581000",
+      "entries": 7,
+      "grossPnl": "3.773401670900",
+      "positiveEveryDay": false,
+      "daily": [
+        {
+          "date": "2026-09-02",
+          "primaryScore": "2.3656312068027",
+          "dataSha256": "d5a63ac9053fcce34c5f2bd53453d74bdd4a6e6f4c6600aa234b64a20ebc2c1f",
+          "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+          "file": "artifacts\\low-price-research\\development\\NU-2026-09-02-B1.json"
+        },
+        {
+          "date": "2026-09-03",
+          "primaryScore": "-2.09411618330815",
+          "dataSha256": "40ec8e74fb2c38db3da5ecdb0083278f81f5ef4fd3406e9b064cca67b89c3b19",
+          "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+          "file": "artifacts\\low-price-research\\development\\NU-2026-09-03-B1.json"
+        }
+      ],
+      "symbol": "NU",
+      "rank": 1,
+      "tier": 2
+    },
+    {
+      "profile": "B1",
+      "days": 2,
+      "totalPrimaryScore": "-0.68638100018735",
+      "meanDailyPrimaryScore": "-0.343190500093675",
+      "worstDayPrimaryScore": "-2.75695046868215",
+      "maximumDailyDrawdown": "4.129943348200",
+      "entries": 6,
+      "grossPnl": "2.314776332900",
+      "positiveEveryDay": false,
+      "daily": [
+        {
+          "date": "2026-09-02",
+          "primaryScore": "2.0705694684948",
+          "dataSha256": "2d98454d14cd7495f660b0d018ed2386e1e3c971ee6a6aac0eb8e570bf89dff1",
+          "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+          "file": "artifacts\\low-price-research\\development\\SOFI-2026-09-02-B1.json"
+        },
+        {
+          "date": "2026-09-03",
+          "primaryScore": "-2.75695046868215",
+          "dataSha256": "7f89d2b643b8dbe2745b94d8e7db6e9314c223c3f375de4ae61ffb412cd75494",
+          "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+          "file": "artifacts\\low-price-research\\development\\SOFI-2026-09-03-B1.json"
+        }
+      ],
+      "symbol": "SOFI",
+      "rank": 2,
+      "tier": 2
+    },
+    {
+      "profile": "C1",
+      "days": 2,
+      "totalPrimaryScore": "-2.67024477070935",
+      "meanDailyPrimaryScore": "-1.335122385354675",
+      "worstDayPrimaryScore": "-2.17024477169435",
+      "maximumDailyDrawdown": "5.317128740000",
+      "entries": 4,
+      "grossPnl": "-0.670580082500",
+      "positiveEveryDay": false,
+      "daily": [
+        {
+          "date": "2026-09-02",
+          "primaryScore": "-0.499999999015",
+          "dataSha256": "4a69917b6e7538653ebef9c36a4e8e8adf3d9d40a79e3d335ab22550bbf22161",
+          "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+          "file": "artifacts\\low-price-research\\development\\AAL-2026-09-02-C1.json"
+        },
+        {
+          "date": "2026-09-03",
+          "primaryScore": "-2.17024477169435",
+          "dataSha256": "1033548d1bc9dd4da766ecb0721339b31abf8cddf318f280933c638a4291f8c0",
+          "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+          "file": "artifacts\\low-price-research\\development\\AAL-2026-09-03-C1.json"
+        }
+      ],
+      "symbol": "AAL",
+      "rank": 3,
+      "tier": 2
+    },
+    {
+      "profile": "R1",
+      "days": 2,
+      "totalPrimaryScore": "-3.92863703931075",
+      "meanDailyPrimaryScore": "-1.964318519655375",
+      "worstDayPrimaryScore": "-3.36688927261025",
+      "maximumDailyDrawdown": "2.430615870500",
+      "entries": 10,
+      "grossPnl": "1.071898790500",
+      "positiveEveryDay": false,
+      "daily": [
+        {
+          "date": "2026-09-02",
+          "primaryScore": "-3.36688927261025",
+          "dataSha256": "810b42d693bc46eb429db3c77ff908db07878730747227f43d853d4e15cc0fa9",
+          "sourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60",
+          "file": "artifacts\\low-price-research\\development\\CCL-2026-09-02-R1.json"
+        },
+        {
+          "date": "2026-09-03",
+          "primaryScore": "-0.5617477667005",
+          "dataSha256": "6c76a246bb01a9505ff7567eb287cf9acb74e10b3d400a1b4dcb67c40000621b",
+          "sourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60",
+          "file": "artifacts\\low-price-research\\development\\CCL-2026-09-03-R1.json"
+        }
+      ],
+      "symbol": "CCL",
+      "rank": 4,
+      "tier": 2
+    }
+  ],
+  "limitation": "All three selections are tier 2: none had a positive score after the 5-bps cost allowance on both development days. Friday remains uninspected at freeze."
+}

@@ -1,0 +1,430 @@
+{
+  "Runtime": "thinkscript-subset-v1",
+  "TestedAtUtc": "2026-09-07T04:34:16.2772406+00:00",
+  "Purpose": "Original candidate syntax, conservative warmup, synthetic decisions, determinism, and maximum-history resource check. No market data or profitability assessment.",
+  "CaseCount": 40,
+  "EachCaseRepeated": true,
+  "Passed": true,
+  "Results": [
+    {
+      "Id": "C1",
+      "File": "LowPrice Research C1.thinkscript",
+      "SourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "IsCompatible": true,
+      "RequiredWarmupBars": 85,
+      "HashMatchesManifest": true,
+      "Errors": [],
+      "CompilePassed": true,
+      "Checks": [
+        {
+          "Name": "insufficient warmup",
+          "Bars": 84,
+          "Holding": false,
+          "Action": "Hold",
+          "State": "WARMING UP",
+          "IndicatorCount": 8,
+          "Passed": true
+        },
+        {
+          "Name": "flat after warmup",
+          "Bars": 85,
+          "Holding": false,
+          "Action": "Hold",
+          "State": "HOLD",
+          "IndicatorCount": 8,
+          "Passed": true
+        },
+        {
+          "Name": "entry fixture",
+          "Bars": 103,
+          "Holding": false,
+          "Action": "Buy",
+          "State": "BUY SIGNAL",
+          "IndicatorCount": 8,
+          "Passed": true
+        },
+        {
+          "Name": "entry does not add while long",
+          "Bars": 103,
+          "Holding": true,
+          "Action": "Hold",
+          "State": "HOLD",
+          "IndicatorCount": 8,
+          "Passed": true
+        },
+        {
+          "Name": "weakness exits long",
+          "Bars": 100,
+          "Holding": true,
+          "Action": "Sell",
+          "State": "SELL SIGNAL",
+          "IndicatorCount": 8,
+          "Passed": true
+        },
+        {
+          "Name": "exit does not open a short",
+          "Bars": 100,
+          "Holding": false,
+          "Action": "Hold",
+          "State": "HOLD",
+          "IndicatorCount": 8,
+          "Passed": true
+        },
+        {
+          "Name": "maximum 4096 bars flat",
+          "Bars": 4096,
+          "Holding": false,
+          "Action": "Hold",
+          "State": "HOLD",
+          "IndicatorCount": 8,
+          "Passed": true
+        },
+        {
+          "Name": "maximum 4096 bars long",
+          "Bars": 4096,
+          "Holding": true,
+          "Action": "Sell",
+          "State": "SELL SIGNAL",
+          "IndicatorCount": 8,
+          "Passed": true
+        }
+      ]
+    },
+    {
+      "Id": "C2",
+      "File": "LowPrice Research C2.thinkscript",
+      "SourceSha256": "a1a2121ad0bba569679b14fb7dac270473e671556d38e4ac7ff302f0afb18f73",
+      "IsCompatible": true,
+      "RequiredWarmupBars": 85,
+      "HashMatchesManifest": true,
+      "Errors": [],
+      "CompilePassed": true,
+      "Checks": [
+        {
+          "Name": "insufficient warmup",
+          "Bars": 84,
+          "Holding": false,
+          "Action": "Hold",
+          "State": "WARMING UP",
+          "IndicatorCount": 8,
+          "Passed": true
+        },
+        {
+          "Name": "flat after warmup",
+          "Bars": 85,
+          "Holding": false,
+          "Action": "Hold",
+          "State": "HOLD",
+          "IndicatorCount": 8,
+          "Passed": true
+        },
+        {
+          "Name": "entry fixture",
+          "Bars": 103,
+          "Holding": false,
+          "Action": "Buy",
+          "State": "BUY SIGNAL",
+          "IndicatorCount": 8,
+          "Passed": true
+        },
+        {
+          "Name": "entry does not add while long",
+          "Bars": 103,
+          "Holding": true,
+          "Action": "Hold",
+          "State": "HOLD",
+          "IndicatorCount": 8,
+          "Passed": true
+        },
+        {
+          "Name": "weakness exits long",
+          "Bars": 100,
+          "Holding": true,
+          "Action": "Sell",
+          "State": "SELL SIGNAL",
+          "IndicatorCount": 8,
+          "Passed": true
+        },
+        {
+          "Name": "exit does not open a short",
+          "Bars": 100,
+          "Holding": false,
+          "Action": "Hold",
+          "State": "HOLD",
+          "IndicatorCount": 8,
+          "Passed": true
+        },
+        {
+          "Name": "maximum 4096 bars flat",
+          "Bars": 4096,
+          "Holding": false,
+          "Action": "Hold",
+          "State": "HOLD",
+          "IndicatorCount": 8,
+          "Passed": true
+        },
+        {
+          "Name": "maximum 4096 bars long",
+          "Bars": 4096,
+          "Holding": true,
+          "Action": "Sell",
+          "State": "SELL SIGNAL",
+          "IndicatorCount": 8,
+          "Passed": true
+        }
+      ]
+    },
+    {
+      "Id": "C3",
+      "File": "LowPrice Research C3.thinkscript",
+      "SourceSha256": "88a0d2f7ee078456b333d7c020553030303ae5533977cd52016a6d886f3a87df",
+      "IsCompatible": true,
+      "RequiredWarmupBars": 85,
+      "HashMatchesManifest": true,
+      "Errors": [],
+      "CompilePassed": true,
+      "Checks": [
+        {
+          "Name": "insufficient warmup",
+          "Bars": 84,
+          "Holding": false,
+          "Action": "Hold",
+          "State": "WARMING UP",
+          "IndicatorCount": 8,
+          "Passed": true
+        },
+        {
+          "Name": "flat after warmup",
+          "Bars": 85,
+          "Holding": false,
+          "Action": "Hold",
+          "State": "HOLD",
+          "IndicatorCount": 8,
+          "Passed": true
+        },
+        {
+          "Name": "entry fixture",
+          "Bars": 103,
+          "Holding": false,
+          "Action": "Buy",
+          "State": "BUY SIGNAL",
+          "IndicatorCount": 8,
+          "Passed": true
+        },
+        {
+          "Name": "entry does not add while long",
+          "Bars": 103,
+          "Holding": true,
+          "Action": "Hold",
+          "State": "HOLD",
+          "IndicatorCount": 8,
+          "Passed": true
+        },
+        {
+          "Name": "weakness exits long",
+          "Bars": 100,
+          "Holding": true,
+          "Action": "Sell",
+          "State": "SELL SIGNAL",
+          "IndicatorCount": 8,
+          "Passed": true
+        },
+        {
+          "Name": "exit does not open a short",
+          "Bars": 100,
+          "Holding": false,
+          "Action": "Hold",
+          "State": "HOLD",
+          "IndicatorCount": 8,
+          "Passed": true
+        },
+        {
+          "Name": "maximum 4096 bars flat",
+          "Bars": 4096,
+          "Holding": false,
+          "Action": "Hold",
+          "State": "HOLD",
+          "IndicatorCount": 8,
+          "Passed": true
+        },
+        {
+          "Name": "maximum 4096 bars long",
+          "Bars": 4096,
+          "Holding": true,
+          "Action": "Sell",
+          "State": "SELL SIGNAL",
+          "IndicatorCount": 8,
+          "Passed": true
+        }
+      ]
+    },
+    {
+      "Id": "B1",
+      "File": "LowPrice Research B1.thinkscript",
+      "SourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+      "IsCompatible": true,
+      "RequiredWarmupBars": 84,
+      "HashMatchesManifest": true,
+      "Errors": [],
+      "CompilePassed": true,
+      "Checks": [
+        {
+          "Name": "insufficient warmup",
+          "Bars": 83,
+          "Holding": false,
+          "Action": "Hold",
+          "State": "WARMING UP",
+          "IndicatorCount": 5,
+          "Passed": true
+        },
+        {
+          "Name": "flat after warmup",
+          "Bars": 84,
+          "Holding": false,
+          "Action": "Hold",
+          "State": "HOLD",
+          "IndicatorCount": 5,
+          "Passed": true
+        },
+        {
+          "Name": "entry fixture",
+          "Bars": 101,
+          "Holding": false,
+          "Action": "Buy",
+          "State": "BUY SIGNAL",
+          "IndicatorCount": 5,
+          "Passed": true
+        },
+        {
+          "Name": "entry does not add while long",
+          "Bars": 101,
+          "Holding": true,
+          "Action": "Hold",
+          "State": "HOLD",
+          "IndicatorCount": 5,
+          "Passed": true
+        },
+        {
+          "Name": "weakness exits long",
+          "Bars": 100,
+          "Holding": true,
+          "Action": "Sell",
+          "State": "SELL SIGNAL",
+          "IndicatorCount": 5,
+          "Passed": true
+        },
+        {
+          "Name": "exit does not open a short",
+          "Bars": 100,
+          "Holding": false,
+          "Action": "Hold",
+          "State": "HOLD",
+          "IndicatorCount": 5,
+          "Passed": true
+        },
+        {
+          "Name": "maximum 4096 bars flat",
+          "Bars": 4096,
+          "Holding": false,
+          "Action": "Hold",
+          "State": "HOLD",
+          "IndicatorCount": 5,
+          "Passed": true
+        },
+        {
+          "Name": "maximum 4096 bars long",
+          "Bars": 4096,
+          "Holding": true,
+          "Action": "Sell",
+          "State": "SELL SIGNAL",
+          "IndicatorCount": 5,
+          "Passed": true
+        }
+      ]
+    },
+    {
+      "Id": "R1",
+      "File": "LowPrice Research R1.thinkscript",
+      "SourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60",
+      "IsCompatible": true,
+      "RequiredWarmupBars": 51,
+      "HashMatchesManifest": true,
+      "Errors": [],
+      "CompilePassed": true,
+      "Checks": [
+        {
+          "Name": "insufficient warmup",
+          "Bars": 50,
+          "Holding": false,
+          "Action": "Hold",
+          "State": "WARMING UP",
+          "IndicatorCount": 4,
+          "Passed": true
+        },
+        {
+          "Name": "flat after warmup",
+          "Bars": 51,
+          "Holding": false,
+          "Action": "Hold",
+          "State": "HOLD",
+          "IndicatorCount": 4,
+          "Passed": true
+        },
+        {
+          "Name": "entry fixture",
+          "Bars": 105,
+          "Holding": false,
+          "Action": "Buy",
+          "State": "BUY SIGNAL",
+          "IndicatorCount": 4,
+          "Passed": true
+        },
+        {
+          "Name": "entry does not add while long",
+          "Bars": 105,
+          "Holding": true,
+          "Action": "Hold",
+          "State": "HOLD",
+          "IndicatorCount": 4,
+          "Passed": true
+        },
+        {
+          "Name": "weakness exits long",
+          "Bars": 100,
+          "Holding": true,
+          "Action": "Sell",
+          "State": "SELL SIGNAL",
+          "IndicatorCount": 4,
+          "Passed": true
+        },
+        {
+          "Name": "exit does not open a short",
+          "Bars": 100,
+          "Holding": false,
+          "Action": "Hold",
+          "State": "HOLD",
+          "IndicatorCount": 4,
+          "Passed": true
+        },
+        {
+          "Name": "maximum 4096 bars flat",
+          "Bars": 4096,
+          "Holding": false,
+          "Action": "Hold",
+          "State": "HOLD",
+          "IndicatorCount": 4,
+          "Passed": true
+        },
+        {
+          "Name": "maximum 4096 bars long",
+          "Bars": 4096,
+          "Holding": true,
+          "Action": "Sell",
+          "State": "SELL SIGNAL",
+          "IndicatorCount": 4,
+          "Passed": true
+        }
+      ]
+    }
+  ]
+}

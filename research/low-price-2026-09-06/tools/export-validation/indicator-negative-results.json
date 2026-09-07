@@ -1,0 +1,27 @@
+{
+  "appCalls": 0,
+  "cases": [
+    {
+      "case": "unchanged",
+      "passed": true,
+      "detectedFailures": 0,
+      "failures": []
+    },
+    {
+      "case": "indicator value + 0.01",
+      "passed": true,
+      "detectedFailures": 1,
+      "failures": [
+        "event 459/fastTrend: expected 13.228885994520635, observed 13.2388859945206, difference 0.009999999999965"
+      ]
+    },
+    {
+      "case": "wrong proposed action",
+      "passed": true,
+      "detectedFailures": 1,
+      "failures": [
+        "event 459: position-aware proposal expected Hold/HOLD"
+      ]
+    }
+  ]
+}

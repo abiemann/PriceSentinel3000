@@ -1,0 +1,121 @@
+{
+  "generatedAtUtc": "2026-09-07T04:43:18.8128065+00:00",
+  "checks": [
+    {
+      "name": "valid AAL-2026-09-02-C1.json",
+      "passed": true,
+      "rejection": null
+    },
+    {
+      "name": "valid AAL-2026-09-03-C1.json",
+      "passed": true,
+      "rejection": null
+    },
+    {
+      "name": "valid CCL-2026-09-02-C1.json",
+      "passed": true,
+      "rejection": null
+    },
+    {
+      "name": "valid CCL-2026-09-03-C1.json",
+      "passed": true,
+      "rejection": null
+    },
+    {
+      "name": "valid F-2026-09-02-C1.json",
+      "passed": true,
+      "rejection": null
+    },
+    {
+      "name": "valid F-2026-09-03-C1.json",
+      "passed": true,
+      "rejection": null
+    },
+    {
+      "name": "valid NU-2026-09-02-C1.json",
+      "passed": true,
+      "rejection": null
+    },
+    {
+      "name": "valid NU-2026-09-03-C1.json",
+      "passed": true,
+      "rejection": null
+    },
+    {
+      "name": "valid PINS-2026-09-02-C1.json",
+      "passed": true,
+      "rejection": null
+    },
+    {
+      "name": "valid PINS-2026-09-03-C1.json",
+      "passed": true,
+      "rejection": null
+    },
+    {
+      "name": "valid RIVN-2026-09-02-C1.json",
+      "passed": true,
+      "rejection": null
+    },
+    {
+      "name": "valid RIVN-2026-09-03-C1.json",
+      "passed": true,
+      "rejection": null
+    },
+    {
+      "name": "valid SNAP-2026-09-02-C1.json",
+      "passed": true,
+      "rejection": null
+    },
+    {
+      "name": "valid SNAP-2026-09-03-C1.json",
+      "passed": true,
+      "rejection": null
+    },
+    {
+      "name": "valid SOFI-2026-09-02-C1.json",
+      "passed": true,
+      "rejection": null
+    },
+    {
+      "name": "valid SOFI-2026-09-03-C1.json",
+      "passed": true,
+      "rejection": null
+    },
+    {
+      "name": "truncated",
+      "passed": true,
+      "rejection": "Stream is truncated or has a different session/mode."
+    },
+    {
+      "name": "missing_record",
+      "passed": true,
+      "rejection": "Invalid page cursor progression."
+    },
+    {
+      "name": "wrong_session",
+      "passed": true,
+      "rejection": "Export session identity mismatch."
+    },
+    {
+      "name": "failed_outcome",
+      "passed": true,
+      "rejection": "Export is not a completed Replay."
+    },
+    {
+      "name": "wrong_setting",
+      "passed": true,
+      "rejection": "Setting mismatch: startingBalance."
+    },
+    {
+      "name": "changed script hash",
+      "passed": true,
+      "rejection": "Script hash differs from current catalog or frozen manifest."
+    },
+    {
+      "name": "exact long numeric token",
+      "passed": true,
+      "rejection": null
+    }
+  ],
+  "appCalls": 0
+}

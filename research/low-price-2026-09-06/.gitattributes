@@ -1,0 +1,4 @@
+# Frozen script hashes must survive checkout on Windows and other platforms.
+*.thinkscript text eol=lf
+*.py text eol=lf
+*.html text eol=lf

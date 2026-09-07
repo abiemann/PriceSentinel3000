@@ -1,0 +1,70 @@
+{
+  "settings": {
+    "startingBalance": 1400,
+    "tradesSettleImmediately": true,
+    "positionSizeBasis": "FixedAmount",
+    "positionSizeValue": 500,
+    "quantityLimitMode": "AsManyAsPossible",
+    "maximumQuantity": 100,
+    "unlimitedEntries": true,
+    "maximumEntriesPerDay": 1,
+    "maximumDailyLossBasis": "FixedAmount",
+    "maximumDailyLossValue": 50,
+    "stopLossBasis": "PurchasePriceDeclinePercentage",
+    "stopLossValue": 1,
+    "bufferMinutes": 15,
+    "quotePollingSeconds": 5,
+    "scriptBarIntervalSeconds": 60,
+    "chartCandleIntervalSeconds": 15,
+    "reconciliationSeconds": 45,
+    "reconciliationLookbackSeconds": 900,
+    "reconciliationCompletionDelaySeconds": 30,
+    "replayTime": "06:30",
+    "replayEndTime": "13:00",
+    "replaySpeed": 100
+  },
+  "jobs": [
+    {
+      "symbol": "NU",
+      "date": "2026-09-02",
+      "profile": "B1",
+      "strategyId": "script:nu holdings (nu) breakout - experimental.thinkscript",
+      "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2"
+    },
+    {
+      "symbol": "NU",
+      "date": "2026-09-03",
+      "profile": "B1",
+      "strategyId": "script:nu holdings (nu) breakout - experimental.thinkscript",
+      "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2"
+    },
+    {
+      "symbol": "SOFI",
+      "date": "2026-09-02",
+      "profile": "B1",
+      "strategyId": "script:sofi technologies (sofi) breakout - experimental.thinkscript",
+      "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2"
+    },
+    {
+      "symbol": "SOFI",
+      "date": "2026-09-03",
+      "profile": "B1",
+      "strategyId": "script:sofi technologies (sofi) breakout - experimental.thinkscript",
+      "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2"
+    },
+    {
+      "symbol": "AAL",
+      "date": "2026-09-02",
+      "profile": "C1",
+      "strategyId": "script:american airlines (aal) confirmation - experimental.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "AAL",
+      "date": "2026-09-03",
+      "profile": "C1",
+      "strategyId": "script:american airlines (aal) confirmation - experimental.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    }
+  ]
+}

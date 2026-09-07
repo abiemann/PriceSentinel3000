@@ -12,8 +12,8 @@
   ],
   "Basis": "Five candidates fixed before any new low-price market data or P&L inspection by the author; C1-C3 derive from original local confirmation logic, B1 and R1 are original price-only compositions.",
   "ValidationPassed": true,
-  "ValidationReport": "../../../artifacts/low-price-profile-validation/validation-results.json",
-  "ValidationProject": "../../../artifacts/low-price-profile-validation/Validation.csproj",
+  "ValidationReport": "validation-results.json",
+  "ValidationProject": "../tools/candidate-validation/Validation.csproj",
   "ValidationScope": "40 synthetic cases, each repeated for deterministic action/state/reason/indicators; exact warmup boundaries; long-only actions; full 4096-bar history without operation or memory failures; all indicator telemetry below 64-value bound. No market data or performance tests.",
   "Candidates": [
     {

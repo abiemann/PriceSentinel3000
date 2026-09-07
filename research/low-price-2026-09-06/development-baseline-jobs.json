@@ -1,0 +1,252 @@
+{
+  "settings": {
+    "startingBalance": 1400,
+    "tradesSettleImmediately": true,
+    "positionSizeBasis": "FixedAmount",
+    "positionSizeValue": 500,
+    "quantityLimitMode": "AsManyAsPossible",
+    "maximumQuantity": 100,
+    "unlimitedEntries": true,
+    "maximumEntriesPerDay": 1,
+    "maximumDailyLossBasis": "FixedAmount",
+    "maximumDailyLossValue": 50,
+    "stopLossBasis": "PurchasePriceDeclinePercentage",
+    "stopLossValue": 1,
+    "bufferMinutes": 15,
+    "quotePollingSeconds": 5,
+    "scriptBarIntervalSeconds": 60,
+    "chartCandleIntervalSeconds": 15,
+    "reconciliationSeconds": 45,
+    "reconciliationLookbackSeconds": 900,
+    "reconciliationCompletionDelaySeconds": 30,
+    "replayTime": "06:30",
+    "replayEndTime": "13:00",
+    "replaySpeed": 100
+  },
+  "jobs": [
+    {
+      "symbol": "SOFI",
+      "date": "2026-08-31",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "SOFI",
+      "date": "2026-09-01",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "SOFI",
+      "date": "2026-09-02",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "SOFI",
+      "date": "2026-09-03",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "F",
+      "date": "2026-08-31",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "F",
+      "date": "2026-09-01",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "F",
+      "date": "2026-09-02",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "F",
+      "date": "2026-09-03",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "RIVN",
+      "date": "2026-08-31",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "RIVN",
+      "date": "2026-09-01",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "RIVN",
+      "date": "2026-09-02",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "RIVN",
+      "date": "2026-09-03",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "SNAP",
+      "date": "2026-08-31",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "SNAP",
+      "date": "2026-09-01",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "SNAP",
+      "date": "2026-09-02",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "SNAP",
+      "date": "2026-09-03",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "NU",
+      "date": "2026-08-31",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "NU",
+      "date": "2026-09-01",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "NU",
+      "date": "2026-09-02",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "NU",
+      "date": "2026-09-03",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "CCL",
+      "date": "2026-08-31",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "CCL",
+      "date": "2026-09-01",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "CCL",
+      "date": "2026-09-02",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "CCL",
+      "date": "2026-09-03",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "AAL",
+      "date": "2026-08-31",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "AAL",
+      "date": "2026-09-01",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "AAL",
+      "date": "2026-09-02",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "AAL",
+      "date": "2026-09-03",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "PINS",
+      "date": "2026-08-31",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "PINS",
+      "date": "2026-09-01",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "PINS",
+      "date": "2026-09-02",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    },
+    {
+      "symbol": "PINS",
+      "date": "2026-09-03",
+      "profile": "C1",
+      "strategyId": "script:lowprice research c1.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    }
+  ]
+}

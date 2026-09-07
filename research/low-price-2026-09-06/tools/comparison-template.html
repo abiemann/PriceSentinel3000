@@ -1,0 +1,276 @@
+<div id="low-price-comparison-20260906" class="tabular-nums">
+  <h2>Three stocks, three sessions</h2>
+  <div class="text-small lp-caption">Gross P&amp;L · fresh $1,400 account/day · $500 positions</div>
+  <div class="text-small lp-caption">Mon Aug 31 and Tue Sep 1: history unavailable</div>
+  <div class="lp-legend" aria-label="Stock series"></div>
+  <div class="lp-days"></div>
+  <table class="table table-sm lp-endpoints">
+    <caption>Daily P&amp;L (USD) · 5 bps/side includes ending closing-cost allowance</caption>
+    <thead><tr><th scope="col">Session / stock</th><th scope="col" class="text-end">Gross</th><th scope="col" class="text-end">5 bps + close</th></tr></thead>
+    <tbody></tbody>
+    <tfoot></tfoot>
+  </table>
+  <div class="lp-selection sr-only" aria-live="polite"></div>
+  <div class="tooltip lp-tooltip" role="tooltip" hidden></div>
+  <script type="application/json" class="lp-data">__AUDITED_COMPARISON_DATA__</script>
+</div>
+<style>
+  #low-price-comparison-20260906 { position: relative; color: var(--foreground); }
+  #low-price-comparison-20260906 .lp-caption { margin-block: 4px; }
+  #low-price-comparison-20260906 .lp-legend { display: flex; flex-wrap: wrap; column-gap: 20px; row-gap: 4px; margin-block: 12px; }
+  #low-price-comparison-20260906 .lp-legend button { display: inline-flex; align-items: center; gap: 6px; padding: 3px 0; border: 0; border-radius: 0; background: transparent; color: var(--foreground); font: inherit; cursor: pointer; }
+  #low-price-comparison-20260906 .lp-legend button[aria-pressed="false"] { opacity: 0.45; }
+  #low-price-comparison-20260906 .lp-swatch { width: 22px; height: 10px; overflow: visible; }
+  #low-price-comparison-20260906 .lp-day { margin-block: 16px; }
+  #low-price-comparison-20260906 .lp-day h3 { margin-block: 0 4px; }
+  #low-price-comparison-20260906 .lp-plot { width: 100%; }
+  #low-price-comparison-20260906 .lp-chart { display: block; width: 100%; overflow: visible; }
+  #low-price-comparison-20260906 .lp-chart text { fill: var(--foreground); font-size: 12px; }
+  #low-price-comparison-20260906 .lp-chart .domain,
+  #low-price-comparison-20260906 .lp-chart .tick line { stroke: var(--border); }
+  #low-price-comparison-20260906 .lp-chart .grid .domain { display: none; }
+  #low-price-comparison-20260906 .lp-chart .grid line { stroke: var(--border); stroke-opacity: 0.55; }
+  #low-price-comparison-20260906 .lp-chart .grid text { display: none; }
+  #low-price-comparison-20260906 .lp-tooltip { position: absolute; z-index: 2; pointer-events: none; max-width: calc(100% - 16px); background: var(--popover); color: var(--popover-foreground); padding: 8px 10px; }
+  #low-price-comparison-20260906 .lp-tooltip[hidden] { display: none; }
+  #low-price-comparison-20260906 .lp-tooltip-row { display: grid; grid-template-columns: 12px minmax(40px, 1fr) auto; gap: 8px; align-items: center; }
+  #low-price-comparison-20260906 .lp-tooltip-swatch { width: 10px; height: 3px; }
+  #low-price-comparison-20260906 .lp-endpoints { margin-block-start: 12px; }
+  #low-price-comparison-20260906 .lp-endpoints caption { text-align: left; caption-side: top; padding-block: 4px 8px; }
+  #low-price-comparison-20260906 .lp-endpoints tbody tr[data-phase="heldout"] { font-weight: 500; }
+  @media (pointer: coarse) {
+    #low-price-comparison-20260906 .lp-legend button { min-height: 44px; min-width: 44px; }
+  }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script>
+(() => {
+  const root = document.getElementById('low-price-comparison-20260906');
+  const data = JSON.parse(root.querySelector('.lp-data').textContent);
+  const visible = new Set(data.stocks.map(stock => stock.ticker));
+  const tooltip = root.querySelector('.lp-tooltip');
+  const legend = root.querySelector('.lp-legend');
+  const plots = [];
+  const money = new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2});
+  const axisMoney = new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD', maximumFractionDigits: 0});
+  const clock = new Intl.DateTimeFormat('en-US', {timeZone: data.timeZone, hour: 'numeric', minute: '2-digit'});
+  const exactClock = new Intl.DateTimeFormat('en-US', {timeZone: data.timeZone, hour: 'numeric', minute: '2-digit', second: '2-digit'});
+  const dayName = new Intl.DateTimeFormat('en-US', {timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric'});
+  const dayShort = new Intl.DateTimeFormat('en-US', {timeZone: 'UTC', weekday: 'short', day: 'numeric'});
+  const dashes = ['', '7 3', '2 3'];
+  const symbols = [d3.symbolCircle, d3.symbolSquare, d3.symbolDiamond];
+  const color = ticker => 'var(--viz-series-' + (data.stocks.findIndex(stock => stock.ticker === ticker) + 1) + ')';
+  const stockIndex = ticker => data.stocks.findIndex(stock => stock.ticker === ticker);
+  const allValues = data.days.flatMap(day => day.series.flatMap(series => series.points.map(point => point[1])));
+  const yExtent = d3.extent([...allValues, 0]);
+  const yPadding = Math.max((yExtent[1] - yExtent[0]) * 0.12, Math.max(...yExtent.map(Math.abs)) * 0.02, 1);
+  const yDomain = [yExtent[0] - yPadding, yExtent[1] + yPadding];
+
+  function hideTooltip() {
+    tooltip.hidden = true;
+    plots.forEach(plot => plot.svg.selectAll('[data-chart-hover-guide], [data-chart-hover-marker]').attr('visibility', 'hidden'));
+  }
+
+  data.stocks.forEach((stock, index) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.setAttribute('aria-pressed', 'true');
+    button.setAttribute('aria-label', stock.company + ' (' + stock.ticker + ') ' + stock.profileId);
+    const swatch = d3.create('svg').attr('class', 'lp-swatch').attr('viewBox', '0 0 22 10').attr('aria-hidden', 'true');
+    swatch.append('line').attr('x1', 0).attr('x2', 22).attr('y1', 5).attr('y2', 5)
+      .attr('stroke', color(stock.ticker)).attr('stroke-width', 2).attr('stroke-dasharray', dashes[index]);
+    button.append(swatch.node(), document.createTextNode(stock.ticker + ' · ' + stock.profileId));
+    button.addEventListener('click', () => {
+      visible.has(stock.ticker) ? visible.delete(stock.ticker) : visible.add(stock.ticker);
+      button.setAttribute('aria-pressed', String(visible.has(stock.ticker)));
+      hideTooltip();
+      plots.forEach(draw);
+      renderTable();
+      root.querySelector('.lp-selection').textContent = visible.size ? Array.from(visible).join(', ') + ' visible' : 'All stock series hidden';
+    });
+    legend.append(button);
+  });
+
+  function renderTable() {
+    const body = root.querySelector('.lp-endpoints tbody');
+    const foot = root.querySelector('.lp-endpoints tfoot');
+    body.replaceChildren();
+    foot.replaceChildren();
+    let gross = 0;
+    let adjusted = 0;
+    let count = 0;
+    data.days.forEach(day => day.series.filter(series => visible.has(series.ticker)).forEach(series => {
+      const row = document.createElement('tr');
+      row.dataset.phase = day.phase;
+      const label = dayShort.format(new Date(day.date + 'T12:00:00Z')) + ' · ' + series.ticker;
+      const cell = document.createElement('th');
+      cell.scope = 'row';
+      cell.textContent = label;
+      cell.setAttribute('aria-label', label + (day.phase === 'heldout' ? ', Friday held out' : ', development'));
+      row.append(cell);
+      [series.grossPnl, series.costAdjustedPnl].forEach(value => {
+        const valueCell = document.createElement('td');
+        valueCell.className = 'text-end';
+        valueCell.textContent = money.format(value);
+        row.append(valueCell);
+      });
+      body.append(row);
+      gross += series.grossPnl;
+      adjusted += series.costAdjustedPnl;
+      count++;
+    }));
+    const row = document.createElement('tr');
+    const label = document.createElement('th');
+    label.scope = 'row';
+    label.textContent = visible.size + ' stocks · ' + count + ' sessions';
+    row.append(label);
+    [gross, adjusted].forEach(value => {
+      const cell = document.createElement('td');
+      cell.className = 'text-end';
+      cell.textContent = money.format(value);
+      row.append(cell);
+    });
+    foot.append(row);
+  }
+
+  function interpolate(points, x) {
+    if (x < points[0].x || x > points[points.length - 1].x) return null;
+    const nearest = d3.bisector(point => point.x).center(points, x);
+    if (points[nearest].x === x) return points[nearest].y;
+    const left = points[nearest].x < x ? nearest : nearest - 1;
+    const right = left + 1;
+    if (left < 0 || right >= points.length) return null;
+    const fraction = (x - points[left].x) / (points[right].x - points[left].x);
+    return points[left].y + fraction * (points[right].y - points[left].y);
+  }
+
+  function declutter(svg) {
+    const xLabels = svg.selectAll('.x-axis .tick text').nodes();
+    xLabels.forEach((label, index) => label.setAttribute('text-anchor', index === 0 ? 'start' : index === xLabels.length - 1 ? 'end' : 'middle'));
+    function overlaps(a, b) {
+      return a.left < b.right + 4 && a.right + 4 > b.left && a.top < b.bottom + 4 && a.bottom + 4 > b.top;
+    }
+    const required = svg.selectAll('.axis-title').nodes().map(node => node.getBoundingClientRect());
+    for (const selector of ['.x-axis .tick text', '.y-axis .tick text']) {
+      let previous = null;
+      svg.selectAll(selector).each(function () {
+        const bounds = this.getBoundingClientRect();
+        if (required.some(box => overlaps(bounds, box)) || (previous && overlaps(bounds, previous))) {
+          this.parentNode.setAttribute('visibility', 'hidden');
+        } else previous = bounds;
+      });
+    }
+  }
+
+  function draw(plot) {
+    const width = plot.container.getBoundingClientRect().width;
+    if (width < 1) return;
+    const height = width < 440 ? 240 : 252;
+    const margin = {left: 72, right: 16, top: 16, bottom: 58};
+    const x1 = margin.left;
+    const x2 = width - margin.right;
+    const y1 = margin.top;
+    const y2 = height - margin.bottom;
+    const svg = plot.svg.attr('viewBox', '0 0 ' + width + ' ' + height).attr('height', height);
+    svg.selectAll('*').remove();
+    svg.append('title').text(plot.title + ': gross P&L in US dollars');
+    svg.append('desc').text('Three selected stock strategies, each starting a fresh $1,400 account. Lines use a shared vertical scale. Friday is held out. Exact daily values are in the following table. Pointer and touch details interpolate at the cursor time.');
+    const xExtent = d3.extent(plot.series.flatMap(series => series.values.map(point => point.x)));
+    const x = d3.scaleLinear().domain(xExtent).range([x1 + 5, x2 - 5]);
+    const y = d3.scaleLinear().domain(yDomain).range([y2 - 5, y1 + 5]);
+    const tickCount = width <= 400 ? 4 : 6;
+    const ticks = d3.range(tickCount).map(index => xExtent[0] + (xExtent[1] - xExtent[0]) * index / (tickCount - 1));
+    svg.append('rect').attr('data-chart-frame', '').attr('x', x1).attr('y', y1).attr('width', x2 - x1).attr('height', y2 - y1)
+      .attr('fill', 'none').attr('stroke', 'var(--border)').attr('stroke-width', 1);
+    svg.append('g').attr('class', 'grid').attr('transform', 'translate(' + x1 + ',0)')
+      .call(d3.axisLeft(y).ticks(4).tickSize(-(x2 - x1)).tickFormat(''));
+    svg.append('g').attr('class', 'y-axis').attr('transform', 'translate(' + x1 + ',0)')
+      .call(d3.axisLeft(y).ticks(4).tickSizeOuter(0).tickFormat(value => axisMoney.format(value)));
+    svg.append('g').attr('class', 'x-axis').attr('transform', 'translate(0,' + y2 + ')')
+      .call(d3.axisBottom(x).tickValues(ticks).tickSizeOuter(0).tickFormat(value => clock.format(new Date(value))));
+    svg.append('text').attr('class', 'axis-title').attr('data-axis', 'x').attr('x', (x1 + x2) / 2).attr('y', height - 8).attr('text-anchor', 'middle').text('Pacific time');
+    svg.append('text').attr('class', 'axis-title').attr('data-axis', 'y').attr('transform', 'translate(16,' + (y1 + y2) / 2 + ') rotate(-90)').attr('text-anchor', 'middle').text('Gross P&L (USD)');
+    const clipId = 'lp-clip-' + plot.day.date;
+    svg.append('defs').append('clipPath').attr('id', clipId).append('rect').attr('x', x1).attr('y', y1).attr('width', x2 - x1).attr('height', y2 - y1);
+    const marks = svg.append('g').attr('clip-path', 'url(#' + clipId + ')');
+    marks.append('line').attr('x1', x1).attr('x2', x2).attr('y1', y(0)).attr('y2', y(0)).attr('stroke', 'var(--foreground)').attr('stroke-width', 1).attr('opacity', 0.4);
+    const shown = plot.series.filter(series => visible.has(series.ticker));
+    shown.forEach(series => {
+      const index = stockIndex(series.ticker);
+      marks.append('path').datum(series.values).attr('data-stock-line', series.ticker).attr('fill', 'none')
+        .attr('stroke', color(series.ticker)).attr('stroke-width', 2).attr('stroke-dasharray', dashes[index])
+        .attr('d', d3.line().x(point => x(point.x)).y(point => y(point.y)));
+      const end = series.values[series.values.length - 1];
+      marks.append('path').attr('data-stock-endpoint', series.ticker).attr('d', d3.symbol().type(symbols[index]).size(34)())
+        .attr('transform', 'translate(' + x(end.x) + ',' + y(end.y) + ')').attr('fill', color(series.ticker));
+    });
+    const guide = marks.append('line').attr('data-chart-hover-guide', '').attr('y1', y1).attr('y2', y2)
+      .attr('stroke', 'var(--foreground)').attr('stroke-width', 1).attr('visibility', 'hidden');
+    const hoverMarkers = marks.selectAll('[data-chart-hover-marker]').data(shown).enter().append('path')
+      .attr('data-chart-hover-marker', series => series.ticker).attr('d', series => d3.symbol().type(symbols[stockIndex(series.ticker)]).size(50)())
+      .attr('fill', series => color(series.ticker)).attr('visibility', 'hidden');
+    plot.pinned = false;
+    function hover(event) {
+      const pointer = d3.pointer(event, svg.node());
+      const cursorX = Math.max(x1, Math.min(x2, pointer[0]));
+      const time = x.invert(cursorX);
+      guide.attr('x1', cursorX).attr('x2', cursorX).attr('visibility', shown.length ? 'visible' : 'hidden');
+      tooltip.replaceChildren();
+      const heading = document.createElement('div');
+      heading.className = 'text-small';
+      heading.textContent = exactClock.format(new Date(time)) + ' PT · interpolated';
+      tooltip.append(heading);
+      hoverMarkers.each(function (series) {
+        const value = interpolate(series.values, time);
+        d3.select(this).attr('visibility', value === null ? 'hidden' : 'visible')
+          .attr('transform', value === null ? null : 'translate(' + cursorX + ',' + y(value) + ')');
+        const row = document.createElement('div');
+        row.className = 'lp-tooltip-row';
+        row.dataset.tooltipStock = series.ticker;
+        const swatch = document.createElement('span');
+        swatch.className = 'lp-tooltip-swatch';
+        swatch.style.background = color(series.ticker);
+        const name = document.createElement('span');
+        name.textContent = series.ticker;
+        const amount = document.createElement('span');
+        amount.textContent = value === null ? 'No observation' : money.format(value);
+        row.append(swatch, name, amount);
+        tooltip.append(row);
+      });
+      tooltip.hidden = shown.length === 0;
+      const rootBounds = root.getBoundingClientRect();
+      const svgBounds = svg.node().getBoundingClientRect();
+      const tipWidth = tooltip.getBoundingClientRect().width;
+      const preferredLeft = svgBounds.left - rootBounds.left + cursorX + 14;
+      const alternativeLeft = svgBounds.left - rootBounds.left + cursorX - tipWidth - 14;
+      const left = preferredLeft + tipWidth > rootBounds.width - 8 ? alternativeLeft : preferredLeft;
+      tooltip.style.left = Math.max(8, Math.min(left, rootBounds.width - tipWidth - 8)) + 'px';
+      tooltip.style.top = (svgBounds.top - rootBounds.top + y1 + 6) + 'px';
+    }
+    svg.append('rect').attr('data-chart-hit', '').attr('data-chart-hover-overlay', 'cross-series')
+      .attr('x', x1).attr('y', y1).attr('width', x2 - x1).attr('height', y2 - y1).attr('fill', 'transparent')
+      .on('pointermove', event => { if (!plot.pinned && event.pointerType !== 'touch') hover(event); })
+      .on('pointerleave', () => { if (!plot.pinned) hideTooltip(); })
+      .on('click', event => { hideTooltip(); plot.pinned = !plot.pinned; if (plot.pinned) hover(event); });
+    declutter(svg);
+  }
+
+  data.days.forEach(day => {
+    const section = document.createElement('section');
+    section.className = 'lp-day';
+    const heading = document.createElement('h3');
+    const title = dayName.format(new Date(day.date + 'T12:00:00Z')) + ' · ' + (day.phase === 'heldout' ? 'Held out' : 'Development');
+    heading.textContent = title;
+    const container = document.createElement('div');
+    container.className = 'lp-plot';
+    section.append(heading, container);
+    root.querySelector('.lp-days').append(section);
+    const svg = d3.select(container).append('svg').attr('class', 'lp-chart').attr('role', 'img').attr('aria-label', title + ' gross P&L');
+    const plot = {day, title, container, svg, series: day.series.map(series => ({ticker: series.ticker, values: series.points.map(point => ({x: point[0], y: point[1]}))}))};
+    plots.push(plot);
+    new ResizeObserver(() => { hideTooltip(); draw(plot); }).observe(container);
+    draw(plot);
+  });
+  renderTable();
+})();
+</script>
