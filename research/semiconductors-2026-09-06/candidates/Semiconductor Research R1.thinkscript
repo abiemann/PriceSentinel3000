@@ -1,0 +1,15 @@
+# Original PriceSentinel research candidate R1, declared 2026-09-06.
+# Enter RSI7 recovery through 35 while price remains below SMA20.
+# Exit on recovery to SMA20 or renewed RSI weakness below 25.
+# Completed one-minute candles. Host controls all execution and risk limits.
+input meanLength = 20;
+input momentumLength = 7;
+input recoveryStrength = 35;
+input failureStrength = 25;
+
+def meanPrice = Average(close, meanLength);
+def strength = RSI(length = momentumLength, price = close);
+def enterLong = strength crosses above recoveryStrength and close < meanPrice;
+def exitLong = close >= meanPrice or strength < failureStrength;
+AddOrder(OrderType.BUY_TO_OPEN, enterLong, name = "Oversold recovery entry");
+AddOrder(OrderType.SELL_TO_CLOSE, exitLong, name = "Mean recovery or momentum failure exit");

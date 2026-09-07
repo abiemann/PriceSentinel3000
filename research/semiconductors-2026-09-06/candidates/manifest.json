@@ -1,0 +1,97 @@
+{
+  "DeclaredAtUtc": "2026-09-07T06:52:54.7404608+00:00",
+  "Runtime": "thinkscript-subset-v1",
+  "CandidateCount": 5,
+  "CandleIntervalSeconds": 60,
+  "CandidateOrder": [
+    "C1",
+    "C2",
+    "C3",
+    "B1",
+    "R1"
+  ],
+  "Basis": "Five previously validated original formulas reused byte-identically, fixed before SOXL/SOXX Replay price or P&L inspection.",
+  "ValidationPassed": true,
+  "ValidationReport": "../../low-price-2026-09-06/candidates/validation-results.json",
+  "ValidationProject": "../../low-price-2026-09-06/tools/candidate-validation/Validation.csproj",
+  "ValidationScope": "40 synthetic cases, each repeated for deterministic action/state/reason/indicators; exact warmup boundaries; long-only actions; full 4096-bar history without operation or memory failures; all indicator telemetry below 64-value bound. No market data or performance tests.",
+  "Candidates": [
+    {
+      "Id": "C1",
+      "File": "Semiconductor Research C1.thinkscript",
+      "SourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "RequiredWarmupBars": 85,
+      "DefaultInputs": {
+        "fastLength": 8,
+        "slowLength": 21,
+        "momentumLength": 7,
+        "entryStrength": 50,
+        "exitStrength": 50
+      },
+      "Compatible": true,
+      "ValidationChecksPassed": 8,
+      "ConceptualRisk": "Trend recovery can whipsaw in sideways markets; momentum exits can crystallize small losses."
+    },
+    {
+      "Id": "C2",
+      "File": "Semiconductor Research C2.thinkscript",
+      "SourceSha256": "a1a2121ad0bba569679b14fb7dac270473e671556d38e4ac7ff302f0afb18f73",
+      "RequiredWarmupBars": 85,
+      "DefaultInputs": {
+        "fastLength": 8,
+        "slowLength": 21,
+        "momentumLength": 7,
+        "entryStrength": 50,
+        "exitStrength": 45
+      },
+      "Compatible": true,
+      "ValidationChecksPassed": 8,
+      "ConceptualRisk": "The lower exit RSI can keep a recovering trend position longer but also allow larger giveback."
+    },
+    {
+      "Id": "C3",
+      "File": "Semiconductor Research C3.thinkscript",
+      "SourceSha256": "88a0d2f7ee078456b333d7c020553030303ae5533977cd52016a6d886f3a87df",
+      "RequiredWarmupBars": 85,
+      "DefaultInputs": {
+        "fastLength": 8,
+        "slowLength": 21,
+        "momentumLength": 7,
+        "entryStrength": 55,
+        "exitStrength": 50
+      },
+      "Compatible": true,
+      "ValidationChecksPassed": 8,
+      "ConceptualRisk": "The stronger entry threshold can avoid weak recovery and can also miss profitable early entries."
+    },
+    {
+      "Id": "B1",
+      "File": "Semiconductor Research B1.thinkscript",
+      "SourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+      "RequiredWarmupBars": 84,
+      "DefaultInputs": {
+        "entryLength": 20,
+        "exitLength": 10,
+        "trendLength": 21
+      },
+      "Compatible": true,
+      "ValidationChecksPassed": 8,
+      "ConceptualRisk": "False breakouts and gaps can reverse rapidly; price-only logic has no volume confirmation."
+    },
+    {
+      "Id": "R1",
+      "File": "Semiconductor Research R1.thinkscript",
+      "SourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60",
+      "RequiredWarmupBars": 51,
+      "DefaultInputs": {
+        "meanLength": 20,
+        "momentumLength": 7,
+        "recoveryStrength": 35,
+        "failureStrength": 25
+      },
+      "Compatible": true,
+      "ValidationChecksPassed": 8,
+      "ConceptualRisk": "An oversold recovery may fail during a persistent decline; mean recovery is a countertrend hypothesis."
+    }
+  ]
+}
