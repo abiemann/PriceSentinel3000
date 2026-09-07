@@ -5,7 +5,7 @@ namespace PriceSentinel3000.Core.MarketData;
 /// NYSE calendar rules. One-off or unscheduled closures are not represented.
 /// See https://www.nyse.com/trade/hours-calendars.
 /// </summary>
-internal static class UsEquityTradingCalendar
+public static class UsEquityTradingCalendar
 {
     public static bool IsTradingDay(DateOnly date)
     {
