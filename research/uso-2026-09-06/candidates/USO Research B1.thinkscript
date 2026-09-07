@@ -1,0 +1,15 @@
+# Original PriceSentinel research candidate B1, declared 2026-09-06.
+# Enter a fresh close breakout above the previous 20 highs, above EMA21.
+# Exit below the previous 10 lows or EMA21. No current-bar channel leakage.
+# Completed one-minute candles. Host controls all execution and risk limits.
+input entryLength = 20;
+input exitLength = 10;
+input trendLength = 21;
+
+def priorHigh = Highest(high, entryLength)[1];
+def priorLow = Lowest(low, exitLength)[1];
+def trend = ExpAverage(close, trendLength);
+def enterLong = close crosses above priorHigh and close > trend;
+def exitLong = close < priorLow or close < trend;
+AddOrder(OrderType.BUY_TO_OPEN, enterLong, name = "Prior channel breakout entry");
+AddOrder(OrderType.SELL_TO_CLOSE, exitLong, name = "Channel or trend exit");
