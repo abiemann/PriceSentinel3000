@@ -1,0 +1,43 @@
+{
+  "basis": "SOXL frozen R1 holdout; SOXX unselected C1 data/warmup diagnostic.",
+  "settings": {
+    "startingBalance": 1400,
+    "tradesSettleImmediately": true,
+    "positionSizeBasis": "FixedAmount",
+    "positionSizeValue": 500,
+    "quantityLimitMode": "AsManyAsPossible",
+    "maximumQuantity": 100,
+    "unlimitedEntries": true,
+    "maximumEntriesPerDay": 1,
+    "maximumDailyLossBasis": "FixedAmount",
+    "maximumDailyLossValue": 50,
+    "stopLossBasis": "PurchasePriceDeclinePercentage",
+    "stopLossValue": 1,
+    "bufferMinutes": 15,
+    "quotePollingSeconds": 5,
+    "scriptBarIntervalSeconds": 60,
+    "chartCandleIntervalSeconds": 15,
+    "reconciliationSeconds": 45,
+    "reconciliationLookbackSeconds": 900,
+    "reconciliationCompletionDelaySeconds": 30,
+    "replayTime": "06:30",
+    "replayEndTime": "13:00",
+    "replaySpeed": 100
+  },
+  "jobs": [
+    {
+      "symbol": "SOXL",
+      "date": "2026-09-04",
+      "profile": "R1",
+      "strategyId": "script:direxion semiconductor bull 3x (soxl) mean recovery - experimental.thinkscript",
+      "sourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60"
+    },
+    {
+      "symbol": "SOXX",
+      "date": "2026-09-04",
+      "profile": "C1",
+      "strategyId": "script:ishares semiconductor (soxx) confirmation - experimental.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc"
+    }
+  ]
+}

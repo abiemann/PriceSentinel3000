@@ -1,0 +1,72 @@
+{
+  "generatedAtUtc": "2026-09-07T07:00:20.527146+00:00",
+  "comparedRuns": 4,
+  "mismatchedRuns": 0,
+  "comparison": "Exact Decimal semantic equality of all source/strategy/events, cached indicators, settings/runtime/source, results decisions/fills/account. Only source observedAtUtc, generated order IDs (internal correlation checked), session IDs, and renamed strategy identity fields are ignored.",
+  "runs": [
+    {
+      "file": "D:\\Projects\\PriceSentinel3000\\artifacts\\semiconductor-research\\verification\\SOXL-2026-09-02-R1.json",
+      "reference": "D:\\Projects\\PriceSentinel3000\\artifacts\\semiconductor-research\\development\\SOXL-2026-09-02-R1.json",
+      "symbol": "SOXL",
+      "date": "2026-09-02",
+      "profile": "R1",
+      "originalSessionId": "b95e8660-2b9f-4ea0-b3f6-25047fc21a0a",
+      "verificationSessionId": "9f12d7be-0ce0-4a7f-b574-3f3dd54975a6",
+      "sourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60",
+      "sourceRecords": 1558,
+      "strategyRecords": 388,
+      "eventRecords": 1558,
+      "matched": true,
+      "failureCount": 0,
+      "failures": []
+    },
+    {
+      "file": "D:\\Projects\\PriceSentinel3000\\artifacts\\semiconductor-research\\verification\\SOXL-2026-09-03-R1.json",
+      "reference": "D:\\Projects\\PriceSentinel3000\\artifacts\\semiconductor-research\\development\\SOXL-2026-09-03-R1.json",
+      "symbol": "SOXL",
+      "date": "2026-09-03",
+      "profile": "R1",
+      "originalSessionId": "66992608-33b7-4ce5-8885-3f9c540df309",
+      "verificationSessionId": "6d1b782c-3c9f-4d56-aa5f-a7c10f977a3d",
+      "sourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60",
+      "sourceRecords": 1559,
+      "strategyRecords": 389,
+      "eventRecords": 1559,
+      "matched": true,
+      "failureCount": 0,
+      "failures": []
+    },
+    {
+      "file": "D:\\Projects\\PriceSentinel3000\\artifacts\\semiconductor-research\\verification\\SOXX-2026-09-02-C1.json",
+      "reference": "D:\\Projects\\PriceSentinel3000\\artifacts\\semiconductor-research\\development\\SOXX-2026-09-02-C1.json",
+      "symbol": "SOXX",
+      "date": "2026-09-02",
+      "profile": "C1",
+      "originalSessionId": "f4e59bcc-8b70-4d24-9179-05d57e5c8417",
+      "verificationSessionId": "7a3f9199-fce8-4d58-a600-bea31b3ddf1e",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "sourceRecords": 1502,
+      "strategyRecords": 335,
+      "eventRecords": 1502,
+      "matched": true,
+      "failureCount": 0,
+      "failures": []
+    },
+    {
+      "file": "D:\\Projects\\PriceSentinel3000\\artifacts\\semiconductor-research\\verification\\SOXX-2026-09-03-C1.json",
+      "reference": "D:\\Projects\\PriceSentinel3000\\artifacts\\semiconductor-research\\development\\SOXX-2026-09-03-C1.json",
+      "symbol": "SOXX",
+      "date": "2026-09-03",
+      "profile": "C1",
+      "originalSessionId": "d8822fd6-ccee-436b-85c9-d7e93303eaf6",
+      "verificationSessionId": "93dc7fe7-ebd6-4e14-bda9-7d7b7baaf6b2",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "sourceRecords": 1537,
+      "strategyRecords": 368,
+      "eventRecords": 1537,
+      "matched": true,
+      "failureCount": 0,
+      "failures": []
+    }
+  ]
+}
