@@ -11,6 +11,7 @@ public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
     private readonly IAsyncDisposable? _automationServer;
+    private DataRetentionDialog? _dataRetentionDialog;
     private bool _closeAfterShutdown;
     private bool _shutdownInProgress;
 
@@ -57,6 +58,20 @@ public partial class MainWindow : Window
             : WindowState.Maximized;
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
+
+    private void AppHeader_DataRetentionRequested(object sender, RoutedEventArgs e)
+    {
+        if (_dataRetentionDialog is not null)
+        {
+            _dataRetentionDialog.Activate();
+            return;
+        }
+
+        _dataRetentionDialog = new DataRetentionDialog { Owner = this };
+        _dataRetentionDialog.Closed += (_, _) => _dataRetentionDialog = null;
+        // Keep the trading workspace, including STOP, accessible while viewing tools.
+        _dataRetentionDialog.Show();
+    }
 
     private void Window_StateChanged(object? sender, EventArgs e)
     {

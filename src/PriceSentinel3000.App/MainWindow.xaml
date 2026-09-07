@@ -87,7 +87,8 @@
             </Grid>
         </Border>
 
-        <views:AppHeaderView Grid.Row="1" />
+        <views:AppHeaderView Grid.Row="1"
+                             DataRetentionRequested="AppHeader_DataRetentionRequested" />
 
         <Grid Grid.Row="2"
               Margin="12">
