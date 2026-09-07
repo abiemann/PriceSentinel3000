@@ -1,0 +1,4147 @@
+{
+  "generatedAtUtc": "2026-09-07T07:02:55.034193+00:00",
+  "protocolSha256": "c39be2857b3f3aeeb2ee1a9b6647432aa0ad489129c6e98af2aef376184973db",
+  "candidateManifestSha256": "83aac6f234ee727728f01b86f8400912675855f1955931fc493d3c1f3a8e0c9a",
+  "auditorSha256": "68f0ba5a0b33e562f1ad2e24ad75dfb37929725daa6d71f08ef7e39674459406",
+  "baseAuditorSha256": "e33304e51570dcb6bc595147d92c9acb19783f4205696c8c3032aec729a68879",
+  "warmupHelperSha256": "a5793c437e578b33ca4f6fc472cee17e8c205227372d89b24385ada808877bcd",
+  "selectionUsesFriday": false,
+  "selectionFrozen": true,
+  "decimalArithmetic": "60 significant digits; exact ledger equality; decimal outputs are strings",
+  "sourceSignature": "SHA256 of canonical UTC source start/end and exact OHLC,last,bid,ask,volume; excludes observedAtUtc",
+  "auditedRuns": 22,
+  "unavailableAttempts": 4,
+  "invalidRuns": 0,
+  "developmentEvidence": [
+    {
+      "symbol": "SOXL",
+      "date": "2026-08-31",
+      "profile": "C1",
+      "fileSha256": "700c033caa6281ad37cbe8f43c0d1efd0b6bae0aa04600ebac19439a08505077",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "dataSha256": null,
+      "unavailable": true,
+      "error": "Robinhood returned no SOXL trades from 8/31/2026 6:30 AM through 1:00 PM.",
+      "primaryScore": null,
+      "grossPnl": null,
+      "entries": null,
+      "maximumDrawdown": null,
+      "dataEligible": null,
+      "failures": []
+    },
+    {
+      "symbol": "SOXL",
+      "date": "2026-09-01",
+      "profile": "C1",
+      "fileSha256": "0af37ba23a66edbfa3504aaeafe56ae53328e9e9c719c7c3589e0d708e4b3cf5",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "dataSha256": null,
+      "unavailable": true,
+      "error": "Robinhood returned no SOXL trades from 9/1/2026 6:30 AM through 1:00 PM.",
+      "primaryScore": null,
+      "grossPnl": null,
+      "entries": null,
+      "maximumDrawdown": null,
+      "dataEligible": null,
+      "failures": []
+    },
+    {
+      "symbol": "SOXL",
+      "date": "2026-09-02",
+      "profile": "B1",
+      "fileSha256": "129ec12f35f24304483810318a44dc7e41bdd9dca09a25c778da6c9cca8d1c10",
+      "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+      "dataSha256": "e20e2a141bd3edaaaa51e3a13e12045aa1e1a5fec6e4a189d8319840ccde9225",
+      "unavailable": false,
+      "error": null,
+      "primaryScore": "-7.08975785521315",
+      "grossPnl": "-4.592054140700",
+      "entries": 5,
+      "maximumDrawdown": "8.891031901300",
+      "dataEligible": true,
+      "failures": []
+    },
+    {
+      "symbol": "SOXL",
+      "date": "2026-09-02",
+      "profile": "C1",
+      "fileSha256": "7f45e29207d284653468f256fc07f0f7aedd6c87de8992f3b98bcbd764ee07a1",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "dataSha256": "e20e2a141bd3edaaaa51e3a13e12045aa1e1a5fec6e4a189d8319840ccde9225",
+      "unavailable": false,
+      "error": null,
+      "primaryScore": "-5.16720394735585",
+      "grossPnl": "-1.668038263700",
+      "entries": 7,
+      "maximumDrawdown": "5.650597554800",
+      "dataEligible": true,
+      "failures": []
+    },
+    {
+      "symbol": "SOXL",
+      "date": "2026-09-02",
+      "profile": "C2",
+      "fileSha256": "97c681d1b309d114535ebe09d16d4a90edc9ae08148434389b53d0a97f805c52",
+      "sourceSha256": "a1a2121ad0bba569679b14fb7dac270473e671556d38e4ac7ff302f0afb18f73",
+      "dataSha256": "e20e2a141bd3edaaaa51e3a13e12045aa1e1a5fec6e4a189d8319840ccde9225",
+      "unavailable": false,
+      "error": null,
+      "primaryScore": "-2.12512082628895",
+      "grossPnl": "0.375066442500",
+      "entries": 5,
+      "maximumDrawdown": "4.549381199900",
+      "dataEligible": true,
+      "failures": []
+    },
+    {
+      "symbol": "SOXL",
+      "date": "2026-09-02",
+      "profile": "C3",
+      "fileSha256": "eb58ce62c322dd30e28671a796a8dbb9701e22c39625b503350bc8b453c294f5",
+      "sourceSha256": "88a0d2f7ee078456b333d7c020553030303ae5533977cd52016a6d886f3a87df",
+      "dataSha256": "e20e2a141bd3edaaaa51e3a13e12045aa1e1a5fec6e4a189d8319840ccde9225",
+      "unavailable": false,
+      "error": null,
+      "primaryScore": "-4.03794278527085",
+      "grossPnl": "-1.038462253700",
+      "entries": 6,
+      "maximumDrawdown": "5.021021544800",
+      "dataEligible": true,
+      "failures": []
+    },
+    {
+      "symbol": "SOXL",
+      "date": "2026-09-02",
+      "profile": "R1",
+      "fileSha256": "e729a4134894a383726130fa738ef431ff9eb0f763d57c6e1b9a013bf4e0f390",
+      "sourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60",
+      "dataSha256": "e20e2a141bd3edaaaa51e3a13e12045aa1e1a5fec6e4a189d8319840ccde9225",
+      "unavailable": false,
+      "error": null,
+      "primaryScore": "-6.8818229540535",
+      "grossPnl": "-1.882764732400",
+      "entries": 10,
+      "maximumDrawdown": "6.813202069900",
+      "dataEligible": true,
+      "failures": []
+    },
+    {
+      "symbol": "SOXL",
+      "date": "2026-09-03",
+      "profile": "B1",
+      "fileSha256": "8a83704549aa4cc47e43c7d5a67ecce229f0d2e4c817cdff9cb3ed8ba65fc683",
+      "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+      "dataSha256": "a7c1f6323a320685cfc6c9a9fba07275efd16b28f43e597b65c7f0faffc5ea08",
+      "unavailable": false,
+      "error": null,
+      "primaryScore": "1.2299097443624",
+      "grossPnl": "4.232025300200",
+      "entries": 6,
+      "maximumDrawdown": "11.600154208600",
+      "dataEligible": true,
+      "failures": []
+    },
+    {
+      "symbol": "SOXL",
+      "date": "2026-09-03",
+      "profile": "C1",
+      "fileSha256": "ca058a7830704dd91e53c23dd7b49ccb19cee9c105bfba0bfe0e8d9c0f3d20f8",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "dataSha256": "a7c1f6323a320685cfc6c9a9fba07275efd16b28f43e597b65c7f0faffc5ea08",
+      "unavailable": false,
+      "error": null,
+      "primaryScore": "-12.59669145217295",
+      "grossPnl": "-6.099742000700",
+      "entries": 13,
+      "maximumDrawdown": "10.700363484300",
+      "dataEligible": true,
+      "failures": []
+    },
+    {
+      "symbol": "SOXL",
+      "date": "2026-09-03",
+      "profile": "C2",
+      "fileSha256": "04693587ec1c2e3901c9073b5e1565eb904d5642311e3938165c98131a36075b",
+      "sourceSha256": "a1a2121ad0bba569679b14fb7dac270473e671556d38e4ac7ff302f0afb18f73",
+      "dataSha256": "a7c1f6323a320685cfc6c9a9fba07275efd16b28f43e597b65c7f0faffc5ea08",
+      "unavailable": false,
+      "error": null,
+      "primaryScore": "-9.48289746152265",
+      "grossPnl": "-3.984890501300",
+      "entries": 11,
+      "maximumDrawdown": "12.997131994900",
+      "dataEligible": true,
+      "failures": []
+    },
+    {
+      "symbol": "SOXL",
+      "date": "2026-09-03",
+      "profile": "C3",
+      "fileSha256": "4de568a98266fd893bb3b13ac1c7ee9686c1eca5d8b9a5c77883924e7dcc3a76",
+      "sourceSha256": "88a0d2f7ee078456b333d7c020553030303ae5533977cd52016a6d886f3a87df",
+      "dataSha256": "a7c1f6323a320685cfc6c9a9fba07275efd16b28f43e597b65c7f0faffc5ea08",
+      "unavailable": false,
+      "error": null,
+      "primaryScore": "-6.70035322917945",
+      "grossPnl": "-2.701704433700",
+      "entries": 8,
+      "maximumDrawdown": "7.039572573300",
+      "dataEligible": true,
+      "failures": []
+    },
+    {
+      "symbol": "SOXL",
+      "date": "2026-09-03",
+      "profile": "R1",
+      "fileSha256": "d0905edf4dd6f26702702a787c34d107c792f4da1989452523b649c96ec15b82",
+      "sourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60",
+      "dataSha256": "a7c1f6323a320685cfc6c9a9fba07275efd16b28f43e597b65c7f0faffc5ea08",
+      "unavailable": false,
+      "error": null,
+      "primaryScore": "4.1933175919855",
+      "grossPnl": "7.196915719000",
+      "entries": 6,
+      "maximumDrawdown": "1.652251901600",
+      "dataEligible": true,
+      "failures": []
+    },
+    {
+      "symbol": "SOXX",
+      "date": "2026-08-31",
+      "profile": "C1",
+      "fileSha256": "2685860c9face026db4b398f9c550dc1653146ad922546a977051276c139e296",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "dataSha256": null,
+      "unavailable": true,
+      "error": "Robinhood returned no SOXX trades from 8/31/2026 6:30 AM through 1:00 PM.",
+      "primaryScore": null,
+      "grossPnl": null,
+      "entries": null,
+      "maximumDrawdown": null,
+      "dataEligible": null,
+      "failures": []
+    },
+    {
+      "symbol": "SOXX",
+      "date": "2026-09-01",
+      "profile": "C1",
+      "fileSha256": "dfdd6f79ee652bb76ab1335e7f9236fa6e160ea6bc14ff249323d374c5a1a0bf",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "dataSha256": null,
+      "unavailable": true,
+      "error": "Robinhood returned no SOXX trades from 9/1/2026 6:30 AM through 1:00 PM.",
+      "primaryScore": null,
+      "grossPnl": null,
+      "entries": null,
+      "maximumDrawdown": null,
+      "dataEligible": null,
+      "failures": []
+    },
+    {
+      "symbol": "SOXX",
+      "date": "2026-09-02",
+      "profile": "B1",
+      "fileSha256": "b727a85e54f5388f8112c4760e636d97811a96c2b429c0f5a261d557a5ce622b",
+      "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+      "dataSha256": "d265252b6a1bdbed36f867f2b108ddf46d217e337406d653972e316ec13036e7",
+      "unavailable": false,
+      "error": null,
+      "primaryScore": "0.000000",
+      "grossPnl": "0.000000",
+      "entries": 0,
+      "maximumDrawdown": "0",
+      "dataEligible": false,
+      "failures": []
+    },
+    {
+      "symbol": "SOXX",
+      "date": "2026-09-02",
+      "profile": "C1",
+      "fileSha256": "b9351dfb565020a3a47abeec94a754a4544777fbae5eda6a925c09971ca104c7",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "dataSha256": "d265252b6a1bdbed36f867f2b108ddf46d217e337406d653972e316ec13036e7",
+      "unavailable": false,
+      "error": null,
+      "primaryScore": "0.000000",
+      "grossPnl": "0.000000",
+      "entries": 0,
+      "maximumDrawdown": "0",
+      "dataEligible": false,
+      "failures": []
+    },
+    {
+      "symbol": "SOXX",
+      "date": "2026-09-02",
+      "profile": "C2",
+      "fileSha256": "23a5772a152105888e8876148bc9bd463fc80a16cccd7c556d75b60c61b9630d",
+      "sourceSha256": "a1a2121ad0bba569679b14fb7dac270473e671556d38e4ac7ff302f0afb18f73",
+      "dataSha256": "d265252b6a1bdbed36f867f2b108ddf46d217e337406d653972e316ec13036e7",
+      "unavailable": false,
+      "error": null,
+      "primaryScore": "0.000000",
+      "grossPnl": "0.000000",
+      "entries": 0,
+      "maximumDrawdown": "0",
+      "dataEligible": false,
+      "failures": []
+    },
+    {
+      "symbol": "SOXX",
+      "date": "2026-09-02",
+      "profile": "C3",
+      "fileSha256": "57d61dfde872d35aba42909407ba1774a6514dc2d4c170b331aadfe609c8d2a5",
+      "sourceSha256": "88a0d2f7ee078456b333d7c020553030303ae5533977cd52016a6d886f3a87df",
+      "dataSha256": "d265252b6a1bdbed36f867f2b108ddf46d217e337406d653972e316ec13036e7",
+      "unavailable": false,
+      "error": null,
+      "primaryScore": "0.000000",
+      "grossPnl": "0.000000",
+      "entries": 0,
+      "maximumDrawdown": "0",
+      "dataEligible": false,
+      "failures": []
+    },
+    {
+      "symbol": "SOXX",
+      "date": "2026-09-02",
+      "profile": "R1",
+      "fileSha256": "b2d800008ce31dc364110ea08ca1fead4dad4f7020a2a2432bb6108534fbd381",
+      "sourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60",
+      "dataSha256": "d265252b6a1bdbed36f867f2b108ddf46d217e337406d653972e316ec13036e7",
+      "unavailable": false,
+      "error": null,
+      "primaryScore": "0.000000",
+      "grossPnl": "0.000000",
+      "entries": 0,
+      "maximumDrawdown": "0",
+      "dataEligible": false,
+      "failures": []
+    },
+    {
+      "symbol": "SOXX",
+      "date": "2026-09-03",
+      "profile": "B1",
+      "fileSha256": "51eef0f233c6328dc8951b5ff01c27560cfe10ff344bdeb62f38528f752aefca",
+      "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+      "dataSha256": "d8267c1155a1b62ab8ee419b2cb5003f9b4d008db59f81e137bbf77b04bf9abe",
+      "unavailable": false,
+      "error": null,
+      "primaryScore": "0.000000",
+      "grossPnl": "0.000000",
+      "entries": 0,
+      "maximumDrawdown": "0",
+      "dataEligible": true,
+      "failures": []
+    },
+    {
+      "symbol": "SOXX",
+      "date": "2026-09-03",
+      "profile": "C1",
+      "fileSha256": "0e74186cd980fa13e84402d8a86febefbd18857277586c14d9aef9e0ca00b1c7",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "dataSha256": "d8267c1155a1b62ab8ee419b2cb5003f9b4d008db59f81e137bbf77b04bf9abe",
+      "unavailable": false,
+      "error": null,
+      "primaryScore": "0.000000",
+      "grossPnl": "0.000000",
+      "entries": 0,
+      "maximumDrawdown": "0",
+      "dataEligible": true,
+      "failures": []
+    },
+    {
+      "symbol": "SOXX",
+      "date": "2026-09-03",
+      "profile": "C2",
+      "fileSha256": "9d119d7daf3507f82ebb3e0638eeeb64f21a8c92e823d51cc1835670c13ad34f",
+      "sourceSha256": "a1a2121ad0bba569679b14fb7dac270473e671556d38e4ac7ff302f0afb18f73",
+      "dataSha256": "d8267c1155a1b62ab8ee419b2cb5003f9b4d008db59f81e137bbf77b04bf9abe",
+      "unavailable": false,
+      "error": null,
+      "primaryScore": "0.000000",
+      "grossPnl": "0.000000",
+      "entries": 0,
+      "maximumDrawdown": "0",
+      "dataEligible": true,
+      "failures": []
+    },
+    {
+      "symbol": "SOXX",
+      "date": "2026-09-03",
+      "profile": "C3",
+      "fileSha256": "f2b12a2cc6351f00ccce387b71473a66659ebfee735d930639f83f406dc0d04d",
+      "sourceSha256": "88a0d2f7ee078456b333d7c020553030303ae5533977cd52016a6d886f3a87df",
+      "dataSha256": "d8267c1155a1b62ab8ee419b2cb5003f9b4d008db59f81e137bbf77b04bf9abe",
+      "unavailable": false,
+      "error": null,
+      "primaryScore": "0.000000",
+      "grossPnl": "0.000000",
+      "entries": 0,
+      "maximumDrawdown": "0",
+      "dataEligible": true,
+      "failures": []
+    },
+    {
+      "symbol": "SOXX",
+      "date": "2026-09-03",
+      "profile": "R1",
+      "fileSha256": "8a1c2d6e87e3ab80f06b8b53b9262804bb1bc50cb28b2d167159ac6e90acbb8f",
+      "sourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60",
+      "dataSha256": "d8267c1155a1b62ab8ee419b2cb5003f9b4d008db59f81e137bbf77b04bf9abe",
+      "unavailable": false,
+      "error": null,
+      "primaryScore": "0.2554376265525",
+      "grossPnl": "0.755815165000",
+      "entries": 1,
+      "maximumDrawdown": "0.334790610000",
+      "dataEligible": true,
+      "failures": []
+    }
+  ],
+  "runs": [
+    {
+      "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-02-B1.json",
+      "symbol": "SOXL",
+      "date": "2026-09-02",
+      "profile": "B1",
+      "unavailable": false,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "cf3b4a81-8a63-4a0c-88cd-43ecf1e3ea30",
+      "sessionId": "c2d19d8d-17e3-4677-83ef-43229cafc455",
+      "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+      "dataSha256": "e20e2a141bd3edaaaa51e3a13e12045aa1e1a5fec6e4a189d8319840ccde9225",
+      "sourceCount": 1558,
+      "strategyCount": 388,
+      "firstSource": "2026-09-02T13:30:00+00:00",
+      "lastClose": "2026-09-02T20:00:00+00:00",
+      "exactEndpoints": true,
+      "coverage": "0.998717948717948717948717948717948717948717948717948717948718",
+      "dataEligible": true,
+      "firstReady": "2026-09-02T14:54:00+00:00",
+      "requiredWarmupBars": 84,
+      "retainedCapacity": 256,
+      "endingRetainedBars": 103,
+      "endingReady": true,
+      "gapCount": 2,
+      "gaps": [
+        {
+          "fromUtc": "2026-09-02T18:11:30+00:00",
+          "throughUtc": "2026-09-02T18:11:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:16:30+00:00",
+          "throughUtc": "2026-09-02T18:16:45+00:00",
+          "missingBars": 1
+        }
+      ],
+      "grossPnl": "-4.592054140700",
+      "realized": "-4.592054140700",
+      "unrealized": "0.000000",
+      "endingQuantity": "0",
+      "endingExposure": "0.000000",
+      "endingCash": "1395.407945859300",
+      "endingEquity": "1395.407945859300",
+      "entries": 5,
+      "fills": 10,
+      "maximumDrawdown": "8.891031901300",
+      "tradedNotional": "4995.407429026300",
+      "tradedShares": "46.849576",
+      "closingAllowanceNotional": "0.000000",
+      "closingAllowanceShares": "0",
+      "exposedObservations": 212,
+      "exposureFraction": "0.136071887034659820282413350449293966623876765083440308087291",
+      "riskOverrides": {},
+      "netByBps": {
+        "0": "-4.592054140700",
+        "1": "-5.09159488360263",
+        "2.5": "-5.840905997956575",
+        "5": "-7.08975785521315",
+        "10": "-9.5874615697263",
+        "25": "-17.08057271326575"
+      },
+      "netByPerShare": {
+        "0.005": "-4.826302020700",
+        "0.01": "-5.060549900700"
+      },
+      "primaryScore": "-7.08975785521315",
+      "maximumContiguousStrategyBars": 281,
+      "readyEvaluations": 218,
+      "warmupEvaluations": 173,
+      "fileSha256": "129ec12f35f24304483810318a44dc7e41bdd9dca09a25c778da6c9cca8d1c10"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-02-C1.json",
+      "symbol": "SOXL",
+      "date": "2026-09-02",
+      "profile": "C1",
+      "unavailable": false,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "6c1b2343-5da4-4c2f-9b44-a8a6a4c1c5a2",
+      "sessionId": "46d72237-508a-49b0-bb3a-8b64d5b991d3",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "dataSha256": "e20e2a141bd3edaaaa51e3a13e12045aa1e1a5fec6e4a189d8319840ccde9225",
+      "sourceCount": 1558,
+      "strategyCount": 388,
+      "firstSource": "2026-09-02T13:30:00+00:00",
+      "lastClose": "2026-09-02T20:00:00+00:00",
+      "exactEndpoints": true,
+      "coverage": "0.998717948717948717948717948717948717948717948717948717948718",
+      "dataEligible": true,
+      "firstReady": "2026-09-02T14:55:00+00:00",
+      "requiredWarmupBars": 85,
+      "retainedCapacity": 256,
+      "endingRetainedBars": 103,
+      "endingReady": true,
+      "gapCount": 2,
+      "gaps": [
+        {
+          "fromUtc": "2026-09-02T18:11:30+00:00",
+          "throughUtc": "2026-09-02T18:11:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:16:30+00:00",
+          "throughUtc": "2026-09-02T18:16:45+00:00",
+          "missingBars": 1
+        }
+      ],
+      "grossPnl": "-1.668038263700",
+      "realized": "-1.950258343700",
+      "unrealized": "0.282220080000",
+      "endingQuantity": "4.703668",
+      "endingExposure": "500.282128480000",
+      "endingCash": "898.049833256300",
+      "endingEquity": "1398.331961736300",
+      "entries": 7,
+      "fills": 13,
+      "maximumDrawdown": "5.650597554800",
+      "tradedNotional": "6498.049238831700",
+      "tradedShares": "60.777324",
+      "closingAllowanceNotional": "500.282128480000",
+      "closingAllowanceShares": "4.703668",
+      "exposedObservations": 173,
+      "exposureFraction": "0.111039794608472400513478818998716302952503209242618741976893",
+      "riskOverrides": {},
+      "netByBps": {
+        "0": "-1.668038263700",
+        "1": "-2.36787140043117",
+        "2.5": "-3.417621105527925",
+        "5": "-5.16720394735585",
+        "10": "-8.6663696310117",
+        "25": "-19.16386668197925"
+      },
+      "netByPerShare": {
+        "0.005": "-1.995443223700",
+        "0.01": "-2.322848183700"
+      },
+      "primaryScore": "-5.16720394735585",
+      "maximumContiguousStrategyBars": 281,
+      "readyEvaluations": 216,
+      "warmupEvaluations": 175,
+      "fileSha256": "7f45e29207d284653468f256fc07f0f7aedd6c87de8992f3b98bcbd764ee07a1"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-02-C2.json",
+      "symbol": "SOXL",
+      "date": "2026-09-02",
+      "profile": "C2",
+      "unavailable": false,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "9a82cd8e-9a80-4fce-a6cc-e727cd12d4c0",
+      "sessionId": "c4e9c0aa-48ab-48f4-9602-29b06ea3055c",
+      "sourceSha256": "a1a2121ad0bba569679b14fb7dac270473e671556d38e4ac7ff302f0afb18f73",
+      "dataSha256": "e20e2a141bd3edaaaa51e3a13e12045aa1e1a5fec6e4a189d8319840ccde9225",
+      "sourceCount": 1558,
+      "strategyCount": 388,
+      "firstSource": "2026-09-02T13:30:00+00:00",
+      "lastClose": "2026-09-02T20:00:00+00:00",
+      "exactEndpoints": true,
+      "coverage": "0.998717948717948717948717948717948717948717948717948717948718",
+      "dataEligible": true,
+      "firstReady": "2026-09-02T14:55:00+00:00",
+      "requiredWarmupBars": 85,
+      "retainedCapacity": 256,
+      "endingRetainedBars": 103,
+      "endingReady": true,
+      "gapCount": 2,
+      "gaps": [
+        {
+          "fromUtc": "2026-09-02T18:11:30+00:00",
+          "throughUtc": "2026-09-02T18:11:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:16:30+00:00",
+          "throughUtc": "2026-09-02T18:16:45+00:00",
+          "missingBars": 1
+        }
+      ],
+      "grossPnl": "0.375066442500",
+      "realized": "0.092846362500",
+      "unrealized": "0.282220080000",
+      "endingQuantity": "4.703668",
+      "endingExposure": "500.282128480000",
+      "endingCash": "900.092937962500",
+      "endingEquity": "1400.375066442500",
+      "entries": 5,
+      "fills": 9,
+      "maximumDrawdown": "4.549381199900",
+      "tradedNotional": "4500.092409097900",
+      "tradedShares": "42.126232",
+      "closingAllowanceNotional": "500.282128480000",
+      "closingAllowanceShares": "4.703668",
+      "exposedObservations": 185,
+      "exposureFraction": "0.118741976893453145057766367137355584082156611039794608472401",
+      "riskOverrides": {},
+      "netByBps": {
+        "0": "0.375066442500",
+        "1": "-0.12497101125779",
+        "2.5": "-0.875027191894475",
+        "5": "-2.12512082628895",
+        "10": "-4.6253080950779",
+        "25": "-12.12586990144475"
+      },
+      "netByPerShare": {
+        "0.005": "0.140916942500",
+        "0.01": "-0.093232557500"
+      },
+      "primaryScore": "-2.12512082628895",
+      "maximumContiguousStrategyBars": 281,
+      "readyEvaluations": 216,
+      "warmupEvaluations": 175,
+      "fileSha256": "97c681d1b309d114535ebe09d16d4a90edc9ae08148434389b53d0a97f805c52"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-02-C3.json",
+      "symbol": "SOXL",
+      "date": "2026-09-02",
+      "profile": "C3",
+      "unavailable": false,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "467192dc-84ce-4b54-b222-55dca2a6b2b1",
+      "sessionId": "f9a7d449-0c61-423b-b421-7ea435ff62a9",
+      "sourceSha256": "88a0d2f7ee078456b333d7c020553030303ae5533977cd52016a6d886f3a87df",
+      "dataSha256": "e20e2a141bd3edaaaa51e3a13e12045aa1e1a5fec6e4a189d8319840ccde9225",
+      "sourceCount": 1558,
+      "strategyCount": 388,
+      "firstSource": "2026-09-02T13:30:00+00:00",
+      "lastClose": "2026-09-02T20:00:00+00:00",
+      "exactEndpoints": true,
+      "coverage": "0.998717948717948717948717948717948717948717948717948717948718",
+      "dataEligible": true,
+      "firstReady": "2026-09-02T14:55:00+00:00",
+      "requiredWarmupBars": 85,
+      "retainedCapacity": 256,
+      "endingRetainedBars": 103,
+      "endingReady": true,
+      "gapCount": 2,
+      "gaps": [
+        {
+          "fromUtc": "2026-09-02T18:11:30+00:00",
+          "throughUtc": "2026-09-02T18:11:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:16:30+00:00",
+          "throughUtc": "2026-09-02T18:16:45+00:00",
+          "missingBars": 1
+        }
+      ],
+      "grossPnl": "-1.038462253700",
+      "realized": "-1.320682333700",
+      "unrealized": "0.282220080000",
+      "endingQuantity": "4.703668",
+      "endingExposure": "500.282128480000",
+      "endingCash": "898.679409266300",
+      "endingEquity": "1398.961537746300",
+      "entries": 6,
+      "fills": 11,
+      "maximumDrawdown": "5.021021544800",
+      "tradedNotional": "5498.678934661700",
+      "tradedShares": "51.450272",
+      "closingAllowanceNotional": "500.282128480000",
+      "closingAllowanceShares": "4.703668",
+      "exposedObservations": 165,
+      "exposureFraction": "0.105905006418485237483953786906290115532734274711168164313222",
+      "riskOverrides": {},
+      "netByBps": {
+        "0": "-1.038462253700",
+        "1": "-1.63835836001417",
+        "2.5": "-2.538202519485425",
+        "5": "-4.03794278527085",
+        "10": "-7.0374233168417",
+        "25": "-16.03586491155425"
+      },
+      "netByPerShare": {
+        "0.005": "-1.319231953700",
+        "0.01": "-1.600001653700"
+      },
+      "primaryScore": "-4.03794278527085",
+      "maximumContiguousStrategyBars": 281,
+      "readyEvaluations": 216,
+      "warmupEvaluations": 175,
+      "fileSha256": "eb58ce62c322dd30e28671a796a8dbb9701e22c39625b503350bc8b453c294f5"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-02-R1.json",
+      "symbol": "SOXL",
+      "date": "2026-09-02",
+      "profile": "R1",
+      "unavailable": false,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "7028112e-6dbb-4a11-b829-6f94da9c68ee",
+      "sessionId": "b95e8660-2b9f-4ea0-b3f6-25047fc21a0a",
+      "sourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60",
+      "dataSha256": "e20e2a141bd3edaaaa51e3a13e12045aa1e1a5fec6e4a189d8319840ccde9225",
+      "sourceCount": 1558,
+      "strategyCount": 388,
+      "firstSource": "2026-09-02T13:30:00+00:00",
+      "lastClose": "2026-09-02T20:00:00+00:00",
+      "exactEndpoints": true,
+      "coverage": "0.998717948717948717948717948717948717948717948717948717948718",
+      "dataEligible": true,
+      "firstReady": "2026-09-02T14:21:00+00:00",
+      "requiredWarmupBars": 51,
+      "retainedCapacity": 256,
+      "endingRetainedBars": 103,
+      "endingReady": true,
+      "gapCount": 2,
+      "gaps": [
+        {
+          "fromUtc": "2026-09-02T18:11:30+00:00",
+          "throughUtc": "2026-09-02T18:11:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:16:30+00:00",
+          "throughUtc": "2026-09-02T18:16:45+00:00",
+          "missingBars": 1
+        }
+      ],
+      "grossPnl": "-1.882764732400",
+      "realized": "-1.882764732400",
+      "unrealized": "0.000000",
+      "endingQuantity": "0",
+      "endingExposure": "0.000000",
+      "endingCash": "1398.117235267600",
+      "endingEquity": "1398.117235267600",
+      "entries": 10,
+      "fills": 20,
+      "maximumDrawdown": "6.813202069900",
+      "tradedNotional": "9998.116443307000",
+      "tradedShares": "94.262840",
+      "closingAllowanceNotional": "0.000000",
+      "closingAllowanceShares": "0",
+      "exposedObservations": 260,
+      "exposureFraction": "0.166880616174582798459563543003851091142490372272143774069320",
+      "riskOverrides": {},
+      "netByBps": {
+        "0": "-1.882764732400",
+        "1": "-2.8825763767307",
+        "2.5": "-4.38229384322675",
+        "5": "-6.8818229540535",
+        "10": "-11.880881175707",
+        "25": "-26.8780558406675"
+      },
+      "netByPerShare": {
+        "0.005": "-2.354078932400",
+        "0.01": "-2.825393132400"
+      },
+      "primaryScore": "-6.8818229540535",
+      "maximumContiguousStrategyBars": 281,
+      "readyEvaluations": 284,
+      "warmupEvaluations": 107,
+      "fileSha256": "e729a4134894a383726130fa738ef431ff9eb0f763d57c6e1b9a013bf4e0f390"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-03-B1.json",
+      "symbol": "SOXL",
+      "date": "2026-09-03",
+      "profile": "B1",
+      "unavailable": false,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "8a4dd916-4f22-42e5-ba62-b6f343b111bd",
+      "sessionId": "38447a8c-26e5-49a4-a753-a7f230d99b8b",
+      "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+      "dataSha256": "a7c1f6323a320685cfc6c9a9fba07275efd16b28f43e597b65c7f0faffc5ea08",
+      "sourceCount": 1559,
+      "strategyCount": 389,
+      "firstSource": "2026-09-03T13:30:00+00:00",
+      "lastClose": "2026-09-03T20:00:00+00:00",
+      "exactEndpoints": true,
+      "coverage": "0.999358974358974358974358974358974358974358974358974358974359",
+      "dataEligible": true,
+      "firstReady": "2026-09-03T14:54:00+00:00",
+      "requiredWarmupBars": 84,
+      "retainedCapacity": 256,
+      "endingRetainedBars": 130,
+      "endingReady": true,
+      "gapCount": 1,
+      "gaps": [
+        {
+          "fromUtc": "2026-09-03T17:49:30+00:00",
+          "throughUtc": "2026-09-03T17:49:45+00:00",
+          "missingBars": 1
+        }
+      ],
+      "grossPnl": "4.232025300200",
+      "realized": "4.232025300200",
+      "unrealized": "0.000000000000",
+      "endingQuantity": "4.682524",
+      "endingExposure": "499.999912720000",
+      "endingCash": "904.232112580200",
+      "endingEquity": "1404.232025300200",
+      "entries": 6,
+      "fills": 11,
+      "maximumDrawdown": "11.600154208600",
+      "tradedNotional": "5504.231198955200",
+      "tradedShares": "52.018566",
+      "closingAllowanceNotional": "499.999912720000",
+      "closingAllowanceShares": "4.682524",
+      "exposedObservations": 644,
+      "exposureFraction": "0.413085311096856959589480436177036561898652982681205901218730",
+      "riskOverrides": {},
+      "netByBps": {
+        "0": "4.232025300200",
+        "1": "3.63160218903248",
+        "2.5": "2.7309675222812",
+        "5": "1.2299097443624",
+        "10": "-1.7722058114752",
+        "25": "-10.778552478988"
+      },
+      "netByPerShare": {
+        "0.005": "3.948519850200",
+        "0.01": "3.665014400200"
+      },
+      "primaryScore": "1.2299097443624",
+      "maximumContiguousStrategyBars": 259,
+      "readyEvaluations": 223,
+      "warmupEvaluations": 168,
+      "fileSha256": "8a83704549aa4cc47e43c7d5a67ecce229f0d2e4c817cdff9cb3ed8ba65fc683"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-03-C1.json",
+      "symbol": "SOXL",
+      "date": "2026-09-03",
+      "profile": "C1",
+      "unavailable": false,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "2abcc259-4d44-49f1-9942-e425a3340cd3",
+      "sessionId": "9b8ee4be-df32-43a1-8478-ff7ac5ef9d05",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "dataSha256": "a7c1f6323a320685cfc6c9a9fba07275efd16b28f43e597b65c7f0faffc5ea08",
+      "sourceCount": 1559,
+      "strategyCount": 389,
+      "firstSource": "2026-09-03T13:30:00+00:00",
+      "lastClose": "2026-09-03T20:00:00+00:00",
+      "exactEndpoints": true,
+      "coverage": "0.999358974358974358974358974358974358974358974358974358974359",
+      "dataEligible": true,
+      "firstReady": "2026-09-03T14:55:00+00:00",
+      "requiredWarmupBars": 85,
+      "retainedCapacity": 256,
+      "endingRetainedBars": 130,
+      "endingReady": true,
+      "gapCount": 1,
+      "gaps": [
+        {
+          "fromUtc": "2026-09-03T17:49:30+00:00",
+          "throughUtc": "2026-09-03T17:49:45+00:00",
+          "missingBars": 1
+        }
+      ],
+      "grossPnl": "-6.099742000700",
+      "realized": "-6.099742000700",
+      "unrealized": "0.000000",
+      "endingQuantity": "0",
+      "endingExposure": "0.000000",
+      "endingCash": "1393.900257999300",
+      "endingEquity": "1393.900257999300",
+      "entries": 13,
+      "fills": 26,
+      "maximumDrawdown": "10.700363484300",
+      "tradedNotional": "12993.898902945900",
+      "tradedShares": "123.061354",
+      "closingAllowanceNotional": "0.000000",
+      "closingAllowanceShares": "0",
+      "exposedObservations": 184,
+      "exposureFraction": "0.118024374599101988454137267479153303399615137908915971776780",
+      "riskOverrides": {
+        "RISK BLOCKED": 2
+      },
+      "netByBps": {
+        "0": "-6.099742000700",
+        "1": "-7.39913189099459",
+        "2.5": "-9.348216726436475",
+        "5": "-12.59669145217295",
+        "10": "-19.0936409036459",
+        "25": "-38.58448925806475"
+      },
+      "netByPerShare": {
+        "0.005": "-6.715048770700",
+        "0.01": "-7.330355540700"
+      },
+      "primaryScore": "-12.59669145217295",
+      "maximumContiguousStrategyBars": 259,
+      "readyEvaluations": 221,
+      "warmupEvaluations": 170,
+      "fileSha256": "ca058a7830704dd91e53c23dd7b49ccb19cee9c105bfba0bfe0e8d9c0f3d20f8"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-03-C2.json",
+      "symbol": "SOXL",
+      "date": "2026-09-03",
+      "profile": "C2",
+      "unavailable": false,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "e39a8a23-e9fd-427f-8706-5cc5e0ddf764",
+      "sessionId": "e2d5835f-95dd-49a0-9f16-e9ed82b2b3d1",
+      "sourceSha256": "a1a2121ad0bba569679b14fb7dac270473e671556d38e4ac7ff302f0afb18f73",
+      "dataSha256": "a7c1f6323a320685cfc6c9a9fba07275efd16b28f43e597b65c7f0faffc5ea08",
+      "sourceCount": 1559,
+      "strategyCount": 389,
+      "firstSource": "2026-09-03T13:30:00+00:00",
+      "lastClose": "2026-09-03T20:00:00+00:00",
+      "exactEndpoints": true,
+      "coverage": "0.999358974358974358974358974358974358974358974358974358974359",
+      "dataEligible": true,
+      "firstReady": "2026-09-03T14:55:00+00:00",
+      "requiredWarmupBars": 85,
+      "retainedCapacity": 256,
+      "endingRetainedBars": 130,
+      "endingReady": true,
+      "gapCount": 1,
+      "gaps": [
+        {
+          "fromUtc": "2026-09-03T17:49:30+00:00",
+          "throughUtc": "2026-09-03T17:49:45+00:00",
+          "missingBars": 1
+        }
+      ],
+      "grossPnl": "-3.984890501300",
+      "realized": "-3.984890501300",
+      "unrealized": "0.000000",
+      "endingQuantity": "0",
+      "endingExposure": "0.000000",
+      "endingCash": "1396.015109498700",
+      "endingEquity": "1396.015109498700",
+      "entries": 11,
+      "fills": 22,
+      "maximumDrawdown": "12.997131994900",
+      "tradedNotional": "10996.013920445300",
+      "tradedShares": "104.045904",
+      "closingAllowanceNotional": "0.000000",
+      "closingAllowanceShares": "0",
+      "exposedObservations": 571,
+      "exposureFraction": "0.366260423348300192431045542014111610006414368184733803720334",
+      "riskOverrides": {
+        "RISK BLOCKED": 2
+      },
+      "netByBps": {
+        "0": "-3.984890501300",
+        "1": "-5.08449189334453",
+        "2.5": "-6.733893981411325",
+        "5": "-9.48289746152265",
+        "10": "-14.9809044217453",
+        "25": "-31.47492530241325"
+      },
+      "netByPerShare": {
+        "0.005": "-4.505120021300",
+        "0.01": "-5.025349541300"
+      },
+      "primaryScore": "-9.48289746152265",
+      "maximumContiguousStrategyBars": 259,
+      "readyEvaluations": 221,
+      "warmupEvaluations": 170,
+      "fileSha256": "04693587ec1c2e3901c9073b5e1565eb904d5642311e3938165c98131a36075b"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-03-C3.json",
+      "symbol": "SOXL",
+      "date": "2026-09-03",
+      "profile": "C3",
+      "unavailable": false,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "694aedc4-aeec-4114-85f0-7a73e9b54d98",
+      "sessionId": "88977f96-cf98-42e6-80c0-9cd873220006",
+      "sourceSha256": "88a0d2f7ee078456b333d7c020553030303ae5533977cd52016a6d886f3a87df",
+      "dataSha256": "a7c1f6323a320685cfc6c9a9fba07275efd16b28f43e597b65c7f0faffc5ea08",
+      "sourceCount": 1559,
+      "strategyCount": 389,
+      "firstSource": "2026-09-03T13:30:00+00:00",
+      "lastClose": "2026-09-03T20:00:00+00:00",
+      "exactEndpoints": true,
+      "coverage": "0.999358974358974358974358974358974358974358974358974358974359",
+      "dataEligible": true,
+      "firstReady": "2026-09-03T14:55:00+00:00",
+      "requiredWarmupBars": 85,
+      "retainedCapacity": 256,
+      "endingRetainedBars": 130,
+      "endingReady": true,
+      "gapCount": 1,
+      "gaps": [
+        {
+          "fromUtc": "2026-09-03T17:49:30+00:00",
+          "throughUtc": "2026-09-03T17:49:45+00:00",
+          "missingBars": 1
+        }
+      ],
+      "grossPnl": "-2.701704433700",
+      "realized": "-2.701704433700",
+      "unrealized": "0.000000",
+      "endingQuantity": "0",
+      "endingExposure": "0.000000",
+      "endingCash": "1397.298295566300",
+      "endingEquity": "1397.298295566300",
+      "entries": 8,
+      "fills": 16,
+      "maximumDrawdown": "7.039572573300",
+      "tradedNotional": "7997.297590958900",
+      "tradedShares": "75.859104",
+      "closingAllowanceNotional": "0.000000",
+      "closingAllowanceShares": "0",
+      "exposedObservations": 128,
+      "exposureFraction": "0.0821039127645926876202694034637588197562540089801154586273252",
+      "riskOverrides": {
+        "RISK BLOCKED": 1
+      },
+      "netByBps": {
+        "0": "-2.701704433700",
+        "1": "-3.50143419279589",
+        "2.5": "-4.701028831439725",
+        "5": "-6.70035322917945",
+        "10": "-10.6990020246589",
+        "25": "-22.69494841109725"
+      },
+      "netByPerShare": {
+        "0.005": "-3.080999953700",
+        "0.01": "-3.460295473700"
+      },
+      "primaryScore": "-6.70035322917945",
+      "maximumContiguousStrategyBars": 259,
+      "readyEvaluations": 221,
+      "warmupEvaluations": 170,
+      "fileSha256": "4de568a98266fd893bb3b13ac1c7ee9686c1eca5d8b9a5c77883924e7dcc3a76"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-03-R1.json",
+      "symbol": "SOXL",
+      "date": "2026-09-03",
+      "profile": "R1",
+      "unavailable": false,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "5af91549-7b60-46e4-b107-ae58a2a346f0",
+      "sessionId": "66992608-33b7-4ce5-8885-3f9c540df309",
+      "sourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60",
+      "dataSha256": "a7c1f6323a320685cfc6c9a9fba07275efd16b28f43e597b65c7f0faffc5ea08",
+      "sourceCount": 1559,
+      "strategyCount": 389,
+      "firstSource": "2026-09-03T13:30:00+00:00",
+      "lastClose": "2026-09-03T20:00:00+00:00",
+      "exactEndpoints": true,
+      "coverage": "0.999358974358974358974358974358974358974358974358974358974359",
+      "dataEligible": true,
+      "firstReady": "2026-09-03T14:21:00+00:00",
+      "requiredWarmupBars": 51,
+      "retainedCapacity": 256,
+      "endingRetainedBars": 130,
+      "endingReady": true,
+      "gapCount": 1,
+      "gaps": [
+        {
+          "fromUtc": "2026-09-03T17:49:30+00:00",
+          "throughUtc": "2026-09-03T17:49:45+00:00",
+          "missingBars": 1
+        }
+      ],
+      "grossPnl": "7.196915719000",
+      "realized": "7.196915719000",
+      "unrealized": "0.000000",
+      "endingQuantity": "0",
+      "endingExposure": "0.000000",
+      "endingCash": "1407.196915719000",
+      "endingEquity": "1407.196915719000",
+      "entries": 6,
+      "fills": 12,
+      "maximumDrawdown": "1.652251901600",
+      "tradedNotional": "6007.196254029000",
+      "tradedShares": "57.241778",
+      "closingAllowanceNotional": "0.000000",
+      "closingAllowanceShares": "0",
+      "exposedObservations": 100,
+      "exposureFraction": "0.0641436818473380372033354714560615779345734445157152020525978",
+      "riskOverrides": {
+        "RISK BLOCKED": 4
+      },
+      "netByBps": {
+        "0": "7.196915719000",
+        "1": "6.5961960935971",
+        "2.5": "5.69511665549275",
+        "5": "4.1933175919855",
+        "10": "1.189719464971",
+        "25": "-7.8210749160725"
+      },
+      "netByPerShare": {
+        "0.005": "6.910706829000",
+        "0.01": "6.624497939000"
+      },
+      "primaryScore": "4.1933175919855",
+      "maximumContiguousStrategyBars": 259,
+      "readyEvaluations": 289,
+      "warmupEvaluations": 102,
+      "fileSha256": "d0905edf4dd6f26702702a787c34d107c792f4da1989452523b649c96ec15b82"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-04-R1.json",
+      "symbol": "SOXL",
+      "date": "2026-09-04",
+      "profile": "R1",
+      "unavailable": false,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "ff6e2bb3-58eb-488a-a51b-cee9719cf217",
+      "sessionId": "0972bc9f-5cc3-4e23-950c-4de321a8b293",
+      "sourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60",
+      "dataSha256": "97d439d6f80b867cb1ce2f43417e38fa07ffdd4be5837739290ac86082553ef9",
+      "sourceCount": 1560,
+      "strategyCount": 390,
+      "firstSource": "2026-09-04T13:30:00+00:00",
+      "lastClose": "2026-09-04T20:00:00+00:00",
+      "exactEndpoints": true,
+      "coverage": "1",
+      "dataEligible": true,
+      "firstReady": "2026-09-04T14:21:00+00:00",
+      "requiredWarmupBars": 51,
+      "retainedCapacity": 256,
+      "endingRetainedBars": 256,
+      "endingReady": true,
+      "gapCount": 0,
+      "gaps": [],
+      "grossPnl": "0.925506301900",
+      "realized": "0.925506301900",
+      "unrealized": "0.000000",
+      "endingQuantity": "0",
+      "endingExposure": "0.000000",
+      "endingCash": "1400.925506301900",
+      "endingEquity": "1400.925506301900",
+      "entries": 13,
+      "fills": 26,
+      "maximumDrawdown": "5.217074593500",
+      "tradedNotional": "13000.923824211900",
+      "tradedShares": "112.215498",
+      "closingAllowanceNotional": "0.000000",
+      "closingAllowanceShares": "0",
+      "exposedObservations": 236,
+      "exposureFraction": "0.151282051282051282051282051282051282051282051282051282051282",
+      "riskOverrides": {
+        "RISK BLOCKED": 3
+      },
+      "netByBps": {
+        "0": "0.925506301900",
+        "1": "-0.37458608052119",
+        "2.5": "-2.324724654152975",
+        "5": "-5.57495561020595",
+        "10": "-12.0754175223119",
+        "25": "-31.57680325862975"
+      },
+      "netByPerShare": {
+        "0.005": "0.364428811900",
+        "0.01": "-0.196648678100"
+      },
+      "primaryScore": "-5.57495561020595",
+      "maximumContiguousStrategyBars": 390,
+      "readyEvaluations": 340,
+      "warmupEvaluations": 51,
+      "fileSha256": "5259e75b228f0d6d10cfe92844837ba046b65fe5b5a2a363ce1b4df141f13098"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\SOXX-2026-09-02-B1.json",
+      "symbol": "SOXX",
+      "date": "2026-09-02",
+      "profile": "B1",
+      "unavailable": false,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "b8520e73-3253-4e4d-bdfe-89b7938c7abe",
+      "sessionId": "7fe28cce-3a8c-4739-8d78-69224b8c810a",
+      "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+      "dataSha256": "d265252b6a1bdbed36f867f2b108ddf46d217e337406d653972e316ec13036e7",
+      "sourceCount": 1502,
+      "strategyCount": 335,
+      "firstSource": "2026-09-02T13:30:00+00:00",
+      "lastClose": "2026-09-02T20:00:00+00:00",
+      "exactEndpoints": true,
+      "coverage": "0.962820512820512820512820512820512820512820512820512820512821",
+      "dataEligible": false,
+      "firstReady": null,
+      "requiredWarmupBars": 84,
+      "retainedCapacity": 256,
+      "endingRetainedBars": 17,
+      "endingReady": false,
+      "gapCount": 53,
+      "gaps": [
+        {
+          "fromUtc": "2026-09-02T14:50:45+00:00",
+          "throughUtc": "2026-09-02T14:51:15+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T15:30:00+00:00",
+          "throughUtc": "2026-09-02T15:30:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T15:35:00+00:00",
+          "throughUtc": "2026-09-02T15:35:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T15:38:00+00:00",
+          "throughUtc": "2026-09-02T15:38:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:09:15+00:00",
+          "throughUtc": "2026-09-02T16:09:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:20:15+00:00",
+          "throughUtc": "2026-09-02T16:20:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:25:30+00:00",
+          "throughUtc": "2026-09-02T16:25:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:38:15+00:00",
+          "throughUtc": "2026-09-02T16:38:45+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T16:40:15+00:00",
+          "throughUtc": "2026-09-02T16:40:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:45:30+00:00",
+          "throughUtc": "2026-09-02T16:45:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:48:30+00:00",
+          "throughUtc": "2026-09-02T16:48:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:54:00+00:00",
+          "throughUtc": "2026-09-02T16:54:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:06:15+00:00",
+          "throughUtc": "2026-09-02T17:06:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:12:15+00:00",
+          "throughUtc": "2026-09-02T17:12:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:14:45+00:00",
+          "throughUtc": "2026-09-02T17:15:15+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T17:16:00+00:00",
+          "throughUtc": "2026-09-02T17:16:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:17:15+00:00",
+          "throughUtc": "2026-09-02T17:17:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:20:00+00:00",
+          "throughUtc": "2026-09-02T17:20:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:25:45+00:00",
+          "throughUtc": "2026-09-02T17:26:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:27:30+00:00",
+          "throughUtc": "2026-09-02T17:27:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:28:45+00:00",
+          "throughUtc": "2026-09-02T17:29:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:36:45+00:00",
+          "throughUtc": "2026-09-02T17:37:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:38:00+00:00",
+          "throughUtc": "2026-09-02T17:38:30+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T17:46:45+00:00",
+          "throughUtc": "2026-09-02T17:47:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:48:15+00:00",
+          "throughUtc": "2026-09-02T17:48:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:48:45+00:00",
+          "throughUtc": "2026-09-02T17:49:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:50:45+00:00",
+          "throughUtc": "2026-09-02T17:51:15+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T17:54:30+00:00",
+          "throughUtc": "2026-09-02T17:54:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:59:45+00:00",
+          "throughUtc": "2026-09-02T18:00:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:04:00+00:00",
+          "throughUtc": "2026-09-02T18:04:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:08:00+00:00",
+          "throughUtc": "2026-09-02T18:08:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:10:30+00:00",
+          "throughUtc": "2026-09-02T18:10:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:11:15+00:00",
+          "throughUtc": "2026-09-02T18:11:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:19:45+00:00",
+          "throughUtc": "2026-09-02T18:20:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:22:15+00:00",
+          "throughUtc": "2026-09-02T18:22:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:23:30+00:00",
+          "throughUtc": "2026-09-02T18:23:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:27:45+00:00",
+          "throughUtc": "2026-09-02T18:28:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:31:15+00:00",
+          "throughUtc": "2026-09-02T18:31:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:33:15+00:00",
+          "throughUtc": "2026-09-02T18:33:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:35:15+00:00",
+          "throughUtc": "2026-09-02T18:35:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:38:15+00:00",
+          "throughUtc": "2026-09-02T18:38:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:39:15+00:00",
+          "throughUtc": "2026-09-02T18:39:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:48:30+00:00",
+          "throughUtc": "2026-09-02T18:48:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:08:00+00:00",
+          "throughUtc": "2026-09-02T19:08:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:14:45+00:00",
+          "throughUtc": "2026-09-02T19:15:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:15:45+00:00",
+          "throughUtc": "2026-09-02T19:16:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:16:45+00:00",
+          "throughUtc": "2026-09-02T19:17:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:17:45+00:00",
+          "throughUtc": "2026-09-02T19:18:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:36:30+00:00",
+          "throughUtc": "2026-09-02T19:36:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:38:30+00:00",
+          "throughUtc": "2026-09-02T19:38:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:39:15+00:00",
+          "throughUtc": "2026-09-02T19:39:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:40:45+00:00",
+          "throughUtc": "2026-09-02T19:41:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:42:30+00:00",
+          "throughUtc": "2026-09-02T19:42:45+00:00",
+          "missingBars": 1
+        }
+      ],
+      "grossPnl": "0.000000",
+      "realized": "0",
+      "unrealized": "0.000000",
+      "endingQuantity": "0",
+      "endingExposure": "0.000000",
+      "endingCash": "1400",
+      "endingEquity": "1400.000000",
+      "entries": 0,
+      "fills": 0,
+      "maximumDrawdown": "0",
+      "tradedNotional": "0",
+      "tradedShares": "0",
+      "closingAllowanceNotional": "0.000000",
+      "closingAllowanceShares": "0",
+      "exposedObservations": 0,
+      "exposureFraction": "0",
+      "riskOverrides": {},
+      "netByBps": {
+        "0": "0.000000",
+        "1": "0.000000",
+        "2.5": "0.0000000",
+        "5": "0.000000",
+        "10": "0.000000",
+        "25": "0.000000"
+      },
+      "netByPerShare": {
+        "0.005": "0.000000",
+        "0.01": "0.000000"
+      },
+      "primaryScore": "0.000000",
+      "maximumContiguousStrategyBars": 80,
+      "readyEvaluations": 0,
+      "warmupEvaluations": 389,
+      "fileSha256": "b727a85e54f5388f8112c4760e636d97811a96c2b429c0f5a261d557a5ce622b"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\SOXX-2026-09-02-C1.json",
+      "symbol": "SOXX",
+      "date": "2026-09-02",
+      "profile": "C1",
+      "unavailable": false,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "bfbf23ac-d3d8-4419-b64b-f7679818dad5",
+      "sessionId": "f4e59bcc-8b70-4d24-9179-05d57e5c8417",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "dataSha256": "d265252b6a1bdbed36f867f2b108ddf46d217e337406d653972e316ec13036e7",
+      "sourceCount": 1502,
+      "strategyCount": 335,
+      "firstSource": "2026-09-02T13:30:00+00:00",
+      "lastClose": "2026-09-02T20:00:00+00:00",
+      "exactEndpoints": true,
+      "coverage": "0.962820512820512820512820512820512820512820512820512820512821",
+      "dataEligible": false,
+      "firstReady": null,
+      "requiredWarmupBars": 85,
+      "retainedCapacity": 256,
+      "endingRetainedBars": 17,
+      "endingReady": false,
+      "gapCount": 53,
+      "gaps": [
+        {
+          "fromUtc": "2026-09-02T14:50:45+00:00",
+          "throughUtc": "2026-09-02T14:51:15+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T15:30:00+00:00",
+          "throughUtc": "2026-09-02T15:30:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T15:35:00+00:00",
+          "throughUtc": "2026-09-02T15:35:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T15:38:00+00:00",
+          "throughUtc": "2026-09-02T15:38:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:09:15+00:00",
+          "throughUtc": "2026-09-02T16:09:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:20:15+00:00",
+          "throughUtc": "2026-09-02T16:20:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:25:30+00:00",
+          "throughUtc": "2026-09-02T16:25:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:38:15+00:00",
+          "throughUtc": "2026-09-02T16:38:45+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T16:40:15+00:00",
+          "throughUtc": "2026-09-02T16:40:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:45:30+00:00",
+          "throughUtc": "2026-09-02T16:45:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:48:30+00:00",
+          "throughUtc": "2026-09-02T16:48:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:54:00+00:00",
+          "throughUtc": "2026-09-02T16:54:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:06:15+00:00",
+          "throughUtc": "2026-09-02T17:06:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:12:15+00:00",
+          "throughUtc": "2026-09-02T17:12:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:14:45+00:00",
+          "throughUtc": "2026-09-02T17:15:15+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T17:16:00+00:00",
+          "throughUtc": "2026-09-02T17:16:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:17:15+00:00",
+          "throughUtc": "2026-09-02T17:17:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:20:00+00:00",
+          "throughUtc": "2026-09-02T17:20:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:25:45+00:00",
+          "throughUtc": "2026-09-02T17:26:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:27:30+00:00",
+          "throughUtc": "2026-09-02T17:27:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:28:45+00:00",
+          "throughUtc": "2026-09-02T17:29:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:36:45+00:00",
+          "throughUtc": "2026-09-02T17:37:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:38:00+00:00",
+          "throughUtc": "2026-09-02T17:38:30+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T17:46:45+00:00",
+          "throughUtc": "2026-09-02T17:47:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:48:15+00:00",
+          "throughUtc": "2026-09-02T17:48:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:48:45+00:00",
+          "throughUtc": "2026-09-02T17:49:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:50:45+00:00",
+          "throughUtc": "2026-09-02T17:51:15+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T17:54:30+00:00",
+          "throughUtc": "2026-09-02T17:54:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:59:45+00:00",
+          "throughUtc": "2026-09-02T18:00:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:04:00+00:00",
+          "throughUtc": "2026-09-02T18:04:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:08:00+00:00",
+          "throughUtc": "2026-09-02T18:08:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:10:30+00:00",
+          "throughUtc": "2026-09-02T18:10:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:11:15+00:00",
+          "throughUtc": "2026-09-02T18:11:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:19:45+00:00",
+          "throughUtc": "2026-09-02T18:20:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:22:15+00:00",
+          "throughUtc": "2026-09-02T18:22:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:23:30+00:00",
+          "throughUtc": "2026-09-02T18:23:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:27:45+00:00",
+          "throughUtc": "2026-09-02T18:28:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:31:15+00:00",
+          "throughUtc": "2026-09-02T18:31:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:33:15+00:00",
+          "throughUtc": "2026-09-02T18:33:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:35:15+00:00",
+          "throughUtc": "2026-09-02T18:35:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:38:15+00:00",
+          "throughUtc": "2026-09-02T18:38:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:39:15+00:00",
+          "throughUtc": "2026-09-02T18:39:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:48:30+00:00",
+          "throughUtc": "2026-09-02T18:48:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:08:00+00:00",
+          "throughUtc": "2026-09-02T19:08:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:14:45+00:00",
+          "throughUtc": "2026-09-02T19:15:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:15:45+00:00",
+          "throughUtc": "2026-09-02T19:16:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:16:45+00:00",
+          "throughUtc": "2026-09-02T19:17:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:17:45+00:00",
+          "throughUtc": "2026-09-02T19:18:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:36:30+00:00",
+          "throughUtc": "2026-09-02T19:36:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:38:30+00:00",
+          "throughUtc": "2026-09-02T19:38:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:39:15+00:00",
+          "throughUtc": "2026-09-02T19:39:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:40:45+00:00",
+          "throughUtc": "2026-09-02T19:41:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:42:30+00:00",
+          "throughUtc": "2026-09-02T19:42:45+00:00",
+          "missingBars": 1
+        }
+      ],
+      "grossPnl": "0.000000",
+      "realized": "0",
+      "unrealized": "0.000000",
+      "endingQuantity": "0",
+      "endingExposure": "0.000000",
+      "endingCash": "1400",
+      "endingEquity": "1400.000000",
+      "entries": 0,
+      "fills": 0,
+      "maximumDrawdown": "0",
+      "tradedNotional": "0",
+      "tradedShares": "0",
+      "closingAllowanceNotional": "0.000000",
+      "closingAllowanceShares": "0",
+      "exposedObservations": 0,
+      "exposureFraction": "0",
+      "riskOverrides": {},
+      "netByBps": {
+        "0": "0.000000",
+        "1": "0.000000",
+        "2.5": "0.0000000",
+        "5": "0.000000",
+        "10": "0.000000",
+        "25": "0.000000"
+      },
+      "netByPerShare": {
+        "0.005": "0.000000",
+        "0.01": "0.000000"
+      },
+      "primaryScore": "0.000000",
+      "maximumContiguousStrategyBars": 80,
+      "readyEvaluations": 0,
+      "warmupEvaluations": 389,
+      "fileSha256": "b9351dfb565020a3a47abeec94a754a4544777fbae5eda6a925c09971ca104c7"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\SOXX-2026-09-02-C2.json",
+      "symbol": "SOXX",
+      "date": "2026-09-02",
+      "profile": "C2",
+      "unavailable": false,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "e08c027f-1f66-454a-ba98-3a40a2a34484",
+      "sessionId": "fd70fe04-8886-4658-8fd9-c673c80d3d1a",
+      "sourceSha256": "a1a2121ad0bba569679b14fb7dac270473e671556d38e4ac7ff302f0afb18f73",
+      "dataSha256": "d265252b6a1bdbed36f867f2b108ddf46d217e337406d653972e316ec13036e7",
+      "sourceCount": 1502,
+      "strategyCount": 335,
+      "firstSource": "2026-09-02T13:30:00+00:00",
+      "lastClose": "2026-09-02T20:00:00+00:00",
+      "exactEndpoints": true,
+      "coverage": "0.962820512820512820512820512820512820512820512820512820512821",
+      "dataEligible": false,
+      "firstReady": null,
+      "requiredWarmupBars": 85,
+      "retainedCapacity": 256,
+      "endingRetainedBars": 17,
+      "endingReady": false,
+      "gapCount": 53,
+      "gaps": [
+        {
+          "fromUtc": "2026-09-02T14:50:45+00:00",
+          "throughUtc": "2026-09-02T14:51:15+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T15:30:00+00:00",
+          "throughUtc": "2026-09-02T15:30:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T15:35:00+00:00",
+          "throughUtc": "2026-09-02T15:35:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T15:38:00+00:00",
+          "throughUtc": "2026-09-02T15:38:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:09:15+00:00",
+          "throughUtc": "2026-09-02T16:09:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:20:15+00:00",
+          "throughUtc": "2026-09-02T16:20:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:25:30+00:00",
+          "throughUtc": "2026-09-02T16:25:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:38:15+00:00",
+          "throughUtc": "2026-09-02T16:38:45+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T16:40:15+00:00",
+          "throughUtc": "2026-09-02T16:40:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:45:30+00:00",
+          "throughUtc": "2026-09-02T16:45:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:48:30+00:00",
+          "throughUtc": "2026-09-02T16:48:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:54:00+00:00",
+          "throughUtc": "2026-09-02T16:54:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:06:15+00:00",
+          "throughUtc": "2026-09-02T17:06:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:12:15+00:00",
+          "throughUtc": "2026-09-02T17:12:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:14:45+00:00",
+          "throughUtc": "2026-09-02T17:15:15+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T17:16:00+00:00",
+          "throughUtc": "2026-09-02T17:16:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:17:15+00:00",
+          "throughUtc": "2026-09-02T17:17:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:20:00+00:00",
+          "throughUtc": "2026-09-02T17:20:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:25:45+00:00",
+          "throughUtc": "2026-09-02T17:26:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:27:30+00:00",
+          "throughUtc": "2026-09-02T17:27:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:28:45+00:00",
+          "throughUtc": "2026-09-02T17:29:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:36:45+00:00",
+          "throughUtc": "2026-09-02T17:37:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:38:00+00:00",
+          "throughUtc": "2026-09-02T17:38:30+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T17:46:45+00:00",
+          "throughUtc": "2026-09-02T17:47:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:48:15+00:00",
+          "throughUtc": "2026-09-02T17:48:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:48:45+00:00",
+          "throughUtc": "2026-09-02T17:49:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:50:45+00:00",
+          "throughUtc": "2026-09-02T17:51:15+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T17:54:30+00:00",
+          "throughUtc": "2026-09-02T17:54:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:59:45+00:00",
+          "throughUtc": "2026-09-02T18:00:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:04:00+00:00",
+          "throughUtc": "2026-09-02T18:04:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:08:00+00:00",
+          "throughUtc": "2026-09-02T18:08:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:10:30+00:00",
+          "throughUtc": "2026-09-02T18:10:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:11:15+00:00",
+          "throughUtc": "2026-09-02T18:11:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:19:45+00:00",
+          "throughUtc": "2026-09-02T18:20:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:22:15+00:00",
+          "throughUtc": "2026-09-02T18:22:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:23:30+00:00",
+          "throughUtc": "2026-09-02T18:23:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:27:45+00:00",
+          "throughUtc": "2026-09-02T18:28:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:31:15+00:00",
+          "throughUtc": "2026-09-02T18:31:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:33:15+00:00",
+          "throughUtc": "2026-09-02T18:33:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:35:15+00:00",
+          "throughUtc": "2026-09-02T18:35:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:38:15+00:00",
+          "throughUtc": "2026-09-02T18:38:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:39:15+00:00",
+          "throughUtc": "2026-09-02T18:39:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:48:30+00:00",
+          "throughUtc": "2026-09-02T18:48:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:08:00+00:00",
+          "throughUtc": "2026-09-02T19:08:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:14:45+00:00",
+          "throughUtc": "2026-09-02T19:15:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:15:45+00:00",
+          "throughUtc": "2026-09-02T19:16:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:16:45+00:00",
+          "throughUtc": "2026-09-02T19:17:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:17:45+00:00",
+          "throughUtc": "2026-09-02T19:18:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:36:30+00:00",
+          "throughUtc": "2026-09-02T19:36:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:38:30+00:00",
+          "throughUtc": "2026-09-02T19:38:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:39:15+00:00",
+          "throughUtc": "2026-09-02T19:39:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:40:45+00:00",
+          "throughUtc": "2026-09-02T19:41:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:42:30+00:00",
+          "throughUtc": "2026-09-02T19:42:45+00:00",
+          "missingBars": 1
+        }
+      ],
+      "grossPnl": "0.000000",
+      "realized": "0",
+      "unrealized": "0.000000",
+      "endingQuantity": "0",
+      "endingExposure": "0.000000",
+      "endingCash": "1400",
+      "endingEquity": "1400.000000",
+      "entries": 0,
+      "fills": 0,
+      "maximumDrawdown": "0",
+      "tradedNotional": "0",
+      "tradedShares": "0",
+      "closingAllowanceNotional": "0.000000",
+      "closingAllowanceShares": "0",
+      "exposedObservations": 0,
+      "exposureFraction": "0",
+      "riskOverrides": {},
+      "netByBps": {
+        "0": "0.000000",
+        "1": "0.000000",
+        "2.5": "0.0000000",
+        "5": "0.000000",
+        "10": "0.000000",
+        "25": "0.000000"
+      },
+      "netByPerShare": {
+        "0.005": "0.000000",
+        "0.01": "0.000000"
+      },
+      "primaryScore": "0.000000",
+      "maximumContiguousStrategyBars": 80,
+      "readyEvaluations": 0,
+      "warmupEvaluations": 389,
+      "fileSha256": "23a5772a152105888e8876148bc9bd463fc80a16cccd7c556d75b60c61b9630d"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\SOXX-2026-09-02-C3.json",
+      "symbol": "SOXX",
+      "date": "2026-09-02",
+      "profile": "C3",
+      "unavailable": false,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "f7759ff4-263f-479d-8782-e75927a8ce71",
+      "sessionId": "00797bb0-60fb-45fc-914a-2b51f92f22e7",
+      "sourceSha256": "88a0d2f7ee078456b333d7c020553030303ae5533977cd52016a6d886f3a87df",
+      "dataSha256": "d265252b6a1bdbed36f867f2b108ddf46d217e337406d653972e316ec13036e7",
+      "sourceCount": 1502,
+      "strategyCount": 335,
+      "firstSource": "2026-09-02T13:30:00+00:00",
+      "lastClose": "2026-09-02T20:00:00+00:00",
+      "exactEndpoints": true,
+      "coverage": "0.962820512820512820512820512820512820512820512820512820512821",
+      "dataEligible": false,
+      "firstReady": null,
+      "requiredWarmupBars": 85,
+      "retainedCapacity": 256,
+      "endingRetainedBars": 17,
+      "endingReady": false,
+      "gapCount": 53,
+      "gaps": [
+        {
+          "fromUtc": "2026-09-02T14:50:45+00:00",
+          "throughUtc": "2026-09-02T14:51:15+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T15:30:00+00:00",
+          "throughUtc": "2026-09-02T15:30:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T15:35:00+00:00",
+          "throughUtc": "2026-09-02T15:35:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T15:38:00+00:00",
+          "throughUtc": "2026-09-02T15:38:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:09:15+00:00",
+          "throughUtc": "2026-09-02T16:09:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:20:15+00:00",
+          "throughUtc": "2026-09-02T16:20:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:25:30+00:00",
+          "throughUtc": "2026-09-02T16:25:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:38:15+00:00",
+          "throughUtc": "2026-09-02T16:38:45+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T16:40:15+00:00",
+          "throughUtc": "2026-09-02T16:40:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:45:30+00:00",
+          "throughUtc": "2026-09-02T16:45:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:48:30+00:00",
+          "throughUtc": "2026-09-02T16:48:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:54:00+00:00",
+          "throughUtc": "2026-09-02T16:54:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:06:15+00:00",
+          "throughUtc": "2026-09-02T17:06:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:12:15+00:00",
+          "throughUtc": "2026-09-02T17:12:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:14:45+00:00",
+          "throughUtc": "2026-09-02T17:15:15+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T17:16:00+00:00",
+          "throughUtc": "2026-09-02T17:16:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:17:15+00:00",
+          "throughUtc": "2026-09-02T17:17:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:20:00+00:00",
+          "throughUtc": "2026-09-02T17:20:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:25:45+00:00",
+          "throughUtc": "2026-09-02T17:26:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:27:30+00:00",
+          "throughUtc": "2026-09-02T17:27:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:28:45+00:00",
+          "throughUtc": "2026-09-02T17:29:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:36:45+00:00",
+          "throughUtc": "2026-09-02T17:37:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:38:00+00:00",
+          "throughUtc": "2026-09-02T17:38:30+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T17:46:45+00:00",
+          "throughUtc": "2026-09-02T17:47:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:48:15+00:00",
+          "throughUtc": "2026-09-02T17:48:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:48:45+00:00",
+          "throughUtc": "2026-09-02T17:49:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:50:45+00:00",
+          "throughUtc": "2026-09-02T17:51:15+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T17:54:30+00:00",
+          "throughUtc": "2026-09-02T17:54:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:59:45+00:00",
+          "throughUtc": "2026-09-02T18:00:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:04:00+00:00",
+          "throughUtc": "2026-09-02T18:04:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:08:00+00:00",
+          "throughUtc": "2026-09-02T18:08:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:10:30+00:00",
+          "throughUtc": "2026-09-02T18:10:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:11:15+00:00",
+          "throughUtc": "2026-09-02T18:11:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:19:45+00:00",
+          "throughUtc": "2026-09-02T18:20:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:22:15+00:00",
+          "throughUtc": "2026-09-02T18:22:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:23:30+00:00",
+          "throughUtc": "2026-09-02T18:23:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:27:45+00:00",
+          "throughUtc": "2026-09-02T18:28:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:31:15+00:00",
+          "throughUtc": "2026-09-02T18:31:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:33:15+00:00",
+          "throughUtc": "2026-09-02T18:33:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:35:15+00:00",
+          "throughUtc": "2026-09-02T18:35:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:38:15+00:00",
+          "throughUtc": "2026-09-02T18:38:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:39:15+00:00",
+          "throughUtc": "2026-09-02T18:39:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:48:30+00:00",
+          "throughUtc": "2026-09-02T18:48:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:08:00+00:00",
+          "throughUtc": "2026-09-02T19:08:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:14:45+00:00",
+          "throughUtc": "2026-09-02T19:15:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:15:45+00:00",
+          "throughUtc": "2026-09-02T19:16:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:16:45+00:00",
+          "throughUtc": "2026-09-02T19:17:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:17:45+00:00",
+          "throughUtc": "2026-09-02T19:18:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:36:30+00:00",
+          "throughUtc": "2026-09-02T19:36:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:38:30+00:00",
+          "throughUtc": "2026-09-02T19:38:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:39:15+00:00",
+          "throughUtc": "2026-09-02T19:39:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:40:45+00:00",
+          "throughUtc": "2026-09-02T19:41:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:42:30+00:00",
+          "throughUtc": "2026-09-02T19:42:45+00:00",
+          "missingBars": 1
+        }
+      ],
+      "grossPnl": "0.000000",
+      "realized": "0",
+      "unrealized": "0.000000",
+      "endingQuantity": "0",
+      "endingExposure": "0.000000",
+      "endingCash": "1400",
+      "endingEquity": "1400.000000",
+      "entries": 0,
+      "fills": 0,
+      "maximumDrawdown": "0",
+      "tradedNotional": "0",
+      "tradedShares": "0",
+      "closingAllowanceNotional": "0.000000",
+      "closingAllowanceShares": "0",
+      "exposedObservations": 0,
+      "exposureFraction": "0",
+      "riskOverrides": {},
+      "netByBps": {
+        "0": "0.000000",
+        "1": "0.000000",
+        "2.5": "0.0000000",
+        "5": "0.000000",
+        "10": "0.000000",
+        "25": "0.000000"
+      },
+      "netByPerShare": {
+        "0.005": "0.000000",
+        "0.01": "0.000000"
+      },
+      "primaryScore": "0.000000",
+      "maximumContiguousStrategyBars": 80,
+      "readyEvaluations": 0,
+      "warmupEvaluations": 389,
+      "fileSha256": "57d61dfde872d35aba42909407ba1774a6514dc2d4c170b331aadfe609c8d2a5"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\SOXX-2026-09-02-R1.json",
+      "symbol": "SOXX",
+      "date": "2026-09-02",
+      "profile": "R1",
+      "unavailable": false,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "a553a5d7-caba-4f1d-b287-e0cb247f108f",
+      "sessionId": "25fc403a-51ce-4131-bc8b-781c3f63a614",
+      "sourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60",
+      "dataSha256": "d265252b6a1bdbed36f867f2b108ddf46d217e337406d653972e316ec13036e7",
+      "sourceCount": 1502,
+      "strategyCount": 335,
+      "firstSource": "2026-09-02T13:30:00+00:00",
+      "lastClose": "2026-09-02T20:00:00+00:00",
+      "exactEndpoints": true,
+      "coverage": "0.962820512820512820512820512820512820512820512820512820512821",
+      "dataEligible": false,
+      "firstReady": "2026-09-02T14:21:00+00:00",
+      "requiredWarmupBars": 51,
+      "retainedCapacity": 256,
+      "endingRetainedBars": 17,
+      "endingReady": false,
+      "gapCount": 53,
+      "gaps": [
+        {
+          "fromUtc": "2026-09-02T14:50:45+00:00",
+          "throughUtc": "2026-09-02T14:51:15+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T15:30:00+00:00",
+          "throughUtc": "2026-09-02T15:30:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T15:35:00+00:00",
+          "throughUtc": "2026-09-02T15:35:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T15:38:00+00:00",
+          "throughUtc": "2026-09-02T15:38:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:09:15+00:00",
+          "throughUtc": "2026-09-02T16:09:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:20:15+00:00",
+          "throughUtc": "2026-09-02T16:20:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:25:30+00:00",
+          "throughUtc": "2026-09-02T16:25:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:38:15+00:00",
+          "throughUtc": "2026-09-02T16:38:45+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T16:40:15+00:00",
+          "throughUtc": "2026-09-02T16:40:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:45:30+00:00",
+          "throughUtc": "2026-09-02T16:45:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:48:30+00:00",
+          "throughUtc": "2026-09-02T16:48:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T16:54:00+00:00",
+          "throughUtc": "2026-09-02T16:54:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:06:15+00:00",
+          "throughUtc": "2026-09-02T17:06:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:12:15+00:00",
+          "throughUtc": "2026-09-02T17:12:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:14:45+00:00",
+          "throughUtc": "2026-09-02T17:15:15+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T17:16:00+00:00",
+          "throughUtc": "2026-09-02T17:16:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:17:15+00:00",
+          "throughUtc": "2026-09-02T17:17:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:20:00+00:00",
+          "throughUtc": "2026-09-02T17:20:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:25:45+00:00",
+          "throughUtc": "2026-09-02T17:26:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:27:30+00:00",
+          "throughUtc": "2026-09-02T17:27:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:28:45+00:00",
+          "throughUtc": "2026-09-02T17:29:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:36:45+00:00",
+          "throughUtc": "2026-09-02T17:37:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:38:00+00:00",
+          "throughUtc": "2026-09-02T17:38:30+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T17:46:45+00:00",
+          "throughUtc": "2026-09-02T17:47:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:48:15+00:00",
+          "throughUtc": "2026-09-02T17:48:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:48:45+00:00",
+          "throughUtc": "2026-09-02T17:49:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:50:45+00:00",
+          "throughUtc": "2026-09-02T17:51:15+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-02T17:54:30+00:00",
+          "throughUtc": "2026-09-02T17:54:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T17:59:45+00:00",
+          "throughUtc": "2026-09-02T18:00:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:04:00+00:00",
+          "throughUtc": "2026-09-02T18:04:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:08:00+00:00",
+          "throughUtc": "2026-09-02T18:08:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:10:30+00:00",
+          "throughUtc": "2026-09-02T18:10:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:11:15+00:00",
+          "throughUtc": "2026-09-02T18:11:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:19:45+00:00",
+          "throughUtc": "2026-09-02T18:20:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:22:15+00:00",
+          "throughUtc": "2026-09-02T18:22:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:23:30+00:00",
+          "throughUtc": "2026-09-02T18:23:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:27:45+00:00",
+          "throughUtc": "2026-09-02T18:28:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:31:15+00:00",
+          "throughUtc": "2026-09-02T18:31:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:33:15+00:00",
+          "throughUtc": "2026-09-02T18:33:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:35:15+00:00",
+          "throughUtc": "2026-09-02T18:35:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:38:15+00:00",
+          "throughUtc": "2026-09-02T18:38:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:39:15+00:00",
+          "throughUtc": "2026-09-02T18:39:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T18:48:30+00:00",
+          "throughUtc": "2026-09-02T18:48:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:08:00+00:00",
+          "throughUtc": "2026-09-02T19:08:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:14:45+00:00",
+          "throughUtc": "2026-09-02T19:15:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:15:45+00:00",
+          "throughUtc": "2026-09-02T19:16:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:16:45+00:00",
+          "throughUtc": "2026-09-02T19:17:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:17:45+00:00",
+          "throughUtc": "2026-09-02T19:18:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:36:30+00:00",
+          "throughUtc": "2026-09-02T19:36:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:38:30+00:00",
+          "throughUtc": "2026-09-02T19:38:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:39:15+00:00",
+          "throughUtc": "2026-09-02T19:39:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:40:45+00:00",
+          "throughUtc": "2026-09-02T19:41:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-02T19:42:30+00:00",
+          "throughUtc": "2026-09-02T19:42:45+00:00",
+          "missingBars": 1
+        }
+      ],
+      "grossPnl": "0.000000",
+      "realized": "0",
+      "unrealized": "0.000000",
+      "endingQuantity": "0",
+      "endingExposure": "0.000000",
+      "endingCash": "1400",
+      "endingEquity": "1400.000000",
+      "entries": 0,
+      "fills": 0,
+      "maximumDrawdown": "0",
+      "tradedNotional": "0",
+      "tradedShares": "0",
+      "closingAllowanceNotional": "0.000000",
+      "closingAllowanceShares": "0",
+      "exposedObservations": 0,
+      "exposureFraction": "0",
+      "riskOverrides": {},
+      "netByBps": {
+        "0": "0.000000",
+        "1": "0.000000",
+        "2.5": "0.0000000",
+        "5": "0.000000",
+        "10": "0.000000",
+        "25": "0.000000"
+      },
+      "netByPerShare": {
+        "0.005": "0.000000",
+        "0.01": "0.000000"
+      },
+      "primaryScore": "0.000000",
+      "maximumContiguousStrategyBars": 80,
+      "readyEvaluations": 30,
+      "warmupEvaluations": 359,
+      "fileSha256": "b2d800008ce31dc364110ea08ca1fead4dad4f7020a2a2432bb6108534fbd381"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\SOXX-2026-09-03-B1.json",
+      "symbol": "SOXX",
+      "date": "2026-09-03",
+      "profile": "B1",
+      "unavailable": false,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "fa23cce3-2286-482c-bc1a-456a91ec5a43",
+      "sessionId": "62d00b79-7236-46c5-8d90-2bdc6f980417",
+      "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+      "dataSha256": "d8267c1155a1b62ab8ee419b2cb5003f9b4d008db59f81e137bbf77b04bf9abe",
+      "sourceCount": 1537,
+      "strategyCount": 368,
+      "firstSource": "2026-09-03T13:30:00+00:00",
+      "lastClose": "2026-09-03T20:00:00+00:00",
+      "exactEndpoints": true,
+      "coverage": "0.985256410256410256410256410256410256410256410256410256410256",
+      "dataEligible": true,
+      "firstReady": null,
+      "requiredWarmupBars": 84,
+      "retainedCapacity": 256,
+      "endingRetainedBars": 64,
+      "endingReady": false,
+      "gapCount": 22,
+      "gaps": [
+        {
+          "fromUtc": "2026-09-03T14:49:00+00:00",
+          "throughUtc": "2026-09-03T14:49:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T15:30:45+00:00",
+          "throughUtc": "2026-09-03T15:31:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T15:58:45+00:00",
+          "throughUtc": "2026-09-03T15:59:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T16:20:45+00:00",
+          "throughUtc": "2026-09-03T16:21:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T16:48:30+00:00",
+          "throughUtc": "2026-09-03T16:48:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T16:55:30+00:00",
+          "throughUtc": "2026-09-03T16:55:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T17:12:15+00:00",
+          "throughUtc": "2026-09-03T17:12:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T17:34:30+00:00",
+          "throughUtc": "2026-09-03T17:34:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T17:49:15+00:00",
+          "throughUtc": "2026-09-03T17:49:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:08:15+00:00",
+          "throughUtc": "2026-09-03T18:08:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:11:00+00:00",
+          "throughUtc": "2026-09-03T18:11:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:16:45+00:00",
+          "throughUtc": "2026-09-03T18:17:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:19:15+00:00",
+          "throughUtc": "2026-09-03T18:19:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:23:30+00:00",
+          "throughUtc": "2026-09-03T18:24:00+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-03T18:33:00+00:00",
+          "throughUtc": "2026-09-03T18:33:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:36:30+00:00",
+          "throughUtc": "2026-09-03T18:36:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:37:30+00:00",
+          "throughUtc": "2026-09-03T18:37:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:42:45+00:00",
+          "throughUtc": "2026-09-03T18:43:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:45:45+00:00",
+          "throughUtc": "2026-09-03T18:46:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:46:30+00:00",
+          "throughUtc": "2026-09-03T18:46:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:48:45+00:00",
+          "throughUtc": "2026-09-03T18:49:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:55:15+00:00",
+          "throughUtc": "2026-09-03T18:55:30+00:00",
+          "missingBars": 1
+        }
+      ],
+      "grossPnl": "0.000000",
+      "realized": "0",
+      "unrealized": "0.000000",
+      "endingQuantity": "0",
+      "endingExposure": "0.000000",
+      "endingCash": "1400",
+      "endingEquity": "1400.000000",
+      "entries": 0,
+      "fills": 0,
+      "maximumDrawdown": "0",
+      "tradedNotional": "0",
+      "tradedShares": "0",
+      "closingAllowanceNotional": "0.000000",
+      "closingAllowanceShares": "0",
+      "exposedObservations": 0,
+      "exposureFraction": "0",
+      "riskOverrides": {},
+      "netByBps": {
+        "0": "0.000000",
+        "1": "0.000000",
+        "2.5": "0.0000000",
+        "5": "0.000000",
+        "10": "0.000000",
+        "25": "0.000000"
+      },
+      "netByPerShare": {
+        "0.005": "0.000000",
+        "0.01": "0.000000"
+      },
+      "primaryScore": "0.000000",
+      "maximumContiguousStrategyBars": 79,
+      "readyEvaluations": 0,
+      "warmupEvaluations": 391,
+      "fileSha256": "51eef0f233c6328dc8951b5ff01c27560cfe10ff344bdeb62f38528f752aefca"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\SOXX-2026-09-03-C1.json",
+      "symbol": "SOXX",
+      "date": "2026-09-03",
+      "profile": "C1",
+      "unavailable": false,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "2ca0dbd9-3bd1-4fe0-b88d-a861448ef433",
+      "sessionId": "d8822fd6-ccee-436b-85c9-d7e93303eaf6",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "dataSha256": "d8267c1155a1b62ab8ee419b2cb5003f9b4d008db59f81e137bbf77b04bf9abe",
+      "sourceCount": 1537,
+      "strategyCount": 368,
+      "firstSource": "2026-09-03T13:30:00+00:00",
+      "lastClose": "2026-09-03T20:00:00+00:00",
+      "exactEndpoints": true,
+      "coverage": "0.985256410256410256410256410256410256410256410256410256410256",
+      "dataEligible": true,
+      "firstReady": null,
+      "requiredWarmupBars": 85,
+      "retainedCapacity": 256,
+      "endingRetainedBars": 64,
+      "endingReady": false,
+      "gapCount": 22,
+      "gaps": [
+        {
+          "fromUtc": "2026-09-03T14:49:00+00:00",
+          "throughUtc": "2026-09-03T14:49:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T15:30:45+00:00",
+          "throughUtc": "2026-09-03T15:31:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T15:58:45+00:00",
+          "throughUtc": "2026-09-03T15:59:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T16:20:45+00:00",
+          "throughUtc": "2026-09-03T16:21:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T16:48:30+00:00",
+          "throughUtc": "2026-09-03T16:48:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T16:55:30+00:00",
+          "throughUtc": "2026-09-03T16:55:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T17:12:15+00:00",
+          "throughUtc": "2026-09-03T17:12:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T17:34:30+00:00",
+          "throughUtc": "2026-09-03T17:34:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T17:49:15+00:00",
+          "throughUtc": "2026-09-03T17:49:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:08:15+00:00",
+          "throughUtc": "2026-09-03T18:08:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:11:00+00:00",
+          "throughUtc": "2026-09-03T18:11:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:16:45+00:00",
+          "throughUtc": "2026-09-03T18:17:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:19:15+00:00",
+          "throughUtc": "2026-09-03T18:19:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:23:30+00:00",
+          "throughUtc": "2026-09-03T18:24:00+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-03T18:33:00+00:00",
+          "throughUtc": "2026-09-03T18:33:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:36:30+00:00",
+          "throughUtc": "2026-09-03T18:36:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:37:30+00:00",
+          "throughUtc": "2026-09-03T18:37:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:42:45+00:00",
+          "throughUtc": "2026-09-03T18:43:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:45:45+00:00",
+          "throughUtc": "2026-09-03T18:46:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:46:30+00:00",
+          "throughUtc": "2026-09-03T18:46:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:48:45+00:00",
+          "throughUtc": "2026-09-03T18:49:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:55:15+00:00",
+          "throughUtc": "2026-09-03T18:55:30+00:00",
+          "missingBars": 1
+        }
+      ],
+      "grossPnl": "0.000000",
+      "realized": "0",
+      "unrealized": "0.000000",
+      "endingQuantity": "0",
+      "endingExposure": "0.000000",
+      "endingCash": "1400",
+      "endingEquity": "1400.000000",
+      "entries": 0,
+      "fills": 0,
+      "maximumDrawdown": "0",
+      "tradedNotional": "0",
+      "tradedShares": "0",
+      "closingAllowanceNotional": "0.000000",
+      "closingAllowanceShares": "0",
+      "exposedObservations": 0,
+      "exposureFraction": "0",
+      "riskOverrides": {},
+      "netByBps": {
+        "0": "0.000000",
+        "1": "0.000000",
+        "2.5": "0.0000000",
+        "5": "0.000000",
+        "10": "0.000000",
+        "25": "0.000000"
+      },
+      "netByPerShare": {
+        "0.005": "0.000000",
+        "0.01": "0.000000"
+      },
+      "primaryScore": "0.000000",
+      "maximumContiguousStrategyBars": 79,
+      "readyEvaluations": 0,
+      "warmupEvaluations": 391,
+      "fileSha256": "0e74186cd980fa13e84402d8a86febefbd18857277586c14d9aef9e0ca00b1c7"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\SOXX-2026-09-03-C2.json",
+      "symbol": "SOXX",
+      "date": "2026-09-03",
+      "profile": "C2",
+      "unavailable": false,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "2dd25d43-c102-49fc-b5bf-9e24b78284da",
+      "sessionId": "b33d8639-0e6f-47d4-94fb-11537831b1dc",
+      "sourceSha256": "a1a2121ad0bba569679b14fb7dac270473e671556d38e4ac7ff302f0afb18f73",
+      "dataSha256": "d8267c1155a1b62ab8ee419b2cb5003f9b4d008db59f81e137bbf77b04bf9abe",
+      "sourceCount": 1537,
+      "strategyCount": 368,
+      "firstSource": "2026-09-03T13:30:00+00:00",
+      "lastClose": "2026-09-03T20:00:00+00:00",
+      "exactEndpoints": true,
+      "coverage": "0.985256410256410256410256410256410256410256410256410256410256",
+      "dataEligible": true,
+      "firstReady": null,
+      "requiredWarmupBars": 85,
+      "retainedCapacity": 256,
+      "endingRetainedBars": 64,
+      "endingReady": false,
+      "gapCount": 22,
+      "gaps": [
+        {
+          "fromUtc": "2026-09-03T14:49:00+00:00",
+          "throughUtc": "2026-09-03T14:49:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T15:30:45+00:00",
+          "throughUtc": "2026-09-03T15:31:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T15:58:45+00:00",
+          "throughUtc": "2026-09-03T15:59:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T16:20:45+00:00",
+          "throughUtc": "2026-09-03T16:21:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T16:48:30+00:00",
+          "throughUtc": "2026-09-03T16:48:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T16:55:30+00:00",
+          "throughUtc": "2026-09-03T16:55:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T17:12:15+00:00",
+          "throughUtc": "2026-09-03T17:12:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T17:34:30+00:00",
+          "throughUtc": "2026-09-03T17:34:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T17:49:15+00:00",
+          "throughUtc": "2026-09-03T17:49:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:08:15+00:00",
+          "throughUtc": "2026-09-03T18:08:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:11:00+00:00",
+          "throughUtc": "2026-09-03T18:11:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:16:45+00:00",
+          "throughUtc": "2026-09-03T18:17:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:19:15+00:00",
+          "throughUtc": "2026-09-03T18:19:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:23:30+00:00",
+          "throughUtc": "2026-09-03T18:24:00+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-03T18:33:00+00:00",
+          "throughUtc": "2026-09-03T18:33:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:36:30+00:00",
+          "throughUtc": "2026-09-03T18:36:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:37:30+00:00",
+          "throughUtc": "2026-09-03T18:37:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:42:45+00:00",
+          "throughUtc": "2026-09-03T18:43:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:45:45+00:00",
+          "throughUtc": "2026-09-03T18:46:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:46:30+00:00",
+          "throughUtc": "2026-09-03T18:46:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:48:45+00:00",
+          "throughUtc": "2026-09-03T18:49:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:55:15+00:00",
+          "throughUtc": "2026-09-03T18:55:30+00:00",
+          "missingBars": 1
+        }
+      ],
+      "grossPnl": "0.000000",
+      "realized": "0",
+      "unrealized": "0.000000",
+      "endingQuantity": "0",
+      "endingExposure": "0.000000",
+      "endingCash": "1400",
+      "endingEquity": "1400.000000",
+      "entries": 0,
+      "fills": 0,
+      "maximumDrawdown": "0",
+      "tradedNotional": "0",
+      "tradedShares": "0",
+      "closingAllowanceNotional": "0.000000",
+      "closingAllowanceShares": "0",
+      "exposedObservations": 0,
+      "exposureFraction": "0",
+      "riskOverrides": {},
+      "netByBps": {
+        "0": "0.000000",
+        "1": "0.000000",
+        "2.5": "0.0000000",
+        "5": "0.000000",
+        "10": "0.000000",
+        "25": "0.000000"
+      },
+      "netByPerShare": {
+        "0.005": "0.000000",
+        "0.01": "0.000000"
+      },
+      "primaryScore": "0.000000",
+      "maximumContiguousStrategyBars": 79,
+      "readyEvaluations": 0,
+      "warmupEvaluations": 391,
+      "fileSha256": "9d119d7daf3507f82ebb3e0638eeeb64f21a8c92e823d51cc1835670c13ad34f"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\SOXX-2026-09-03-C3.json",
+      "symbol": "SOXX",
+      "date": "2026-09-03",
+      "profile": "C3",
+      "unavailable": false,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "d1369738-4fdd-48a5-b4d8-1afd7b560971",
+      "sessionId": "0bc087dd-c796-43f9-ac79-f0e808f7355a",
+      "sourceSha256": "88a0d2f7ee078456b333d7c020553030303ae5533977cd52016a6d886f3a87df",
+      "dataSha256": "d8267c1155a1b62ab8ee419b2cb5003f9b4d008db59f81e137bbf77b04bf9abe",
+      "sourceCount": 1537,
+      "strategyCount": 368,
+      "firstSource": "2026-09-03T13:30:00+00:00",
+      "lastClose": "2026-09-03T20:00:00+00:00",
+      "exactEndpoints": true,
+      "coverage": "0.985256410256410256410256410256410256410256410256410256410256",
+      "dataEligible": true,
+      "firstReady": null,
+      "requiredWarmupBars": 85,
+      "retainedCapacity": 256,
+      "endingRetainedBars": 64,
+      "endingReady": false,
+      "gapCount": 22,
+      "gaps": [
+        {
+          "fromUtc": "2026-09-03T14:49:00+00:00",
+          "throughUtc": "2026-09-03T14:49:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T15:30:45+00:00",
+          "throughUtc": "2026-09-03T15:31:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T15:58:45+00:00",
+          "throughUtc": "2026-09-03T15:59:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T16:20:45+00:00",
+          "throughUtc": "2026-09-03T16:21:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T16:48:30+00:00",
+          "throughUtc": "2026-09-03T16:48:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T16:55:30+00:00",
+          "throughUtc": "2026-09-03T16:55:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T17:12:15+00:00",
+          "throughUtc": "2026-09-03T17:12:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T17:34:30+00:00",
+          "throughUtc": "2026-09-03T17:34:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T17:49:15+00:00",
+          "throughUtc": "2026-09-03T17:49:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:08:15+00:00",
+          "throughUtc": "2026-09-03T18:08:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:11:00+00:00",
+          "throughUtc": "2026-09-03T18:11:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:16:45+00:00",
+          "throughUtc": "2026-09-03T18:17:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:19:15+00:00",
+          "throughUtc": "2026-09-03T18:19:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:23:30+00:00",
+          "throughUtc": "2026-09-03T18:24:00+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-03T18:33:00+00:00",
+          "throughUtc": "2026-09-03T18:33:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:36:30+00:00",
+          "throughUtc": "2026-09-03T18:36:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:37:30+00:00",
+          "throughUtc": "2026-09-03T18:37:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:42:45+00:00",
+          "throughUtc": "2026-09-03T18:43:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:45:45+00:00",
+          "throughUtc": "2026-09-03T18:46:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:46:30+00:00",
+          "throughUtc": "2026-09-03T18:46:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:48:45+00:00",
+          "throughUtc": "2026-09-03T18:49:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:55:15+00:00",
+          "throughUtc": "2026-09-03T18:55:30+00:00",
+          "missingBars": 1
+        }
+      ],
+      "grossPnl": "0.000000",
+      "realized": "0",
+      "unrealized": "0.000000",
+      "endingQuantity": "0",
+      "endingExposure": "0.000000",
+      "endingCash": "1400",
+      "endingEquity": "1400.000000",
+      "entries": 0,
+      "fills": 0,
+      "maximumDrawdown": "0",
+      "tradedNotional": "0",
+      "tradedShares": "0",
+      "closingAllowanceNotional": "0.000000",
+      "closingAllowanceShares": "0",
+      "exposedObservations": 0,
+      "exposureFraction": "0",
+      "riskOverrides": {},
+      "netByBps": {
+        "0": "0.000000",
+        "1": "0.000000",
+        "2.5": "0.0000000",
+        "5": "0.000000",
+        "10": "0.000000",
+        "25": "0.000000"
+      },
+      "netByPerShare": {
+        "0.005": "0.000000",
+        "0.01": "0.000000"
+      },
+      "primaryScore": "0.000000",
+      "maximumContiguousStrategyBars": 79,
+      "readyEvaluations": 0,
+      "warmupEvaluations": 391,
+      "fileSha256": "f2b12a2cc6351f00ccce387b71473a66659ebfee735d930639f83f406dc0d04d"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\SOXX-2026-09-03-R1.json",
+      "symbol": "SOXX",
+      "date": "2026-09-03",
+      "profile": "R1",
+      "unavailable": false,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "ef5793e6-81e3-4256-8fca-c50c6f4d6c74",
+      "sessionId": "fe1ef1a6-a837-4693-b5ee-ec8fcd299eb7",
+      "sourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60",
+      "dataSha256": "d8267c1155a1b62ab8ee419b2cb5003f9b4d008db59f81e137bbf77b04bf9abe",
+      "sourceCount": 1537,
+      "strategyCount": 368,
+      "firstSource": "2026-09-03T13:30:00+00:00",
+      "lastClose": "2026-09-03T20:00:00+00:00",
+      "exactEndpoints": true,
+      "coverage": "0.985256410256410256410256410256410256410256410256410256410256",
+      "dataEligible": true,
+      "firstReady": "2026-09-03T14:21:00+00:00",
+      "requiredWarmupBars": 51,
+      "retainedCapacity": 256,
+      "endingRetainedBars": 64,
+      "endingReady": true,
+      "gapCount": 22,
+      "gaps": [
+        {
+          "fromUtc": "2026-09-03T14:49:00+00:00",
+          "throughUtc": "2026-09-03T14:49:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T15:30:45+00:00",
+          "throughUtc": "2026-09-03T15:31:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T15:58:45+00:00",
+          "throughUtc": "2026-09-03T15:59:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T16:20:45+00:00",
+          "throughUtc": "2026-09-03T16:21:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T16:48:30+00:00",
+          "throughUtc": "2026-09-03T16:48:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T16:55:30+00:00",
+          "throughUtc": "2026-09-03T16:55:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T17:12:15+00:00",
+          "throughUtc": "2026-09-03T17:12:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T17:34:30+00:00",
+          "throughUtc": "2026-09-03T17:34:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T17:49:15+00:00",
+          "throughUtc": "2026-09-03T17:49:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:08:15+00:00",
+          "throughUtc": "2026-09-03T18:08:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:11:00+00:00",
+          "throughUtc": "2026-09-03T18:11:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:16:45+00:00",
+          "throughUtc": "2026-09-03T18:17:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:19:15+00:00",
+          "throughUtc": "2026-09-03T18:19:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:23:30+00:00",
+          "throughUtc": "2026-09-03T18:24:00+00:00",
+          "missingBars": 2
+        },
+        {
+          "fromUtc": "2026-09-03T18:33:00+00:00",
+          "throughUtc": "2026-09-03T18:33:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:36:30+00:00",
+          "throughUtc": "2026-09-03T18:36:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:37:30+00:00",
+          "throughUtc": "2026-09-03T18:37:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:42:45+00:00",
+          "throughUtc": "2026-09-03T18:43:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:45:45+00:00",
+          "throughUtc": "2026-09-03T18:46:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:46:30+00:00",
+          "throughUtc": "2026-09-03T18:46:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:48:45+00:00",
+          "throughUtc": "2026-09-03T18:49:00+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-03T18:55:15+00:00",
+          "throughUtc": "2026-09-03T18:55:30+00:00",
+          "missingBars": 1
+        }
+      ],
+      "grossPnl": "0.755815165000",
+      "realized": "0.755815165000",
+      "unrealized": "0.000000",
+      "endingQuantity": "0",
+      "endingExposure": "0.000000",
+      "endingCash": "1400.755815165000",
+      "endingEquity": "1400.755815165000",
+      "entries": 1,
+      "fills": 2,
+      "maximumDrawdown": "0.334790610000",
+      "tradedNotional": "1000.755076895000",
+      "tradedShares": "2.029034",
+      "closingAllowanceNotional": "0.000000",
+      "closingAllowanceShares": "0",
+      "exposedObservations": 24,
+      "exposureFraction": "0.0156148340923877683799609629147690305790500975927130774235524",
+      "riskOverrides": {},
+      "netByBps": {
+        "0": "0.755815165000",
+        "1": "0.6557396573105",
+        "2.5": "0.50562639577625",
+        "5": "0.2554376265525",
+        "10": "-0.244939911895",
+        "25": "-1.7460725272375"
+      },
+      "netByPerShare": {
+        "0.005": "0.745669995000",
+        "0.01": "0.735524825000"
+      },
+      "primaryScore": "0.2554376265525",
+      "maximumContiguousStrategyBars": 79,
+      "readyEvaluations": 43,
+      "warmupEvaluations": 348,
+      "fileSha256": "8a1c2d6e87e3ab80f06b8b53b9262804bb1bc50cb28b2d167159ac6e90acbb8f"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\SOXX-2026-09-04-C1.json",
+      "symbol": "SOXX",
+      "date": "2026-09-04",
+      "profile": "C1",
+      "unavailable": false,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "5d417cbb-2d53-4586-8596-a1850728c1d5",
+      "sessionId": "57311f09-80d5-4fa5-9e96-2b1fa587bf0c",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "dataSha256": "1a63883ca7978d4f18d348921d1e51a432b707ec9b98ad3acb9b4c4673be226e",
+      "sourceCount": 1555,
+      "strategyCount": 385,
+      "firstSource": "2026-09-04T13:30:00+00:00",
+      "lastClose": "2026-09-04T20:00:00+00:00",
+      "exactEndpoints": true,
+      "coverage": "0.996794871794871794871794871794871794871794871794871794871795",
+      "dataEligible": true,
+      "firstReady": "2026-09-04T14:55:00+00:00",
+      "requiredWarmupBars": 85,
+      "retainedCapacity": 256,
+      "endingRetainedBars": 68,
+      "endingReady": false,
+      "gapCount": 5,
+      "gaps": [
+        {
+          "fromUtc": "2026-09-04T16:27:15+00:00",
+          "throughUtc": "2026-09-04T16:27:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-04T16:29:30+00:00",
+          "throughUtc": "2026-09-04T16:29:45+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-04T16:33:15+00:00",
+          "throughUtc": "2026-09-04T16:33:30+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-04T17:25:00+00:00",
+          "throughUtc": "2026-09-04T17:25:15+00:00",
+          "missingBars": 1
+        },
+        {
+          "fromUtc": "2026-09-04T18:51:45+00:00",
+          "throughUtc": "2026-09-04T18:52:00+00:00",
+          "missingBars": 1
+        }
+      ],
+      "grossPnl": "0.801761740000",
+      "realized": "0.801761740000",
+      "unrealized": "0.000000",
+      "endingQuantity": "0",
+      "endingExposure": "0.000000",
+      "endingCash": "1400.801761740000",
+      "endingEquity": "1400.801761740000",
+      "entries": 1,
+      "fills": 2,
+      "maximumDrawdown": "1.062575800000",
+      "tradedNotional": "1000.801506900000",
+      "tradedShares": "1.931956",
+      "closingAllowanceNotional": "0.000000",
+      "closingAllowanceShares": "0",
+      "exposedObservations": 56,
+      "exposureFraction": "0.0360128617363344051446945337620578778135048231511254019292605",
+      "riskOverrides": {
+        "RISK BLOCKED": 1
+      },
+      "netByBps": {
+        "0": "0.801761740000",
+        "1": "0.701681589310",
+        "2.5": "0.5515613632750",
+        "5": "0.301360986550",
+        "10": "-0.199039766900",
+        "25": "-1.700242027250"
+      },
+      "netByPerShare": {
+        "0.005": "0.792101960000",
+        "0.01": "0.782442180000"
+      },
+      "primaryScore": "0.301360986550",
+      "maximumContiguousStrategyBars": 177,
+      "readyEvaluations": 94,
+      "warmupEvaluations": 297,
+      "fileSha256": "8816484eae2c42e6e066eb4f099e88d757db0b9dcfb6830c4de7bb4d785211b5"
+    }
+  ],
+  "unavailable": [
+    {
+      "file": "artifacts\\semiconductor-research\\development\\unavailable-SOXL-2026-08-31-C1.json",
+      "symbol": "SOXL",
+      "date": "2026-08-31",
+      "profile": "C1",
+      "unavailable": true,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "0e537209-1780-4a28-b49b-6ddde3bb1e23",
+      "error": "Robinhood returned no SOXL trades from 8/31/2026 6:30 AM through 1:00 PM.",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "fileSha256": "700c033caa6281ad37cbe8f43c0d1efd0b6bae0aa04600ebac19439a08505077"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\unavailable-SOXL-2026-09-01-C1.json",
+      "symbol": "SOXL",
+      "date": "2026-09-01",
+      "profile": "C1",
+      "unavailable": true,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "e1b742e5-3103-4286-8ac6-a46357319b92",
+      "error": "Robinhood returned no SOXL trades from 9/1/2026 6:30 AM through 1:00 PM.",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "fileSha256": "0af37ba23a66edbfa3504aaeafe56ae53328e9e9c719c7c3589e0d708e4b3cf5"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\unavailable-SOXX-2026-08-31-C1.json",
+      "symbol": "SOXX",
+      "date": "2026-08-31",
+      "profile": "C1",
+      "unavailable": true,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "a13cdac5-1ca2-4f95-8c79-e04ce569d689",
+      "error": "Robinhood returned no SOXX trades from 8/31/2026 6:30 AM through 1:00 PM.",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "fileSha256": "2685860c9face026db4b398f9c550dc1653146ad922546a977051276c139e296"
+    },
+    {
+      "file": "artifacts\\semiconductor-research\\development\\unavailable-SOXX-2026-09-01-C1.json",
+      "symbol": "SOXX",
+      "date": "2026-09-01",
+      "profile": "C1",
+      "unavailable": true,
+      "failures": [],
+      "processId": 30636,
+      "operationId": "fa0cfc0d-2cce-483d-a27c-b9faccd637fe",
+      "error": "Robinhood returned no SOXX trades from 9/1/2026 6:30 AM through 1:00 PM.",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "fileSha256": "dfdd6f79ee652bb76ab1335e7f9236fa6e160ea6bc14ff249323d374c5a1a0bf"
+    }
+  ],
+  "stocks": [
+    {
+      "symbol": "SOXL",
+      "ready": true,
+      "problems": [],
+      "availableDevelopmentDates": [
+        "2026-09-02",
+        "2026-09-03"
+      ],
+      "unavailableDevelopmentDates": [
+        "2026-08-31",
+        "2026-09-01"
+      ],
+      "eligibleDevelopmentDates": [
+        "2026-09-02",
+        "2026-09-03"
+      ],
+      "ranking": [
+        {
+          "profile": "R1",
+          "days": 2,
+          "totalPrimaryScore": "-2.6885053620680",
+          "meanDailyPrimaryScore": "-1.3442526810340",
+          "worstDayPrimaryScore": "-6.8818229540535",
+          "maximumDailyDrawdown": "6.813202069900",
+          "entries": 16,
+          "grossPnl": "5.314150986600",
+          "positiveEveryDay": false,
+          "daily": [
+            {
+              "date": "2026-09-02",
+              "primaryScore": "-6.8818229540535",
+              "dataSha256": "e20e2a141bd3edaaaa51e3a13e12045aa1e1a5fec6e4a189d8319840ccde9225",
+              "sourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60",
+              "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-02-R1.json"
+            },
+            {
+              "date": "2026-09-03",
+              "primaryScore": "4.1933175919855",
+              "dataSha256": "a7c1f6323a320685cfc6c9a9fba07275efd16b28f43e597b65c7f0faffc5ea08",
+              "sourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60",
+              "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-03-R1.json"
+            }
+          ]
+        },
+        {
+          "profile": "B1",
+          "days": 2,
+          "totalPrimaryScore": "-5.85984811085075",
+          "meanDailyPrimaryScore": "-2.929924055425375",
+          "worstDayPrimaryScore": "-7.08975785521315",
+          "maximumDailyDrawdown": "11.600154208600",
+          "entries": 11,
+          "grossPnl": "-0.360028840500",
+          "positiveEveryDay": false,
+          "daily": [
+            {
+              "date": "2026-09-02",
+              "primaryScore": "-7.08975785521315",
+              "dataSha256": "e20e2a141bd3edaaaa51e3a13e12045aa1e1a5fec6e4a189d8319840ccde9225",
+              "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+              "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-02-B1.json"
+            },
+            {
+              "date": "2026-09-03",
+              "primaryScore": "1.2299097443624",
+              "dataSha256": "a7c1f6323a320685cfc6c9a9fba07275efd16b28f43e597b65c7f0faffc5ea08",
+              "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+              "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-03-B1.json"
+            }
+          ]
+        },
+        {
+          "profile": "C3",
+          "days": 2,
+          "totalPrimaryScore": "-10.73829601445030",
+          "meanDailyPrimaryScore": "-5.36914800722515",
+          "worstDayPrimaryScore": "-6.70035322917945",
+          "maximumDailyDrawdown": "7.039572573300",
+          "entries": 14,
+          "grossPnl": "-3.740166687400",
+          "positiveEveryDay": false,
+          "daily": [
+            {
+              "date": "2026-09-02",
+              "primaryScore": "-4.03794278527085",
+              "dataSha256": "e20e2a141bd3edaaaa51e3a13e12045aa1e1a5fec6e4a189d8319840ccde9225",
+              "sourceSha256": "88a0d2f7ee078456b333d7c020553030303ae5533977cd52016a6d886f3a87df",
+              "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-02-C3.json"
+            },
+            {
+              "date": "2026-09-03",
+              "primaryScore": "-6.70035322917945",
+              "dataSha256": "a7c1f6323a320685cfc6c9a9fba07275efd16b28f43e597b65c7f0faffc5ea08",
+              "sourceSha256": "88a0d2f7ee078456b333d7c020553030303ae5533977cd52016a6d886f3a87df",
+              "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-03-C3.json"
+            }
+          ]
+        },
+        {
+          "profile": "C2",
+          "days": 2,
+          "totalPrimaryScore": "-11.60801828781160",
+          "meanDailyPrimaryScore": "-5.80400914390580",
+          "worstDayPrimaryScore": "-9.48289746152265",
+          "maximumDailyDrawdown": "12.997131994900",
+          "entries": 16,
+          "grossPnl": "-3.609824058800",
+          "positiveEveryDay": false,
+          "daily": [
+            {
+              "date": "2026-09-02",
+              "primaryScore": "-2.12512082628895",
+              "dataSha256": "e20e2a141bd3edaaaa51e3a13e12045aa1e1a5fec6e4a189d8319840ccde9225",
+              "sourceSha256": "a1a2121ad0bba569679b14fb7dac270473e671556d38e4ac7ff302f0afb18f73",
+              "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-02-C2.json"
+            },
+            {
+              "date": "2026-09-03",
+              "primaryScore": "-9.48289746152265",
+              "dataSha256": "a7c1f6323a320685cfc6c9a9fba07275efd16b28f43e597b65c7f0faffc5ea08",
+              "sourceSha256": "a1a2121ad0bba569679b14fb7dac270473e671556d38e4ac7ff302f0afb18f73",
+              "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-03-C2.json"
+            }
+          ]
+        },
+        {
+          "profile": "C1",
+          "days": 2,
+          "totalPrimaryScore": "-17.76389539952880",
+          "meanDailyPrimaryScore": "-8.88194769976440",
+          "worstDayPrimaryScore": "-12.59669145217295",
+          "maximumDailyDrawdown": "10.700363484300",
+          "entries": 20,
+          "grossPnl": "-7.767780264400",
+          "positiveEveryDay": false,
+          "daily": [
+            {
+              "date": "2026-09-02",
+              "primaryScore": "-5.16720394735585",
+              "dataSha256": "e20e2a141bd3edaaaa51e3a13e12045aa1e1a5fec6e4a189d8319840ccde9225",
+              "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+              "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-02-C1.json"
+            },
+            {
+              "date": "2026-09-03",
+              "primaryScore": "-12.59669145217295",
+              "dataSha256": "a7c1f6323a320685cfc6c9a9fba07275efd16b28f43e597b65c7f0faffc5ea08",
+              "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+              "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-03-C1.json"
+            }
+          ]
+        }
+      ],
+      "winner": {
+        "profile": "R1",
+        "days": 2,
+        "totalPrimaryScore": "-2.6885053620680",
+        "meanDailyPrimaryScore": "-1.3442526810340",
+        "worstDayPrimaryScore": "-6.8818229540535",
+        "maximumDailyDrawdown": "6.813202069900",
+        "entries": 16,
+        "grossPnl": "5.314150986600",
+        "positiveEveryDay": false,
+        "daily": [
+          {
+            "date": "2026-09-02",
+            "primaryScore": "-6.8818229540535",
+            "dataSha256": "e20e2a141bd3edaaaa51e3a13e12045aa1e1a5fec6e4a189d8319840ccde9225",
+            "sourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60",
+            "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-02-R1.json"
+          },
+          {
+            "date": "2026-09-03",
+            "primaryScore": "4.1933175919855",
+            "dataSha256": "a7c1f6323a320685cfc6c9a9fba07275efd16b28f43e597b65c7f0faffc5ea08",
+            "sourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60",
+            "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-03-R1.json"
+          }
+        ],
+        "symbol": "SOXL",
+        "rank": 1,
+        "tier": 2
+      }
+    },
+    {
+      "symbol": "SOXX",
+      "ready": false,
+      "problems": [
+        "Fewer than two eligible development days"
+      ],
+      "availableDevelopmentDates": [
+        "2026-09-02",
+        "2026-09-03"
+      ],
+      "unavailableDevelopmentDates": [
+        "2026-08-31",
+        "2026-09-01"
+      ],
+      "eligibleDevelopmentDates": [
+        "2026-09-03"
+      ],
+      "ranking": [
+        {
+          "profile": "R1",
+          "days": 1,
+          "totalPrimaryScore": "0.2554376265525",
+          "meanDailyPrimaryScore": "0.2554376265525",
+          "worstDayPrimaryScore": "0.2554376265525",
+          "maximumDailyDrawdown": "0.334790610000",
+          "entries": 1,
+          "grossPnl": "0.755815165000",
+          "positiveEveryDay": true,
+          "daily": [
+            {
+              "date": "2026-09-03",
+              "primaryScore": "0.2554376265525",
+              "dataSha256": "d8267c1155a1b62ab8ee419b2cb5003f9b4d008db59f81e137bbf77b04bf9abe",
+              "sourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60",
+              "file": "artifacts\\semiconductor-research\\development\\SOXX-2026-09-03-R1.json"
+            }
+          ]
+        },
+        {
+          "profile": "C1",
+          "days": 1,
+          "totalPrimaryScore": "0.000000",
+          "meanDailyPrimaryScore": "0.000000",
+          "worstDayPrimaryScore": "0.000000",
+          "maximumDailyDrawdown": "0",
+          "entries": 0,
+          "grossPnl": "0.000000",
+          "positiveEveryDay": false,
+          "daily": [
+            {
+              "date": "2026-09-03",
+              "primaryScore": "0.000000",
+              "dataSha256": "d8267c1155a1b62ab8ee419b2cb5003f9b4d008db59f81e137bbf77b04bf9abe",
+              "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+              "file": "artifacts\\semiconductor-research\\development\\SOXX-2026-09-03-C1.json"
+            }
+          ]
+        },
+        {
+          "profile": "C2",
+          "days": 1,
+          "totalPrimaryScore": "0.000000",
+          "meanDailyPrimaryScore": "0.000000",
+          "worstDayPrimaryScore": "0.000000",
+          "maximumDailyDrawdown": "0",
+          "entries": 0,
+          "grossPnl": "0.000000",
+          "positiveEveryDay": false,
+          "daily": [
+            {
+              "date": "2026-09-03",
+              "primaryScore": "0.000000",
+              "dataSha256": "d8267c1155a1b62ab8ee419b2cb5003f9b4d008db59f81e137bbf77b04bf9abe",
+              "sourceSha256": "a1a2121ad0bba569679b14fb7dac270473e671556d38e4ac7ff302f0afb18f73",
+              "file": "artifacts\\semiconductor-research\\development\\SOXX-2026-09-03-C2.json"
+            }
+          ]
+        },
+        {
+          "profile": "C3",
+          "days": 1,
+          "totalPrimaryScore": "0.000000",
+          "meanDailyPrimaryScore": "0.000000",
+          "worstDayPrimaryScore": "0.000000",
+          "maximumDailyDrawdown": "0",
+          "entries": 0,
+          "grossPnl": "0.000000",
+          "positiveEveryDay": false,
+          "daily": [
+            {
+              "date": "2026-09-03",
+              "primaryScore": "0.000000",
+              "dataSha256": "d8267c1155a1b62ab8ee419b2cb5003f9b4d008db59f81e137bbf77b04bf9abe",
+              "sourceSha256": "88a0d2f7ee078456b333d7c020553030303ae5533977cd52016a6d886f3a87df",
+              "file": "artifacts\\semiconductor-research\\development\\SOXX-2026-09-03-C3.json"
+            }
+          ]
+        },
+        {
+          "profile": "B1",
+          "days": 1,
+          "totalPrimaryScore": "0.000000",
+          "meanDailyPrimaryScore": "0.000000",
+          "worstDayPrimaryScore": "0.000000",
+          "maximumDailyDrawdown": "0",
+          "entries": 0,
+          "grossPnl": "0.000000",
+          "positiveEveryDay": false,
+          "daily": [
+            {
+              "date": "2026-09-03",
+              "primaryScore": "0.000000",
+              "dataSha256": "d8267c1155a1b62ab8ee419b2cb5003f9b4d008db59f81e137bbf77b04bf9abe",
+              "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+              "file": "artifacts\\semiconductor-research\\development\\SOXX-2026-09-03-B1.json"
+            }
+          ]
+        }
+      ],
+      "winner": null
+    }
+  ],
+  "selections": [
+    {
+      "profile": "R1",
+      "days": 2,
+      "totalPrimaryScore": "-2.6885053620680",
+      "meanDailyPrimaryScore": "-1.3442526810340",
+      "worstDayPrimaryScore": "-6.8818229540535",
+      "maximumDailyDrawdown": "6.813202069900",
+      "entries": 16,
+      "grossPnl": "5.314150986600",
+      "positiveEveryDay": false,
+      "daily": [
+        {
+          "date": "2026-09-02",
+          "primaryScore": "-6.8818229540535",
+          "dataSha256": "e20e2a141bd3edaaaa51e3a13e12045aa1e1a5fec6e4a189d8319840ccde9225",
+          "sourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60",
+          "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-02-R1.json"
+        },
+        {
+          "date": "2026-09-03",
+          "primaryScore": "4.1933175919855",
+          "dataSha256": "a7c1f6323a320685cfc6c9a9fba07275efd16b28f43e597b65c7f0faffc5ea08",
+          "sourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60",
+          "file": "artifacts\\semiconductor-research\\development\\SOXL-2026-09-03-R1.json"
+        }
+      ],
+      "symbol": "SOXL",
+      "rank": 1,
+      "tier": 2
+    }
+  ],
+  "selectionShortfall": 1
+}

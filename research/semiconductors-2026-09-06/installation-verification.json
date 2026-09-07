@@ -1,0 +1,37 @@
+{
+  "verifiedAtUtc": "2026-09-07 07:09:48 UTC",
+  "appVersion": "1.2-dev.17",
+  "processId": 30636,
+  "installedStrategies": [
+    {
+      "id": "script:direxion semiconductor bull 3x (soxl) mean recovery - experimental.thinkscript",
+      "name": "Direxion Semiconductor Bull 3X (SOXL) Mean Recovery - experimental",
+      "fileName": "Direxion Semiconductor Bull 3X (SOXL) Mean Recovery - experimental.thinkscript",
+      "sourceSha256": "66568d7690651cb1173007ccc4104a98b8af138cf74aef3dc297d20c2fc83a60",
+      "runtimeVersion": "thinkscript-subset-v1",
+      "isBuiltIn": false
+    },
+    {
+      "id": "script:ishares semiconductor (soxx) confirmation - experimental.thinkscript",
+      "name": "iShares Semiconductor (SOXX) Confirmation - experimental",
+      "fileName": "iShares Semiconductor (SOXX) Confirmation - experimental.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "runtimeVersion": "thinkscript-subset-v1",
+      "isBuiltIn": false
+    }
+  ],
+  "originalCatalogCount": 14,
+  "finalCatalogCount": 16,
+  "allOriginalScriptsPreserved": true,
+  "temporaryCandidatesRemaining": 0,
+  "catalogErrors": [],
+  "originalSettingsRestored": true,
+  "originalSelectedModeRestored": true,
+  "originalEffectiveModeRestored": true,
+  "idle": true,
+  "restoredSymbol": "TSLA",
+  "restoredStrategyId": "script:tesla (tsla) confirmation - experimental.thinkscript",
+  "retainedSessionId": "57311f09-80d5-4fa5-9e96-2b1fa587bf0c",
+  "retainedSessionStrategyId": "script:ishares semiconductor (soxx) confirmation - experimental.thinkscript",
+  "note": "Restored configuration is separate from the retained completed SOXX Friday session and chart."
+}
