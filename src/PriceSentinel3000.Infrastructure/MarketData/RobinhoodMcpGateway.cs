@@ -11,7 +11,7 @@ using PriceSentinel3000.Infrastructure.Storage;
 
 namespace PriceSentinel3000.Infrastructure.MarketData;
 
-public sealed class RobinhoodMcpGateway :
+public sealed partial class RobinhoodMcpGateway :
     IMarketDataSource,
     ICachedAuthenticationMarketDataSource,
     IInstrumentSearchSource,
@@ -97,7 +97,7 @@ public sealed class RobinhoodMcpGateway :
             {
                 RedirectUri = RobinhoodBrowserAuthorization.RedirectUri,
                 AuthorizationCallbackHandler = allowInteractiveAuthorization
-                    ? RobinhoodBrowserAuthorization.AuthorizeAsync
+                    ? AuthorizeUnlessLibraryAsync
                     : DeclineInteractiveAuthorizationAsync,
                 TokenCache = _authStore,
                 ClientId = registration?.ClientId,

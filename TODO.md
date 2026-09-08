@@ -30,15 +30,17 @@ Run several symbols in one portfolio, with one shared account and operating mode
 - [ ] Require explicit LIVE arming of the reviewed symbol/strategy/allocation list and re-arming for material changes. Apply shared broker-account limits and define Stop/entry-disable/close-position behavior across all managed symbols, without silently abandoning open positions or closing unrelated holdings. Preserve the MCP prohibition on controlling LIVE execution.
 - [ ] Validate with fake broker concurrency/recovery tests and a user-supervised LIVE readiness review after Paper/Replay acceptance. Multiple open positions must not depend on parallel order submission; begin with serialized submissions if they can service exits promptly. Treat this as a separate feature milestone from the current release verification above.
 
-## Local market-data library — proposed, not implemented
+## Local market-data library — implemented
 
-The journal saves session observations, but Replay currently fetches history from Robinhood; it does not read a reusable daily history library. See the [proposed design](DESIGN.md#proposed-local-market-data-library).
+See the [user guide](docs/market-data-library.md) and [design](DESIGN.md#local-market-data-library).
 
-- [ ] Add an explicit download workflow for selected symbols and dates, preserving genuine 15-second OHLCV while the provider still makes it available. Display actual resolution and coverage; do not promise that older fine-resolution history can be recovered.
-- [ ] Store market history separately from session journaling and repository research reports. Preserve exact prices, UTC boundaries, provider/adjustment provenance, revisions, and source hashes; distinguish historical candles from sampled live quotes.
-- [ ] Validate completeness and deduplication, report gaps, and prevent mixed resolutions or incompatible price adjustments from silently entering a replay.
-- [ ] Allow Replay and script analysis to reuse local history offline and aggregate complete fine candles into larger intervals. Never generate artificial 15-second prices from coarser history.
-- [ ] Verify reproducible results from a pinned dataset, interrupted-download recovery, and fixed-script comparisons across source resolutions. Keep strategy interval fixed when measuring the effect of source resolution.
+- [x] App-styled Tools entry, saved-state clock, modeless list/schedule/library UI, editable lists, individual equity inclusion, and read-only Robinhood snapshot import/refresh.
+- [x] User-selected daily time and saved time zone, holiday/early-close/DST handling, app-open collection, durable deduplicated jobs, bounded retries, restart/disconnection recovery, and manual date-range downloads.
+- [x] Portable symbol-only list transfer and year / numbered English month / ticker / daily JSON history with exact candles, source-close timing, provenance, gaps, nullable volume and immutable revisions.
+- [x] Local-first and offline Replay, explicit revision selection and dataset pins, actual-resolution enforcement, and read-only paginated MCP library discovery/candle access without an active session.
+- [x] Automated storage, scheduler, import, Replay, MCP and UI integration checks; authenticated read-only list/candle provider smoke checks.
+- [ ] Compare fixed scripts empirically across retained source resolutions using the same period and strategy interval. Preserving finer data does not guarantee higher P&L.
+- [ ] Consider a separately installed background worker if users need collection while the app is closed. Current scheduling explicitly requires an open, connected app.
 
 ## Strategy scripting follow-ups
 

@@ -67,7 +67,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        _dataRetentionDialog = new DataRetentionDialog { Owner = this };
+        _dataRetentionDialog = new DataRetentionDialog { Owner = this, DataContext = _viewModel.DataRetention };
         _dataRetentionDialog.Closed += (_, _) => _dataRetentionDialog = null;
         // Keep the trading workspace, including STOP, accessible while viewing tools.
         _dataRetentionDialog.Show();

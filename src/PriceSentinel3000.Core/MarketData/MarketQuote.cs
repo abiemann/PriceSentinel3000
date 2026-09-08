@@ -12,7 +12,8 @@ public sealed record MarketQuote(
     decimal? HighPrice = null,
     decimal? LowPrice = null,
     decimal? ClosePrice = null,
-    int SourceIntervalSeconds = 15)
+    int SourceIntervalSeconds = 15,
+    bool HasKnownVolume = true)
 {
     // Historical bars cover this duration from SourceTimestampUtc. Live sampled
     // quotes are instantaneous; their observation path does not use this value.

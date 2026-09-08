@@ -31,9 +31,9 @@ public sealed class AutomationMcpTests
         }), cancellationToken: timeout.Token);
 
         var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
-        Assert.Equal(new[] { "candles", "capture_chart", "configure", "events", "indicators", "list_strategies", "pause", "results", "resume", "run_to_end", "start", "status", "step", "stop" },
+        Assert.Equal(new[] { "candles", "capture_chart", "configure", "events", "indicators", "library_candles", "library_datasets", "list_strategies", "pause", "results", "resume", "run_to_end", "start", "status", "step", "stop" },
             tools.Select(tool => tool.Name).OrderBy(name => name));
-        foreach (string name in new[] { "candles", "indicators", "events", "capture_chart" })
+        foreach (string name in new[] { "candles", "indicators", "events", "capture_chart", "library_datasets", "library_candles" })
         {
             Assert.True(tools.Single(tool => tool.Name == name).ProtocolTool.Annotations!.ReadOnlyHint);
         }
@@ -96,6 +96,23 @@ public sealed class AutomationMcpTests
         Assert.Equal(0, requests.Last().Arguments.GetProperty("afterSequence").GetInt64());
         Assert.Equal(50, requests.Last().Arguments.GetProperty("limit").GetInt32());
         Assert.False(requests.Last().Arguments.TryGetProperty("sessionId", out _));
+
+        await client.CallToolAsync("library_datasets", new Dictionary<string, object?>
+        {
+            ["offset"] = 10, ["limit"] = 20, ["catalogHash"] = new string('a', 64),
+        }, cancellationToken: timeout.Token);
+        Assert.Equal("library_datasets", requests.Last().Command);
+        Assert.Equal(10, requests.Last().Arguments.GetProperty("offset").GetInt32());
+        Assert.Equal(new string('a', 64), requests.Last().Arguments.GetProperty("catalogHash").GetString());
+        Assert.False(tools.Single(tool => tool.Name == "library_datasets").JsonSchema.GetProperty("properties").TryGetProperty("path", out _));
+        await client.CallToolAsync("library_candles", new Dictionary<string, object?>
+        {
+            ["datasetHash"] = new string('b', 64), ["offset"] = 100, ["limit"] = 25,
+        }, cancellationToken: timeout.Token);
+        Assert.Equal("library_candles", requests.Last().Command);
+        Assert.Equal(new string('b', 64), requests.Last().Arguments.GetProperty("datasetHash").GetString());
+        Assert.Equal(25, requests.Last().Arguments.GetProperty("limit").GetInt32());
+        Assert.Contains("datasetHash", tools.Single(tool => tool.Name == "library_candles").JsonSchema.GetProperty("required").EnumerateArray().Select(item => item.GetString()));
 
         await client.CallToolAsync("indicators", cancellationToken: timeout.Token);
         Assert.Equal("indicators", requests.Last().Command);
@@ -214,6 +231,8 @@ public sealed class AutomationMcpTests
     [InlineData("indicators")]
     [InlineData("events")]
     [InlineData("capture_chart")]
+    [InlineData("library_datasets")]
+    [InlineData("library_candles")]
     public void CliAcceptsResearchCommands(string command) =>
         Assert.Equal(command, ControlOptions.Parse(["--command", command]).Command);
 }

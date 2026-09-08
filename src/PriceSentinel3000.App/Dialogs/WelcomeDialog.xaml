@@ -86,7 +86,7 @@
                        FontSize="14"
                        LineHeight="21"
                        TextWrapping="Wrap"
-                       Text="PriceSentinel needs a Robinhood Agentic Trading connection for real-time Paper Trader prices and historical Replay data. Without that connection, the app cannot monitor or replay prices." />
+                       Text="Connect to Robinhood for real-time Paper Trader prices and history downloads. Choose USE OFFLINE to replay saved candles from your local market-data library without a connection." />
             <TextBlock Margin="0,15,0,0"
                        Foreground="{StaticResource SubduedTextBrush}"
                        FontSize="13"
@@ -143,6 +143,8 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="12" />
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
             <Button x:Name="ExitButton"
@@ -152,12 +154,15 @@
                     IsCancel="True"
                     Content="EXIT" />
             <Button x:Name="LoginButton"
-                    Grid.Column="2"
+                    Grid.Column="4"
                     Style="{StaticResource PrimaryButtonStyle}"
                     Height="44"
                     Click="Login_Click"
                     IsDefault="True"
                     Content="LOGIN" />
+            <Button Grid.Column="2" Style="{StaticResource SecondaryButtonStyle}"
+                    Height="44" Click="Offline_Click" Content="USE OFFLINE"
+                    ToolTip="Use copied local history without connecting to Robinhood" />
         </Grid>
         </Grid>
     </Grid>

@@ -26,4 +26,7 @@ public static class AppDataPaths
 
     public static string StrategiesDirectory =>
         Path.Combine(ApplicationDirectory, "Strategies");
+
+    public static string CollectionState =>
+        Path.Combine(ApplicationDirectory, "collection-state.json");
 }

@@ -74,7 +74,8 @@ public sealed partial class MainViewModel
             intervalSeconds = historical ? (int?)source.SourceIntervalSeconds : null,
             finalized = historical,
             open = source.CandleOpen, high = source.CandleHigh, low = source.CandleLow, close = source.CandleClose,
-            source.Last, source.Bid, source.Ask, source.Volume,
+            source.Last, source.Bid, source.Ask,
+            volume = source.HasKnownVolume ? (decimal?)source.Volume : null,
             fresh = historical || IsFreshObservation(execution),
         });
         if (_scriptSignalEngine is not { } engine || _researchBarVersion == engine.Bars.Version) return;
@@ -89,7 +90,8 @@ public sealed partial class MainViewModel
             {
                 sequence = barSequence, observationSequence = sequence,
                 availableAtUtc = availableAt, barVersion = engine.Bars.Version,
-                bar.StartsAtUtc, bar.EndsAtUtc, bar.Open, bar.High, bar.Low, bar.Close, bar.Volume,
+                bar.StartsAtUtc, bar.EndsAtUtc, bar.Open, bar.High, bar.Low, bar.Close,
+                volume = bar.HasKnownVolume ? (decimal?)bar.Volume : null,
                 finalized = true,
             });
         }
@@ -201,7 +203,12 @@ public sealed partial class MainViewModel
     private static object ResearchEvaluation(ScriptEvaluationSnapshot evaluation) => new
     {
         evaluation.EvaluatedAtUtc, evaluation.BarVersion, evaluation.CompletedBarCount,
-        evaluation.RetainedBars, evaluation.RequiredWarmupBars, evaluation.LatestBar,
+        evaluation.RetainedBars, evaluation.RequiredWarmupBars,
+        latestBar = evaluation.LatestBar is not { } bar ? null : new
+        {
+            bar.StartsAtUtc, bar.EndsAtUtc, bar.Open, bar.High, bar.Low, bar.Close,
+            volume = bar.HasKnownVolume ? (decimal?)bar.Volume : null,
+        },
         evaluation.State, evaluation.IsWarmingUp,
         proposal = new
         {

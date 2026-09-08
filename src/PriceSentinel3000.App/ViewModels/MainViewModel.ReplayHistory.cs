@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Windows.Threading;
+using PriceSentinel3000.Application.MarketDataLibrary;
 using PriceSentinel3000.Core.MarketData;
 
 namespace PriceSentinel3000.App.ViewModels;
@@ -6,18 +8,86 @@ namespace PriceSentinel3000.App.ViewModels;
 public sealed partial class MainViewModel
 {
     private int? _historicalSourceIntervalSeconds;
+    private string _historicalLibraryDescription = "";
+    private LibraryReplayHistoryResult? _resolvedReplayHistory;
+    private bool ReplayUsesLocalFiles => _resolvedReplayHistory?.Source is "local-library" or "pinned-library";
+
+    private async Task<IReadOnlyList<MarketQuote>> LoadReplayHistoryAsync(
+        Instrument instrument, DateTimeOffset from, DateTimeOffset through, CancellationToken token)
+    {
+        _resolvedReplayHistory = null;
+        if (DataRetention is not { } retention)
+        {
+            SetMarketDataState("ROBINHOOD LOGIN", "AUTHORIZING", isConnected: false);
+            await _marketDataSource.ConnectAsync(token);
+            return await _marketDataSource.GetReplayHistoryAsync(instrument, from, through,
+                _timeProvider.GetUtcNow(), token);
+        }
+
+        // Snapshot the root and choices before background disk work. A session's
+        // recorded hashes stay fixed even if the next Replay uses other settings.
+        IMarketDataLibrary library = retention.CreateLibrary();
+        string[] pins = retention.ReplayPinnedHashes.Split([',', '\r', '\n', ' ', '\t'],
+            StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        bool offline = retention.ReplayOfflineOnly;
+        var query = new HistoricalDataQuery(instrument.Symbol, from.ToUniversalTime(), through.ToUniversalTime(),
+            AdjustmentPolicy: "split", SessionBounds: retention.Collector.State.Settings.SessionBounds,
+            PinnedHashes: pins,
+            RevisionPolicy: retention.ReplayUseLatestRevision
+                ? HistoricalRevisionPolicy.LatestFetched : HistoricalRevisionPolicy.RejectConflicts);
+        Dispatcher dispatcher = Dispatcher.CurrentDispatcher;
+        var resolver = new LibraryReplayHistoryResolver(library, retention.Provider, cancellation =>
+            dispatcher.InvokeAsync(() =>
+            {
+                SetMarketDataState("ROBINHOOD LOGIN", "AUTHORIZING", isConnected: false);
+                return retention.PrepareConnectionAsync(cancellation);
+            }).Task.Unwrap());
+        SetMarketDataState("LOCAL LIBRARY", "READING HISTORY", isConnected: false);
+        _resolvedReplayHistory = await Task.Run(() => resolver.ResolveAsync(query, offline, token), token);
+        foreach (MarketDataLibraryDiagnostic diagnostic in _resolvedReplayHistory.Diagnostics)
+            AddActivity(diagnostic.Message, "WARNING");
+        DateTimeOffset observedAt = _timeProvider.GetUtcNow();
+        return _resolvedReplayHistory.Candles.Select(candle => new MarketQuote(
+            instrument, observedAt, candle.StartsAtUtc, 0m, 0m, candle.Close, candle.Volume ?? 0m,
+            candle.Open, candle.High, candle.Low, candle.Close, _resolvedReplayHistory.SourceIntervalSeconds,
+            HasKnownVolume: candle.Volume.HasValue)).ToArray();
+    }
+
+    private object ReplayHistoryProvenance(int sourceInterval) => new
+    {
+        SourceIntervalSeconds = sourceInterval,
+        IsFallback = sourceInterval > 15,
+        Availability = "source-candle-close",
+        ExecutionModel = "completed-source-candle-close",
+        IntrabarPricesAvailable = false,
+        Source = _resolvedReplayHistory?.Source ?? "provider",
+        DatasetHashes = _resolvedReplayHistory?.Datasets.Select(item => item.DatasetHash).ToArray() ?? [],
+        Datasets = _resolvedReplayHistory?.Datasets.Select(item => new
+        {
+            item.DatasetHash, item.Provider, item.InstrumentId, item.Symbol, item.TradingDate,
+            item.SourceIntervalSeconds, item.AdjustmentPolicy, item.AdjustmentBasis,
+            item.SessionBounds, item.FetchedAtUtc,
+        }).ToArray(),
+        Coverage = _resolvedReplayHistory?.Coverage,
+        Diagnostics = _resolvedReplayHistory?.Diagnostics,
+    };
 
     public string DataResolutionLabel => _historicalSourceIntervalSeconds is { } interval
         ? $"{interval} SEC CANDLES"
         : _chartRingBuffer is null ? "--" : "SAMPLED QUOTES";
 
     public string DataResolutionDescription => _historicalSourceIntervalSeconds is { } interval
-        ? $"Historical data: {interval}-second candles. Prices become available at each candle's close. Signals, risk checks, and simulated fills cannot see movements inside a source candle."
+        ? $"Historical data: {interval}-second candles. Prices become available at each candle's close. Signals, risk checks, and simulated fills cannot see movements inside a source candle.{_historicalLibraryDescription}"
         : "Paper and Live use sampled current quotes; historical warmup uses completed candles.";
 
     private void SetHistoricalSourceInterval(int? interval)
     {
         _historicalSourceIntervalSeconds = interval;
+        _historicalLibraryDescription = interval is not null && _resolvedReplayHistory is { } result
+            ? $" Source: {(ReplayUsesLocalFiles ? "local data library" : "Robinhood, saved to the local library")}. " +
+              $"Coverage: {result.Coverage.ActualCandleCount}/{result.Coverage.ExpectedCandleCount} candles ({(result.Coverage.Complete ? "complete" : "partial")}). " +
+              $"Dataset hashes: {string.Join(", ", result.Datasets.Select(item => item.DatasetHash))}."
+            : "";
         OnPropertyChanged(nameof(ChartCandleIntervalOptions));
         OnPropertyChanged(nameof(ChartCandleIntervalSeconds));
         OnPropertyChanged(nameof(DataResolutionLabel));

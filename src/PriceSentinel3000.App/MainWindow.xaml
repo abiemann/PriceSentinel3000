@@ -88,6 +88,7 @@
         </Border>
 
         <views:AppHeaderView Grid.Row="1"
+                             IsAutomaticDownloadEnabled="{Binding DataRetention.SavedAutomaticDownloadsEnabled, FallbackValue=False}"
                              DataRetentionRequested="AppHeader_DataRetentionRequested" />
 
         <Grid Grid.Row="2"

@@ -158,6 +158,21 @@ public sealed class JsonMarketDataLibraryTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(_directory, "2026", "11 - November")));
     }
 
+    [Theory]
+    [InlineData("th-TH")]
+    [InlineData("ar-SA")]
+    public void DailyFilename_UsesGregorianDateIndependentOfCurrentCulture(string culture)
+    {
+        CultureInfo previous = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(culture);
+            HistoricalDatasetInfo saved = Assert.Single(Library.Save(Download()));
+            Assert.Equal("2026/09 - September/NFLX/2026-09-04.15s.json", saved.RelativePath.Replace('\\', '/'));
+        }
+        finally { CultureInfo.CurrentCulture = previous; }
+    }
+
     [Fact]
     public void Coverage_ReportsMissingEdgesAndInteriorWithoutInventingBars()
     {

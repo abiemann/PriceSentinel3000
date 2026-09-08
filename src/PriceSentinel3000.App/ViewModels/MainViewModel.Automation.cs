@@ -44,7 +44,7 @@ public sealed partial class MainViewModel
         {
             if (_disposed) return AutomationResponse.Fail("closed", "The application is closed.");
             string command = request.Command;
-            bool readOnly = command is "status" or "results" or "candles" or "indicators" or "events" or "capture_chart" ||
+            bool readOnly = command is "status" or "results" or "candles" or "indicators" or "events" or "capture_chart" or "library_datasets" or "library_candles" ||
                             command == "strategies" && !ReadArguments<StrategyArguments>(request).Refresh;
             if (!readOnly)
             {
@@ -72,6 +72,10 @@ public sealed partial class MainViewModel
                     return ReadAutomationEvents(ReadArguments<ResearchPageArguments>(request));
                 case "capture_chart":
                     return CaptureAutomationChart(request.Arguments);
+                case "library_datasets":
+                    return await ReadAutomationLibraryDatasetsAsync(ReadArguments<LibraryDatasetArguments>(request));
+                case "library_candles":
+                    return await ReadAutomationLibraryCandlesAsync(ReadArguments<LibraryCandleArguments>(request));
                 case "strategies":
                     StrategyArguments scripts = ReadArguments<StrategyArguments>(request);
                     if (scripts.Refresh)

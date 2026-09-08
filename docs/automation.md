@@ -21,8 +21,8 @@ $control = '.\artifacts\automation-publish\automation\PriceSentinel3000.Control.
 
 The app opens in OFF with **Automation enabled (Replay / Paper)** in its title.
 This launch mode permits inspection and configuration without logging in first.
-Starting a data session uses the normal Robinhood connection flow and may require
-the user's secure browser login. The control executable never opens the app or
+Starting a connected data session may require the user's secure browser login.
+Replay with usable local history or explicit library pins works without login. The control executable never opens the app or
 authenticates a broker itself.
 
 Normal launches do not expose automation. Only one app can own the default
@@ -71,6 +71,8 @@ MCP tools expose the same inputs as named parameters.
 | `candles` | Page exact processed source observations or finalized strategy candles, with UTC timestamps and availability times. |
 | `indicators` | Read actual strategy indicator values, evaluation identity, and current warmup state. |
 | `events` | Page strategy proposals, host risk overrides, decisions, fills, and numeric account state in processing order. |
+| `library_datasets` | Page validated local dataset metadata; pass the returned `catalogHash` on subsequent pages. No session or login required. |
+| `library_candles` | Page exact immutable local candles by `datasetHash`, with decimal strings, nullable volume and provenance. Maximum 100 rows per page. |
 | `capture_chart` | Return the actual simulation chart as a PNG image with its visible range, display interval, RSI, and session metadata. |
 
 The pipe protocol uses `strategies` internally; the command line accepts
@@ -275,3 +277,5 @@ MCP readouts validate session behavior. They do not prove that every WPF control
 renders correctly. Keep a visual smoke test for chart drawing, clipping, labels,
 and layout. Comparing runs also requires identical source history, settings, and
 strategy hashes; separately fetched provider history may have changed.
+
+See [Local market-data library](market-data-library.md) for folder sharing, collection setup and offline Replay. Library tools accept no filesystem paths and may be read while LIVE is selected; they cannot trade or modify saved files.

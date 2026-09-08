@@ -19,6 +19,10 @@ For assistant-driven Replay and Paper tests, see [Local app control](docs/automa
 The optional MCP/CLI companion controls the visible app and supports exact Replay
 pause/step boundaries and fast playback.
 
+## Retain high-resolution history
+
+Open **Tools > Retain Hi-Res Data** to create download lists, import individual equities from Robinhood lists, and choose a daily collection time and time zone. The app stores portable daily candles under year / numbered English month / ticker folders, then reuses them for Replay and read-only MCP analysis. Automatic collection requires the app to stay open and connected; copied history can be replayed offline. See the [market-data library guide](docs/market-data-library.md).
+
 ## Reviewer tour
 
 A Robinhood Agentic Trading account is required to run the connected workspace,
@@ -74,8 +78,8 @@ execution path to the authenticated Robinhood data foundation:
   by every selectable chart candle interval, expanding for a selected script's
   warmup when needed; configurable delayed-lookback
   reconciliation uses real 15-second Robinhood equity bars
-- Replay accepts a ticker plus an exact local date/time and tries 15-second,
-  30-second, then one-minute history until usable data is returned. It preserves
+- Replay accepts a ticker plus an exact local date/time and checks saved history
+  before provider history at 15 seconds, 30 seconds, then one minute. It preserves
   the source duration and can be paused, resumed, or stopped without losing the
   captured chart and paper-account state
 - Replay local start/end range (up to 24 hours) and playback speed (1x-100x)

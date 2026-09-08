@@ -98,6 +98,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
     private Task? _shutdownTask;
     private bool _disposed;
 
+    public DataRetentionViewModel? DataRetention { get; internal set; }
+
     internal MainViewModel(
         IMarketDataSource marketDataSource,
         ICachedAuthenticationMarketDataSource cachedAuthentication,
@@ -106,8 +108,10 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
         ITradingJournal journal,
         IUserPreferencesStore preferencesStore,
         TimeProvider? timeProvider = null,
-        IStrategyCatalog? strategyCatalog = null)
+        IStrategyCatalog? strategyCatalog = null,
+        DataRetentionViewModel? dataRetention = null)
     {
+        DataRetention = dataRetention;
         _marketDataSource = marketDataSource ??
             throw new ArgumentNullException(nameof(marketDataSource));
         _cachedAuthentication = cachedAuthentication ??
@@ -729,7 +733,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
         catch
         {
             SetMarketDataState("ADAPTER OFFLINE", "OFFLINE", isConnected: false);
-            StatusMessage = "Robinhood is required. Retry LOGIN or exit PriceSentinel.";
+            StatusMessage = "Robinhood is offline. Retry LOGIN for downloads or use local Replay history.";
             throw;
         }
     }
@@ -937,6 +941,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
 
         try
         {
+            if (DataRetention is not null) await DataRetention.DisposeAsync();
             await _marketDataSource.DisposeAsync();
         }
         catch (Exception exception)

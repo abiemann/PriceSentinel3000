@@ -7,6 +7,8 @@ using PriceSentinel3000.Infrastructure.Automation;
 using PriceSentinel3000.Infrastructure.MarketData;
 using PriceSentinel3000.Infrastructure.Storage;
 using PriceSentinel3000.Infrastructure.Strategies;
+using PriceSentinel3000.Application.MarketDataLibrary;
+using PriceSentinel3000.Infrastructure.MarketDataLibrary;
 
 namespace PriceSentinel3000.App;
 
@@ -30,6 +32,24 @@ public partial class App : System.Windows.Application
             new JsonUserPreferencesStore(AppDataPaths.UserPreferences),
             TimeProvider.System,
             FileSystemStrategyCatalog.CreateDefault());
+        try
+        {
+            var collector = await Task.Run(() => new MarketDataCollector(
+                new JsonCollectionStateStore(AppDataPaths.CollectionState), robinhoodGateway,
+                root => new JsonMarketDataLibrary(root)));
+            viewModel.DataRetention = new DataRetentionViewModel(collector, robinhoodGateway,
+                robinhoodGateway, robinhoodGateway, root => new JsonMarketDataLibrary(root),
+                async token => { if (!robinhoodGateway.HasActiveConnection) await viewModel.ConnectRobinhoodAtStartupAsync(token); },
+                () => robinhoodGateway.HasActiveConnection, Dispatcher);
+        }
+        catch (Exception exception) when (exception is System.IO.IOException or UnauthorizedAccessException or ArgumentException or System.Text.Json.JsonException)
+        {
+            MessageBox.Show($"The saved data-collection settings could not be loaded: {exception.Message}\n\nRestore collection-state.json from a valid copy before using automatic downloads.",
+                "Data library settings", MessageBoxButton.OK, MessageBoxImage.Error);
+            await viewModel.ShutdownAsync();
+            Shutdown();
+            return;
+        }
         bool enableAutomation = e.Args.Contains("--automation", StringComparer.OrdinalIgnoreCase);
         // Automation can inspect and configure the OFF workspace without logging in.
         // Starting a data session still uses the normal Robinhood connection flow.
@@ -92,5 +112,6 @@ public partial class App : System.Windows.Application
         MainWindow = mainWindow;
         ShutdownMode = ShutdownMode.OnMainWindowClose;
         mainWindow.Show();
+        viewModel.DataRetention?.Start();
     }
 }

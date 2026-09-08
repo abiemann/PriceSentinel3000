@@ -258,13 +258,13 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
     private static string IdentityKey(HistoricalDatasetInfo item) =>
         JsonSerializer.Serialize(new[] { item.Provider, item.InstrumentId, item.Symbol, item.AdjustmentPolicy, item.AdjustmentBasis, item.SessionBounds });
     private static string RevisionKey(HistoricalDatasetInfo item) =>
-        $"{IdentityKey(item)}|{item.TradingDate:yyyy-MM-dd}|{item.SourceIntervalSeconds}";
+        FormattableString.Invariant($"{IdentityKey(item)}|{item.TradingDate:yyyy-MM-dd}|{item.SourceIntervalSeconds}");
     private static string Hash(HistoricalDataset dataset) => Convert.ToHexStringLower(SHA256.HashData(
         JsonSerializer.SerializeToUtf8Bytes(dataset with { DatasetHash = "" }, JsonOptions)));
     private static string SemanticHash(HistoricalDataset dataset) => Hash(dataset with { FetchedAtUtc = DateTimeOffset.UnixEpoch });
     private static string DailyPath(HistoricalDataset dataset) => Path.Combine(dataset.TradingDate.Year.ToString("0000", CultureInfo.InvariantCulture),
         dataset.TradingDate.ToString("MM - MMMM", CultureInfo.InvariantCulture), dataset.Symbol,
-        $"{dataset.TradingDate:yyyy-MM-dd}.{dataset.SourceIntervalSeconds}s.json");
+        FormattableString.Invariant($"{dataset.TradingDate:yyyy-MM-dd}.{dataset.SourceIntervalSeconds}s.json"));
     private string Resolve(string relative)
     {
         if (Path.IsPathRooted(relative)) throw new InvalidDataException("Library file paths must be relative.");

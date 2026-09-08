@@ -1,81 +1,88 @@
 <Window x:Class="PriceSentinel3000.App.Dialogs.DataRetentionDialog"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        Title="Retain Hi-Res Data"
-        Width="600"
-        SizeToContent="Height"
-        ResizeMode="NoResize"
-        WindowStyle="None"
-        WindowStartupLocation="CenterOwner"
-        ShowInTaskbar="False"
-        FontFamily="Segoe UI"
-        Background="{StaticResource WindowBrush}">
-    <shell:WindowChrome.WindowChrome>
-        <shell:WindowChrome CaptionHeight="36"
-                            CornerRadius="8"
-                            GlassFrameThickness="0"
-                            ResizeBorderThickness="0"
-                            UseAeroCaptionButtons="False" />
-    </shell:WindowChrome.WindowChrome>
-
-    <Border BorderBrush="{StaticResource SubtleBorderBrush}"
-            BorderThickness="1"
-            CornerRadius="8">
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="36" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
-            <Border Background="{StaticResource ChromeSurfaceBrush}"
-                    BorderBrush="{StaticResource ChromeBorderBrush}"
-                    BorderThickness="0,0,0,1"
-                    CornerRadius="8,8,0,0">
-                <Grid>
-                    <TextBlock Margin="14,0,46,0"
-                               VerticalAlignment="Center"
-                               Foreground="{StaticResource SupportingTextBrush}"
-                               FontSize="11"
-                               FontWeight="SemiBold"
-                               Text="TOOLS / RETAIN HI-RES DATA" />
-                    <Button HorizontalAlignment="Right"
-                            Style="{StaticResource CloseTitleBarButtonStyle}"
-                            shell:WindowChrome.IsHitTestVisibleInChrome="True"
-                            Click="CloseButton_Click"
-                            Content="&#xE8BB;"
-                            AutomationProperties.Name="Close Retain Hi-Res Data"
-                            ToolTip="Close" />
-                </Grid>
-            </Border>
-
-            <StackPanel Grid.Row="1" Margin="24">
-                <TextBlock Foreground="{StaticResource PrimaryTextBrush}"
-                           FontSize="24"
-                           FontWeight="Bold"
-                           Text="Retain Hi-Res Data" />
-                <TextBlock Margin="0,8,0,20"
-                           Foreground="{StaticResource SecondaryTextBrush}"
-                           FontSize="13"
-                           TextWrapping="Wrap"
-                           Text="Keep daily high-resolution market history for replay and strategy analysis." />
-                <Border Style="{StaticResource CardStyle}">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource SectionLabelStyle}"
-                                   Text="AUTOMATIC DOWNLOADS: OFF" />
-                        <TextBlock Margin="0,10,0,0"
-                                   Foreground="{StaticResource SecondaryTextBrush}"
-                                   FontSize="13"
-                                   TextWrapping="Wrap"
-                                   Text="Daily collection is not available in this build yet. Stock lists, Robinhood list import, and the download schedule will be configured here when collection is ready." />
-                    </StackPanel>
-                </Border>
-                <Button Margin="0,20,0,0"
-                        MinWidth="100"
-                        HorizontalAlignment="Right"
-                        Style="{StaticResource SecondaryButtonStyle}"
-                        Click="CloseButton_Click"
-                        Content="CLOSE" />
-            </StackPanel>
-        </Grid>
-    </Border>
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+ Title="Retain Hi-Res Data" Width="1080" Height="790" MinWidth="860" MinHeight="620" WindowStyle="None"
+ WindowStartupLocation="CenterOwner" ShowInTaskbar="False" FontFamily="Segoe UI" Background="{StaticResource WindowBrush}" Foreground="{StaticResource PrimaryTextBrush}">
+ <shell:WindowChrome.WindowChrome><shell:WindowChrome CaptionHeight="36" CornerRadius="8" GlassFrameThickness="0" ResizeBorderThickness="6" UseAeroCaptionButtons="False" /></shell:WindowChrome.WindowChrome>
+ <Window.Resources>
+  <Style TargetType="TextBlock"><Setter Property="TextWrapping" Value="Wrap" /><Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}" /></Style>
+  <Style TargetType="TabItem"><Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}" /><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TabItem">
+   <Border x:Name="TabBorder" Background="{StaticResource CardBrush}" Padding="20,12" Margin="0,0,4,0" CornerRadius="6,6,0,0"><ContentPresenter ContentSource="Header" /></Border>
+   <ControlTemplate.Triggers><Trigger Property="IsSelected" Value="True"><Setter Property="Foreground" Value="{StaticResource AccentBrush}" /><Setter TargetName="TabBorder" Property="Background" Value="{StaticResource SuccessSurfaceBrush}" /></Trigger></ControlTemplate.Triggers>
+  </ControlTemplate></Setter.Value></Setter></Style>
+  <Style x:Key="LibraryGrid" TargetType="DataGrid">
+   <Setter Property="Background" Value="{StaticResource WindowBrush}" /><Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" /><Setter Property="RowBackground" Value="{StaticResource CardBrush}" /><Setter Property="AlternatingRowBackground" Value="{StaticResource WindowBrush}" />
+   <Setter Property="BorderBrush" Value="{StaticResource SubtleBorderBrush}" /><Setter Property="GridLinesVisibility" Value="None" /><Setter Property="AutoGenerateColumns" Value="False" /><Setter Property="IsReadOnly" Value="True" /><Setter Property="CanUserAddRows" Value="False" /><Setter Property="HeadersVisibility" Value="Column" /><Setter Property="RowHeight" Value="32" />
+   <Setter Property="ColumnHeaderStyle"><Setter.Value><Style TargetType="DataGridColumnHeader"><Setter Property="Background" Value="{StaticResource HeaderSurfaceBrush}" /><Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}" /><Setter Property="Padding" Value="8" /></Style></Setter.Value></Setter>
+  </Style>
+ </Window.Resources>
+ <Border BorderBrush="{StaticResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8"><Grid>
+  <Grid.RowDefinitions><RowDefinition Height="36" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+  <Border Background="{StaticResource ChromeSurfaceBrush}" CornerRadius="8,8,0,0"><Grid>
+   <TextBlock Margin="14,0,46,0" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold" Text="TOOLS / RETAIN HI-RES DATA" />
+   <Button HorizontalAlignment="Right" Style="{StaticResource CloseTitleBarButtonStyle}" shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="CloseButton_Click" Content="&#xE8BB;" AutomationProperties.Name="Close Retain Hi-Res Data" ToolTip="Close" />
+  </Grid></Border>
+  <StackPanel Grid.Row="1" Margin="24,20,24,16"><TextBlock FontSize="25" FontWeight="Bold" Foreground="{StaticResource PrimaryTextBrush}" Text="Retain Hi-Res Data" />
+   <TextBlock Margin="0,6,0,0" Text="Keep real daily candles for Replay and strategy analysis. Copy a day, ticker, month, or year to share history." />
+   <TextBlock Margin="0,8,0,0" Foreground="{StaticResource AccentBrush}" Text="{Binding SavedSchedule}" />
+  </StackPanel>
+  <TabControl Grid.Row="2" Margin="24,0,24,12" Background="{StaticResource WindowBrush}" BorderBrush="{StaticResource SubtleBorderBrush}">
+   <TabItem Header="EQUITY LISTS"><Grid Margin="16"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="20" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
+     <TextBlock Style="{StaticResource SectionLabelStyle}" Text="YOUR DOWNLOAD LISTS" />
+     <ComboBox Margin="0,10,0,8" Style="{StaticResource InputComboBoxStyle}" ItemsSource="{Binding Lists}" SelectedItem="{Binding SelectedList}" DisplayMemberPath="Name" AutomationProperties.Name="Saved download lists" />
+     <TextBlock Margin="0,0,0,8" FontSize="11" Text="{Binding ListSummary}" />
+     <WrapPanel><Button Style="{StaticResource SecondaryButtonStyle}" Content="NEW LIST" Command="{Binding NewListCommand}" Margin="0,0,8,0" /><Button Style="{StaticResource SecondaryButtonStyle}" Content="REMOVE LIST" Command="{Binding DeleteListCommand}" /></WrapPanel>
+     <TextBlock Margin="0,20,0,5" Text="List name" /><TextBox Style="{StaticResource InputTextBoxStyle}" Text="{Binding ListName, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Download list name" />
+     <CheckBox Margin="0,10,0,14" Style="{StaticResource PaperCheckBoxStyle}" Content="Include this list in downloads" IsChecked="{Binding ListEnabled}" />
+     <TextBlock Text="Add symbols (spaces or commas)" /><TextBox Margin="0,6,0,8" Style="{StaticResource InputTextBoxStyle}" Text="{Binding TickerInput, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Equity symbols to add" />
+     <Button HorizontalAlignment="Left" Style="{StaticResource SecondaryButtonStyle}" Content="ADD EQUITIES" Command="{Binding AddTickersCommand}" />
+     <TextBlock Margin="0,24,0,10" Style="{StaticResource SectionLabelStyle}" Text="IMPORT FROM ROBINHOOD" />
+     <Button HorizontalAlignment="Left" Style="{StaticResource SecondaryButtonStyle}" Content="LOAD ROBINHOOD LISTS" Command="{Binding LoadWatchlistsCommand}" />
+     <ComboBox Margin="0,8,0,8" Style="{StaticResource InputComboBoxStyle}" ItemsSource="{Binding RobinhoodLists}" SelectedItem="{Binding SelectedRobinhoodList}" DisplayMemberPath="Name" AutomationProperties.Name="Robinhood list to import" />
+     <WrapPanel><Button Style="{StaticResource SecondaryButtonStyle}" Content="PREVIEW IMPORT" Command="{Binding ImportWatchlistCommand}" Margin="0,0,8,8" /><Button Style="{StaticResource SecondaryButtonStyle}" Content="REFRESH SOURCE" Command="{Binding RefreshWatchlistCommand}" /></WrapPanel>
+     <TextBlock Margin="0,8,0,0" FontSize="12" Text="Imports create editable local copies. Choose individual equities on the right and save. Refresh previews changes and preserves exclusions." />
+    </StackPanel></ScrollViewer>
+    <Grid Grid.Column="2"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+     <TextBlock Style="{StaticResource SectionLabelStyle}" Text="EQUITIES TO INCLUDE" Margin="0,0,0,10" />
+     <ListBox Grid.Row="1" ItemsSource="{Binding Members}" Background="{StaticResource CardBrush}" BorderBrush="{StaticResource SubtleBorderBrush}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+      <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Padding" Value="8" /></Style></ListBox.ItemContainerStyle>
+      <ListBox.ItemTemplate><DataTemplate><CheckBox Style="{StaticResource PaperCheckBoxStyle}" IsChecked="{Binding IsIncluded}"><StackPanel><TextBlock Foreground="{StaticResource PrimaryTextBrush}" FontWeight="SemiBold" Text="{Binding Symbol}" /><TextBlock FontSize="11" Text="{Binding CompanyName}" /></StackPanel></CheckBox></DataTemplate></ListBox.ItemTemplate>
+     </ListBox>
+     <Button Grid.Row="2" Margin="0,12,0,10" Style="{StaticResource PrimaryButtonStyle}" Content="SAVE LIST" Command="{Binding SaveListCommand}" />
+     <WrapPanel Grid.Row="3"><Button Style="{StaticResource SecondaryButtonStyle}" Content="IMPORT LIST FILE" Click="ImportListFile_Click" Margin="0,0,8,0" /><Button Style="{StaticResource SecondaryButtonStyle}" Content="EXPORT LISTS" Click="ExportLists_Click" /></WrapPanel>
+    </Grid>
+   </Grid></TabItem>
+   <TabItem Header="SCHEDULE &amp; DOWNLOADS"><Grid Margin="16"><Grid.ColumnDefinitions><ColumnDefinition Width="340" /><ColumnDefinition Width="20" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
+     <CheckBox Style="{StaticResource PaperCheckBoxStyle}" Content="Enable automatic daily downloads" IsChecked="{Binding AutomaticDownloadsEnabled}" />
+     <TextBlock Margin="0,16,0,6" Text="Time of day (24-hour HH:mm)" /><TextBox Style="{StaticResource InputTextBoxStyle}" Text="{Binding DailyTime, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Daily download time" />
+     <TextBlock Margin="0,12,0,6" Text="Time zone" /><ComboBox Style="{StaticResource InputComboBoxStyle}" ItemsSource="{Binding TimeZones}" SelectedValuePath="Id" DisplayMemberPath="DisplayName" SelectedValue="{Binding TimeZoneId}" AutomationProperties.Name="Daily download time zone" />
+     <TextBlock Margin="0,12,0,6" Text="Market session" /><ComboBox Style="{StaticResource InputComboBoxStyle}" ItemsSource="{Binding SessionChoices}" SelectedItem="{Binding SessionBounds}" AutomationProperties.Name="Download session coverage" />
+     <TextBlock Margin="0,12,0,6" Text="Library folder" /><TextBox Style="{StaticResource InputTextBoxStyle}" Text="{Binding LibraryRootPath, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Market data library folder" />
+     <Button Margin="0,12,0,8" Style="{StaticResource PrimaryButtonStyle}" Content="SAVE SCHEDULE &amp; FOLDER" Command="{Binding SaveScheduleCommand}" />
+     <TextBlock FontSize="12" Text="Runs while PriceSentinel is open and connected. The saved time zone follows daylight saving time. Missed runs catch up within 7 days. Collection uses the latest session that closed at least 15 minutes ago; an early scheduled time collects the prior session." />
+     <TextBlock Margin="0,16,0,0" FontSize="12" Text="Regular coverage: 9:30–16:00 Eastern (13:00 early close). Extended coverage: 4:00–20:00 Eastern (17:00 early close). Market holidays are skipped." />
+    </StackPanel></ScrollViewer>
+    <Grid Grid.Column="2"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+     <StackPanel><TextBlock Style="{StaticResource SectionLabelStyle}" Text="DOWNLOAD SAVED, INCLUDED EQUITIES" />
+      <Grid Margin="0,10,0,10"><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="12" /><ColumnDefinition /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="From (yyyy-MM-dd)" /><TextBox Margin="0,6,0,0" Style="{StaticResource InputTextBoxStyle}" Text="{Binding FromDate, UpdateSourceTrigger=PropertyChanged}" /></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="Through (yyyy-MM-dd)" /><TextBox Margin="0,6,0,0" Style="{StaticResource InputTextBoxStyle}" Text="{Binding ThroughDate, UpdateSourceTrigger=PropertyChanged}" /></StackPanel></Grid>
+     </StackPanel>
+     <WrapPanel Grid.Row="1"><Button Style="{StaticResource PrimaryButtonStyle}" Content="DOWNLOAD NOW" Command="{Binding DownloadNowCommand}" Margin="0,0,8,8" /><Button Style="{StaticResource SecondaryButtonStyle}" Content="RETRY MISSING" Command="{Binding RetryMissingCommand}" Margin="0,0,8,8" /><Button Style="{StaticResource SecondaryButtonStyle}" Content="CANCEL REQUEST" Command="{Binding CancelDownloadsCommand}" /></WrapPanel>
+     <TextBlock Grid.Row="2" Margin="0,12,0,10" Text="{Binding JobSummary}" />
+     <DataGrid Grid.Row="3" Style="{StaticResource LibraryGrid}" ItemsSource="{Binding Jobs}"><DataGrid.Columns><DataGridTextColumn Header="Equity" Binding="{Binding Symbol}" Width="65" /><DataGridTextColumn Header="Date" Binding="{Binding SessionDate}" Width="95" /><DataGridTextColumn Header="State" Binding="{Binding Status}" Width="85" /><DataGridTextColumn Header="Secs" Binding="{Binding ActualSourceIntervalSeconds}" Width="50" /><DataGridTextColumn Header="Details" Binding="{Binding Error}" Width="*" MinWidth="120" /></DataGrid.Columns></DataGrid>
+    </Grid>
+   </Grid></TabItem>
+   <TabItem Header="LOCAL LIBRARY"><Grid Margin="16"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+    <StackPanel><WrapPanel><Button Style="{StaticResource SecondaryButtonStyle}" Content="RESCAN LIBRARY" Command="{Binding ScanLibraryCommand}" Margin="0,0,8,10" /><Button Style="{StaticResource SecondaryButtonStyle}" Content="OPEN FOLDER" Command="{Binding OpenFolderCommand}" /></WrapPanel><TextBlock Margin="0,0,0,10" Text="Folders: year / 09 - September / TICKER / date.15s.json. Copy files into this library and rescan. Files retain exact prices, timestamps, provenance, coverage and their content hashes." /></StackPanel>
+    <DataGrid Grid.Row="1" Style="{StaticResource LibraryGrid}" ItemsSource="{Binding Datasets}" SelectedItem="{Binding SelectedDataset}"><DataGrid.Columns><DataGridTextColumn Header="Equity" Binding="{Binding Symbol}" Width="70" /><DataGridTextColumn Header="Date" Binding="{Binding TradingDate}" Width="100" /><DataGridTextColumn Header="Seconds" Binding="{Binding SourceIntervalSeconds}" Width="65" /><DataGridCheckBoxColumn Header="Complete" Binding="{Binding Coverage.Complete}" Width="75" /><DataGridTextColumn Header="Candles" Binding="{Binding Coverage.ActualCandleCount}" Width="65" /><DataGridTextColumn Header="Provider" Binding="{Binding Provider}" Width="80" /><DataGridTextColumn Header="Revision hash" Binding="{Binding DatasetHash}" Width="*" /></DataGrid.Columns></DataGrid>
+    <StackPanel Grid.Row="2" Margin="0,14,0,0"><WrapPanel><CheckBox Style="{StaticResource PaperCheckBoxStyle}" Content="Replay from local files only" IsChecked="{Binding ReplayOfflineOnly}" Margin="0,0,20,10" /><CheckBox Style="{StaticResource PaperCheckBoxStyle}" Content="Use latest fetched revision if there is a conflict" IsChecked="{Binding ReplayUseLatestRevision}" /></WrapPanel>
+     <TextBlock Text="Optional Replay dataset hashes (comma-separated). Pins restrict the next Replay to these exact files." /><TextBox Margin="0,6,0,8" Style="{StaticResource InputTextBoxStyle}" Text="{Binding ReplayPinnedHashes, UpdateSourceTrigger=PropertyChanged}" />
+     <WrapPanel><Button Style="{StaticResource SecondaryButtonStyle}" Content="PIN SELECTED FOR REPLAY" Command="{Binding PinDatasetCommand}" Margin="0,0,8,8" /><Button Style="{StaticResource SecondaryButtonStyle}" Content="CLEAR PINS" Command="{Binding ClearPinsCommand}" /></WrapPanel>
+     <TextBlock FontSize="11" Text="Robinhood supplies split-adjusted history without a versioned adjustment basis. Hashes preserve the exact revision used; corrected prices remain separate files. Missing candles or volume are never invented." />
+    </StackPanel>
+   </Grid></TabItem>
+  </TabControl>
+  <Border Grid.Row="3" Background="{StaticResource HeaderSurfaceBrush}" Padding="24,12"><TextBlock Text="{Binding Status}" Foreground="{StaticResource AccentBrush}" FontSize="12" /></Border>
+ </Grid></Border>
 </Window>

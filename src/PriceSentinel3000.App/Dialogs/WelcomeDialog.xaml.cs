@@ -70,6 +70,13 @@ public partial class WelcomeDialog : Window
         DialogResult = false;
     }
 
+    private void Offline_Click(object sender, RoutedEventArgs e)
+    {
+        _isClosing = true;
+        _loginCancellation?.Cancel();
+        DialogResult = true;
+    }
+
     private void CloseButton_Click(object sender, RoutedEventArgs e) =>
         Exit_Click(sender, e);
 

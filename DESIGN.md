@@ -131,39 +131,45 @@ Required warm-up comes from the compiled program and the selected interval,
 within a documented maximum. Insufficient or interrupted history produces a
 visible warming-up HOLD. It does not silently use the Built-In strategy.
 
-## Proposed local market-data library
+## Local market-data library
 
-Preserve genuine fine-resolution history for repeatable Replay and script
-analysis after the provider's availability window expires. This feature is not
-implemented. The current SQLite journal records session observations, but Replay
-still downloads its requested history from Robinhood. A sampled live quote or an
-old row's default 15-second duration is not proof of a finalized 15-second OHLCV
-candle; journal rows cannot be blindly reused as such.
+Implemented September 7, 2026. The [user guide](docs/market-data-library.md) covers setup, scheduling, portable files, offline Replay and MCP access. History is separate from the SQLite journal, credentials and repository research. Sampled quote rows are not treated as finalized historical candles.
 
-Provide an explicit symbol/date download workflow with actual source resolution,
-coverage, and gaps visible before use. A proposed storage location is
-`%LOCALAPPDATA%\PriceSentinel3000\MarketData`, separate from the session journal
-and repository research archives. Preserve exact numeric prices, UTC start/end
-and availability times, volume, provider/instrument identity, adjustment policy,
-fetch time, and dataset hashes/revisions. Deduplicate without silently overwriting
-the dataset pinned by a prior experiment. Validate incomplete or interrupted
-downloads and reject incompatible adjustments or mixed source resolutions.
+### Download lists and daily collection UI
 
-Replay should prefer complete compatible local history for the requested range
-and support offline use. Report missing coverage explicitly before any provider
-backfill; do not silently switch resolution, invent missing prices, or infer the
-sequence of prices within a candle. Aggregate available fine candles upward using
-first open, maximum high, minimum low, last close, and summed volume. Incomplete
-groups must remain gaps rather than apparently complete candles.
+**Tools > Retain Hi-Res Data** opens a reusable modeless window; main trading controls stay available. Its clock reflects saved automatic-download state, not unsaved edits. The three tabs contain editable named equity lists, a global daily schedule and download queue, and local library inspection/Replay selection.
 
-Source resolution and strategy interval remain independent. A one-minute script
-can use one-minute bars aggregated from complete 15-second history while the host
-checks risk at each available source close. Two-minute source data cannot run an
-unchanged one-minute script. Resolution comparisons must hold script source,
-inputs, strategy interval, risk controls, and underlying dataset fixed; changing
-the strategy interval is a separate experiment. Finer observations may reveal
-additional drawdown or different risk exits without improving strategy profits,
-and still cannot reproduce tick-level execution or historical spreads.
+Manual lists accept pasted symbols. Connected resolution validates equities and resolves company names; offline entries remain visibly unresolved until download. Per-member and per-list inclusion control the collection union independently of strategy selection and trade eligibility. Robinhood import retrieves personal lists, validates response completeness, previews individual equity checkboxes, and creates an editable local snapshot. Explicit refresh preserves exclusions and previews membership changes before Save. Portable list exports omit private remote IDs. Removing lists never deletes candles.
+
+The collector persists settings, queued membership and progress atomically in `collection-state.json`. At the user's chosen time and saved zone, it collects the latest selected session finalized at least 15 minutes earlier. It preserves the chosen clock time, follows DST and the exchange holiday/early-close calendar, catches up within seven calendar days after enablement, skips complete saved sessions, and serializes requests with bounded retry. Skipped clock times run at the first valid minute; repeated times run once at the earlier occurrence. Regular coverage is default; extended coverage is explicit. The app must be open and connected. Background calls cannot initiate interactive authorization. Running while the app is closed remains separate future work.
+
+### Portable folder layout
+
+The default root is `%LOCALAPPDATA%\PriceSentinel3000\MarketData`, selectable in the UI:
+
+```text
+MarketData/
+  README.md
+  2026/
+    08 - August/
+      NFLX/
+        2026-08-24.15s.json
+    09 - September/
+      SOXL/
+        2026-09-04.15s.json
+```
+
+Create only needed folders. Month names are invariant English; daily grouping uses America/New_York while candles preserve exact UTC starts, ends and source-close availability. Schema 1 stores self-contained UTF-8 JSON with invariant decimal strings, nullable unknown volume, source/instrument identity, actual interval, adjustment metadata, fetched time, requested/covered ranges, gaps and a canonical full SHA-256 hash. The generated root README documents the schema. Unknown volume does not imply complete OHLCV.
+
+Copies of files or whole folders work without the original journal, sidecars, private list IDs or credentials. Rescans validate content, metadata and full hashes. Atomic writes deduplicate identical data and preserve corrections as `.rev-<hash>.json` revisions. Conflicting revisions require explicit pins or LatestFetched selection. Different providers/instruments/adjustment identities cannot merge implicitly. Robinhood's unversioned split-adjustment basis is disclosed; fetched timestamps are not invented adjustment epochs.
+
+### Replay lookup and script-analysis access
+
+Explicit hashes take precedence and never permit silent substitution. Otherwise Replay checks local 15-second files, then provider 15-second history, local/provider 30-second, local/provider 60-second, and finally actual imported local 120-second data. The adapter has no 120-second request. Provider results are validated and archived before use. Usable sparse local fine data is retained with visible gaps; requesting missing/corrected data is an explicit collection action. Offline mode skips all provider requests, and the welcome screen permits local use without authentication.
+
+One genuine source interval is used per run, with existing strategy-interval compatibility and completed-bar aggregation. Missing price groups remain gaps; no finer prices are synthesized. Exact selected hashes, coverage, resolution and source provenance are retained in journal/MCP results. The read-only `library_datasets` and `library_candles` tools use the same validated reader without an active session or connection; catalog pagination detects changes and candle pages are pinned by immutable hash. No MCP library tool accepts arbitrary filesystem paths.
+
+Deterministic tests cover copying data, UTC/Eastern boundaries, non-Gregorian display cultures, partial coverage, unknown volume, corrupt files, revisions, concurrent writes, schedule recovery, imported exclusions and offline Replay/MCP. Finer source data can change risk exits without improving strategy profits. Empirical resolution comparisons must freeze the script, its interval, risk controls and evaluation period; broader profit research is a separate task.
 
 ## Strategy and host contract
 

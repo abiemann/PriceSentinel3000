@@ -47,7 +47,7 @@ public sealed record ControlOptions(bool Mcp, bool Help, string? PipeName, strin
 
         if (command is not null && command is not
             ("status" or "strategies" or "configure" or "start" or "pause" or "resume" or "step" or "stop" or "run_to_end" or "results" or
-             "candles" or "indicators" or "events" or "capture_chart"))
+             "candles" or "indicators" or "events" or "capture_chart" or "library_datasets" or "library_candles"))
         {
             throw new ArgumentException($"Unknown automation command: {command}");
         }

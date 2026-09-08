@@ -74,7 +74,8 @@ public sealed class ScriptBarSeries
             if (_lastObservation is null ||
                 PriceCandleAggregator.AlignToInterval(_lastObservation.Value, _interval) == start)
                 _formingComplete = at == start;
-            _forming = new(start, start + _interval, quote.Last, quote.Last, quote.Last, quote.Last, 0m);
+            _forming = new(start, start + _interval, quote.Last, quote.Last, quote.Last, quote.Last, 0m,
+                HasKnownVolume: false);
         }
         else
         {
@@ -83,6 +84,7 @@ public sealed class ScriptBarSeries
                 High = Math.Max(_forming.High, quote.Last),
                 Low = Math.Min(_forming.Low, quote.Last),
                 Close = quote.Last,
+                HasKnownVolume = false,
             };
         }
         _lastObservation = at;
@@ -108,7 +110,7 @@ public sealed class ScriptBarSeries
                 ResetCompleted();
             _formingComplete = at == start;
             _forming = new(start, start + _interval, quote.CandleOpen, quote.CandleHigh,
-                quote.CandleLow, quote.CandleClose, quote.Volume);
+                quote.CandleLow, quote.CandleClose, quote.Volume, quote.HasKnownVolume);
         }
         else
         {
@@ -118,6 +120,7 @@ public sealed class ScriptBarSeries
                 Low = Math.Min(_forming.Low, quote.CandleLow),
                 Close = quote.CandleClose,
                 Volume = _forming.Volume + quote.Volume,
+                HasKnownVolume = _forming.HasKnownVolume && quote.HasKnownVolume,
             };
         }
         _nextHistoricalStart = quote.SourceEndsAtUtc;

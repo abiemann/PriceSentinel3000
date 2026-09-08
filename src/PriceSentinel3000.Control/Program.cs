@@ -23,7 +23,7 @@ public static class Program
             {
                 await Console.Error.WriteLineAsync("PriceSentinel3000.Control --mcp [--pipe NAME]\n" +
                     "PriceSentinel3000.Control --command COMMAND [--arguments JSON] [--pipe NAME]\n" +
-                    "Commands: status, list_strategies, configure, start, pause, resume, step, stop, run_to_end, results, candles, indicators, events, capture_chart.\n" +
+                    "Commands: status, list_strategies, configure, start, pause, resume, step, stop, run_to_end, results, candles, indicators, events, capture_chart, library_datasets, library_candles.\n" +
                     "Connects to the visible app started with --automation. Does not launch the app or authenticate a broker.");
                 return 0;
             }

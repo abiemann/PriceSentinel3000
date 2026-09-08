@@ -12,7 +12,8 @@ public sealed record StrategyBar(
     decimal High,
     decimal Low,
     decimal Close,
-    decimal Volume);
+    decimal Volume,
+    bool HasKnownVolume = true);
 
 public sealed record ScriptDiagnostic(int Line, string Message, bool IsError = true);
 

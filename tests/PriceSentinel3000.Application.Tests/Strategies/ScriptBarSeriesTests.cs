@@ -31,6 +31,7 @@ public sealed class ScriptBarSeriesTests
         Assert.Equal(9m, bar.Low);
         Assert.Equal(14m, bar.Close);
         Assert.Equal(30m, bar.Volume);
+        Assert.False(bar.HasKnownVolume); // Live samples cannot complete the historical volume.
         Assert.Equal(1, series.Version);
     }
 
@@ -82,7 +83,26 @@ public sealed class ScriptBarSeriesTests
         Assert.Equal(Start, bar.StartsAtUtc);
         Assert.Equal(Start.AddSeconds(120), bar.EndsAtUtc);
         Assert.Equal((10m, 13m, 8m, 12m, 35m), (bar.Open, bar.High, bar.Low, bar.Close, bar.Volume));
+        Assert.True(bar.HasKnownVolume);
         Assert.Equal(1, series.CompletedBarCount);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(30)]
+    public void OneUnknownSourceVolumeMakesTheEntireStrategyCandleVolumeUnknown(int unknownAt)
+    {
+        var series = new ScriptBarSeries(60, 10);
+        foreach (int second in new[] { 0, 30 })
+            series.ObserveHistoricalBar(History(second, 10, 12, 9, 11) with
+            {
+                SourceIntervalSeconds = 30, Volume = second == unknownAt ? 0m : 50m,
+                HasKnownVolume = second != unknownAt,
+            });
+
+        StrategyBar bar = Assert.Single(series.Snapshot());
+        Assert.False(bar.HasKnownVolume);
+        Assert.Equal((10m, 12m, 9m, 11m), (bar.Open, bar.High, bar.Low, bar.Close));
     }
 
     [Fact]
@@ -152,6 +172,7 @@ public sealed class ScriptBarSeriesTests
         Assert.Equal(10m, bar.Open);
         Assert.Equal(11m, bar.High);
         Assert.Equal(11m, bar.Close);
+        Assert.False(bar.HasKnownVolume);
         Assert.Equal(bar, Assert.Single(series.Snapshot()));
         Assert.Equal(1, series.Version);
     }
