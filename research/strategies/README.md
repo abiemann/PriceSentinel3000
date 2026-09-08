@@ -15,6 +15,13 @@ The application build copies it to `Strategies/OriginalConfirmation.thinkscript`
 moving the repository source does not change installed strategy IDs or contents.
 The other profiles are research versions and may differ from newer local scripts.
 
+The top-level profiles and original example declare
+`# PriceSentinel: tested-candle-seconds=60`, their reference tested strategy
+interval. This is separate from the source data resolution. See the
+[interval metadata guide](../../docs/strategy-scripting.md#tested-candle-interval)
+for selection and override behavior. The frozen trial scripts in `candidates`
+retain their original bytes; their test configuration stays in the study records.
+
 To use a stock profile, copy its `.thinkscript` file directly into
 `%LOCALAPPDATA%\PriceSentinel3000\Strategies`, then refresh and select it in the app.
 The app does not scan nested folders. Use the stock/fund ticker in the filename
@@ -27,6 +34,9 @@ dotnet run --project research/strategies/validation/StrategyExamples.csproj
 ```
 
 Names, source hashes, session IDs, and observed results in historical evidence
-describe the original runs. Source files were relocated without changing their
-bytes. Manifest file paths point to the new locations; older recorded manifest
-hashes refer to the versions captured at those experiments' commits.
+describe the original runs. Relocation preserved source bytes; subsequent
+interval annotations change active files' hashes without changing their rules.
+Use the sources pinned in the recorded sessions or experiment commits when
+reproducing historical hashes. Manifest file paths point to the new locations;
+older recorded manifest hashes refer to the versions captured at those
+experiments' commits.

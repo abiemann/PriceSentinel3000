@@ -1,3 +1,4 @@
+# PriceSentinel: tested-candle-seconds=60
 # Original PriceSentinel research candidate C1, declared 2026-09-06.
 # EMA8/21 pullback recovery with RSI7 entry50/exit50, matching NFLX logic.
 # Completed one-minute candles. Host controls all execution and risk limits.

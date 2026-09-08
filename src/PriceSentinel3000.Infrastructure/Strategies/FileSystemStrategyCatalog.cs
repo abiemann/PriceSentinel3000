@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using PriceSentinel3000.Application.Strategies;
 using PriceSentinel3000.Core.Scripting;
 using PriceSentinel3000.Infrastructure.Storage;
@@ -15,6 +16,10 @@ public sealed class FileSystemStrategyCatalog : IStrategyCatalog
     private static readonly UTF8Encoding Utf8 = new(false, true);
     private static readonly HashSet<string> Extensions =
         new([".thinkscript", ".ts", ".txt"], StringComparer.OrdinalIgnoreCase);
+    private static readonly Regex TestedIntervalComment = new(
+        @"^\s*(?:#|//)\s*PriceSentinel\s*:\s*tested-candle-seconds\b(.*)$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    private static readonly Regex TestedIntervalValue = new(@"^\s*=\s*(15|30|60|120|300)\s*$");
     private readonly object _gate = new();
     private readonly string? _seedDirectory;
     private Dictionary<string, PinnedStrategy> _pinned = new(StringComparer.OrdinalIgnoreCase);
@@ -119,8 +124,8 @@ public sealed class FileSystemStrategyCatalog : IStrategyCatalog
         {
             byte[] bytes = ReadSourceBytes(path);
             string source = Utf8.GetString(bytes);
-            CompiledThinkScript program = ThinkScriptCompiler.Compile(
-                source.StartsWith('\uFEFF') ? source[1..] : source);
+            string compilerSource = source.StartsWith('\uFEFF') ? source[1..] : source;
+            CompiledThinkScript program = ThinkScriptCompiler.Compile(compilerSource);
             foreach (ScriptDiagnostic diagnostic in program.Diagnostics)
             {
                 diagnostics.Add(new(fileName, diagnostic.Message, diagnostic.Line, diagnostic.IsError));
@@ -141,7 +146,10 @@ public sealed class FileSystemStrategyCatalog : IStrategyCatalog
                 },
                 fileName,
                 Convert.ToHexStringLower(SHA256.HashData(bytes)),
-                ThinkScriptCompiler.RuntimeVersion);
+                ThinkScriptCompiler.RuntimeVersion)
+            {
+                TestedCandleIntervalSeconds = ReadTestedInterval(compilerSource, fileName, diagnostics),
+            };
             if (entries.Any(entry => string.Equals(
                     entry.Descriptor.Id, descriptor.Id, StringComparison.OrdinalIgnoreCase)))
             {
@@ -156,6 +164,45 @@ public sealed class FileSystemStrategyCatalog : IStrategyCatalog
         {
             diagnostics.Add(new(fileName, exception.Message));
         }
+    }
+
+    private static int? ReadTestedInterval(
+        string source,
+        string fileName,
+        ICollection<StrategyCatalogDiagnostic> diagnostics)
+    {
+        int? declarationLine = null;
+        int? interval = null;
+        using var reader = new StringReader(source);
+        for (int lineNumber = 1; reader.ReadLine() is { } line; lineNumber++)
+        {
+            Match declaration = TestedIntervalComment.Match(line);
+            if (!declaration.Success)
+            {
+                continue;
+            }
+
+            if (declarationLine.HasValue)
+            {
+                diagnostics.Add(new(fileName,
+                    "Tested candle interval is not specified because this file has multiple PriceSentinel tested-candle-seconds declarations. Keep exactly one declaration.",
+                    lineNumber, IsError: false));
+                return null;
+            }
+
+            declarationLine = lineNumber;
+            Match value = TestedIntervalValue.Match(declaration.Groups[1].Value);
+            interval = value.Success ? int.Parse(value.Groups[1].Value) : null;
+        }
+
+        if (declarationLine.HasValue && !interval.HasValue)
+        {
+            diagnostics.Add(new(fileName,
+                "Tested candle interval is not specified because its declaration is invalid. Use '# PriceSentinel: tested-candle-seconds=60' with 15, 30, 60, 120, or 300 seconds.",
+                declarationLine, IsError: false));
+        }
+
+        return interval;
     }
 
     private void SeedSample(ICollection<StrategyCatalogDiagnostic> diagnostics)

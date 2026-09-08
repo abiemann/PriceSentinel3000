@@ -600,6 +600,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
                 OnPropertyChanged(nameof(PrimaryActionLabel));
                 OnPropertyChanged(nameof(SecondaryActionLabel));
                 OnPropertyChanged(nameof(IsSessionConfigurationEditable));
+                NotifyTestedScriptInterval();
                 StartSessionCommand.RaiseCanExecuteChanged();
                 StopSessionCommand.RaiseCanExecuteChanged();
             }
@@ -1100,6 +1101,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
     {
         _isStartingSession = value;
         OnPropertyChanged(nameof(IsSessionConfigurationEditable));
+        NotifyTestedScriptInterval();
         StartSessionCommand.RaiseCanExecuteChanged();
         StopSessionCommand.RaiseCanExecuteChanged();
     }

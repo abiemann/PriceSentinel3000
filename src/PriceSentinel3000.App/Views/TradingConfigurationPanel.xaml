@@ -85,7 +85,8 @@
                                   Style="{StaticResource InputComboBoxStyle}"
                                   ItemsSource="{Binding AvailableStrategies}"
                                   DisplayMemberPath="Name" SelectedValuePath="Id"
-                                  SelectedValue="{Binding SelectedStrategyId, Mode=TwoWay}"
+                                  SelectedItem="{Binding SelectedStrategy, Mode=OneWay}"
+                                  SelectionChanged="StrategySelector_SelectionChanged"
                                   DropDownOpened="StrategySelector_DropDownOpened"
                                   ToolTip="Shared by Paper, LIVE, and Replay. Copy a compatible thinkScript strategy into the scripts folder." />
                         <Grid Margin="0,10,0,0">
@@ -101,11 +102,27 @@
                         </Grid>
                         <StackPanel Margin="0,12,0,0" IsEnabled="{Binding IsExternalStrategySelected}">
                             <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Script candle interval" />
-                            <ComboBox ItemsSource="{Binding ScriptBarIntervalOptions}"
+                            <ComboBox x:Name="ScriptBarIntervalSelector" ItemsSource="{Binding ScriptBarIntervalOptions}"
                                       Style="{StaticResource InputComboBoxStyle}"
                                       DisplayMemberPath="Label" SelectedValuePath="Value"
                                       SelectedValue="{Binding ScriptBarIntervalSeconds, Mode=TwoWay}"
                                       ToolTip="Scripts evaluate completed price candles. This interval is independent of the chart display." />
+                            <TextBlock x:Name="TestedScriptIntervalText" Text="{Binding TestedScriptIntervalLabel}"
+                                       TextWrapping="Wrap" Margin="0,6,0,0" FontSize="11" Foreground="#AFC5DE"
+                                       ToolTip="Declared in the script's PriceSentinel metadata. Selecting a script applies this interval; changing the chart interval does not change it." />
+                            <TextBlock x:Name="ScriptIntervalWarningText" Text="{Binding ScriptIntervalWarning}"
+                                       TextWrapping="Wrap" Margin="0,6,0,0" FontSize="11" Foreground="#FFCA80">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasScriptIntervalMismatch}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                         </StackPanel>
                         <TextBlock Text="{Binding ScriptDiagnostics}" TextWrapping="Wrap" Margin="0,8,0,0"
                                    FontSize="11" Foreground="#FFCA80" MaxHeight="150">

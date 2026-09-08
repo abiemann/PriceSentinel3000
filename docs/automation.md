@@ -80,6 +80,15 @@ The pipe protocol uses `strategies` internally; the command line accepts
 rejected. The complete candidate configuration is validated before applying
 settings. Strategy compatibility is rechecked when starting the actual session.
 
+Strategy descriptors include nullable `testedCandleIntervalSeconds` from the
+script's [interval metadata](strategy-scripting.md#tested-candle-interval).
+When `configure` selects a different annotated script and omits
+`scriptBarIntervalSeconds`, it applies the declared interval. An explicit interval
+overrides that default; keeping the same script preserves the current interval.
+`status` reports `testedCandleIntervalSeconds` and `scriptIntervalWarning` for
+Paper/Replay configuration. Session provenance records both the tested and actual
+candle intervals. A mismatch warns without blocking a deliberate experiment.
+
 `start` and `resume` accept Replay-only options:
 
 - `pauseAfterObservations`: positive number of **additional** source observations.

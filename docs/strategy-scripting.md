@@ -18,6 +18,22 @@ Edit numeric `input` defaults in the source file to change parameters. Boolean d
 
 Refresh reads and compiles source without evaluating it. A session pins the compiled program, exact source, SHA-256 hash, runtime version, and defaults. Source changes on disk cannot change a running session. An unavailable or incompatible selected file blocks starting that selection. LIVE asks for approval of the selected file version and candle interval. Session provenance records those choices.
 
+## Tested candle interval
+
+A script can declare the candle interval used for its reference tests with one standalone comment:
+
+```thinkscript
+# PriceSentinel: tested-candle-seconds=60
+```
+
+This is optional PriceSentinel metadata, not a native thinkScript directive. It is an ordinary comment in thinkorswim. Supported values are 15, 30, 60, 120, and 300 seconds; whitespace and letter case are ignored, and `//` comments are also accepted. Use one declaration per file. Unsupported, malformed, or duplicate declarations produce a note and leave the tested interval unspecified without excluding otherwise compatible scripts.
+
+Choosing a different annotated script automatically selects its tested interval. The strategy panel displays **Tested interval: 1 minute**, for example. A manual override remains available and displays **This changes the strategy's behavior; previous test results may not apply.** Refreshing the catalog or reopening the app preserves the saved interval and shows any mismatch. Scripts without metadata show **Tested interval not specified.** Chart display timing remains independent, and metadata never changes an active or paused session.
+
+The annotation records the author's reference test configuration, not automatic verification or a claim of profitability. A script may have other interval comparison experiments. Recheck the annotation when changing its rules or inputs. Session provenance and MCP retain the declared interval alongside the actual selected interval and exact source hash. Adding the comment changes that hash, even though the executable rules are unchanged.
+
+Fifteen-second source history can supply one-minute strategy candles through aggregation. Source resolution does not determine the tested interval, and the annotation cannot create finer data or bypass source compatibility checks.
+
 ## Data and order timing
 
 Periods count **completed strategy candles**, not calendar days. Select 15, 30, 60, 120, or 300 seconds; the default is 60 seconds. Paper/LIVE warm-start candles are aggregated from available consecutive 15-second historical OHLC observations. Subsequent candles use sampled live quote prices, so their highs and lows describe observed samples and may differ from a venue's full trade feed.

@@ -182,9 +182,18 @@ public sealed partial class MainViewModel
         }
         TradingSessionSettings candidate = merged.Deserialize<TradingSessionSettings>(AutomationProtocol.JsonOptions)!;
         candidate = candidate with { Symbol = candidate.Symbol.Trim().ToUpperInvariant() };
+        PinnedStrategy candidateStrategy = _strategyCatalog.GetPinned(candidate.StrategyId);
+        // Match the selector's default for a newly chosen script. Explicit intervals
+        // remain overrides, including configurations used to reproduce past research.
+        if (candidate.StrategyId != SelectedStrategyId && arguments.Settings is { } strategyPatch &&
+            !strategyPatch.TryGetProperty("scriptBarIntervalSeconds", out _) &&
+            candidateStrategy.Descriptor.TestedCandleIntervalSeconds is { } testedSeconds)
+        {
+            candidate = candidate with { ScriptBarIntervalSeconds = testedSeconds };
+        }
         IReadOnlyList<string> errors = TradingSessionSettingsValidator.Validate(candidate);
         if (errors.Count > 0) return AutomationResponse.Fail("invalid_configuration", string.Join(" ", errors));
-        ValidateAutomationStrategy(candidate);
+        ValidateAutomationStrategy(candidate, candidateStrategy);
 
         // Validate the complete candidate before any setters or preference writes run.
         _applyingAutomationConfiguration = true;
@@ -206,6 +215,7 @@ public sealed partial class MainViewModel
             BufferMinutes = candidate.BufferMinutes;
             QuotePollingSeconds = candidate.QuotePollingSeconds;
             SelectedStrategyId = candidate.StrategyId;
+            SynchronizeStrategyDescriptor(candidateStrategy.Descriptor);
             ScriptBarIntervalSeconds = candidate.ScriptBarIntervalSeconds;
             ChartCandleIntervalSeconds = candidate.ChartCandleIntervalSeconds;
             ReconciliationSeconds = candidate.ReconciliationSeconds;
@@ -222,9 +232,9 @@ public sealed partial class MainViewModel
         return AutomationResponse.Ok(AutomationStatus());
     }
 
-    private void ValidateAutomationStrategy(TradingSessionSettings settings)
+    private void ValidateAutomationStrategy(TradingSessionSettings settings, PinnedStrategy? pinned = null)
     {
-        PinnedStrategy pinned = _strategyCatalog.GetPinned(settings.StrategyId);
+        pinned ??= _strategyCatalog.GetPinned(settings.StrategyId);
         if (pinned.Program is not null &&
             (long)(pinned.Program.RequiredWarmupBars + 2) * settings.ScriptBarIntervalSeconds > 86_400)
             throw new ArgumentException("The selected script requires more than 24 hours of warm-up.");
@@ -331,6 +341,8 @@ public sealed partial class MainViewModel
         fast = _replaySessionRunner.Fast,
         settings = CreateSettings(),
         strategy = HasAutomationLiveContext ? null : _pinnedStrategy?.Descriptor,
+        testedCandleIntervalSeconds = HasAutomationLiveContext ? (int?)null : TestedScriptIntervalSeconds,
+        scriptIntervalWarning = HasAutomationLiveContext ? null : ScriptIntervalWarning,
         replayHistory = HasAutomationLiveContext || _automationOperationId.HasValue && !_automationOperationSessionId.HasValue
             ? null : AutomationReplayHistory,
         message = HasAutomationLiveContext ? "LIVE cannot be controlled by automation." : StatusMessage,

@@ -1,3 +1,4 @@
+# PriceSentinel: tested-candle-seconds=60
 # NVIDIA (NVDA) Confirmation - experimental; research profile, 2026-09-06.
 # Original PriceSentinel EMA8/EMA21/RSI7 trend and pullback logic.
 # Selected only on September 2 and 3, 2026: highest summed development P&L

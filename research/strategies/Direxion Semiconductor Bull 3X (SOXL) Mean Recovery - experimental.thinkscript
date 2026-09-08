@@ -1,3 +1,4 @@
+# PriceSentinel: tested-candle-seconds=60
 # Original PriceSentinel research candidate R1, declared 2026-09-06.
 # Enter RSI7 recovery through 35 while price remains below SMA20.
 # Exit on recovery to SMA20 or renewed RSI weakness below 25.

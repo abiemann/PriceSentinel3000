@@ -48,6 +48,8 @@ See the [user guide](docs/market-data-library.md) and [design](DESIGN.md#local-m
 
 The current development build offers **Built-In** and compatible folder-based thinkScript strategies in one selector for Paper, LIVE, and Replay. It pins source and parameters per session, enforces bounded interpretation, preserves host risk controls, and packages one original example. See [DESIGN.md](DESIGN.md) and the [compatibility guide](docs/strategy-scripting.md).
 
+- [x] Read optional tested-interval comments, select the declared interval when choosing a script, show unspecified/mismatch guidance, and retain declared and actual intervals in session/MCP provenance. Refresh and app startup preserve saved overrides; active sessions keep their pinned configuration.
+
 - Eventually port the existing compiled strategy to the script interface while preserving its behavior through recorded regression fixtures. Keep **Built-In** available until that parity is demonstrated.
 - Extend thinkScript compatibility only with documented semantics and unchanged-source fixtures. Prioritize features needed by a small number of useful strategies; do not silently approximate unsupported trading rules.
 - Add reliable volume and explicit data availability before admitting volume-dependent strategies. Add secondary timeframes only with completed-bar timing and repainting tests.

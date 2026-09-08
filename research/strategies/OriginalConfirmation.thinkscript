@@ -1,3 +1,4 @@
+# PriceSentinel: tested-candle-seconds=60
 # OriginalConfirmation - PriceSentinel3000 original example, 2026-09-05.
 # Educational long-only trend/pullback strategy; no profitability claim.
 # PriceSentinel evaluates this on completed one-minute bars.

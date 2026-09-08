@@ -1,3 +1,4 @@
+# PriceSentinel: tested-candle-seconds=60
 # Original PriceSentinel research candidate B1, declared 2026-09-06.
 # Enter a fresh close breakout above the previous 20 highs, above EMA21.
 # Exit below the previous 10 lows or EMA21. No current-bar channel leakage.

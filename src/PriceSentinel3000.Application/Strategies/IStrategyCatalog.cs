@@ -14,6 +14,8 @@ public sealed record StrategyDescriptor(
         new(BuiltInId, "Built-In", null, null, "price-action-v1");
 
     public bool IsBuiltIn => Id == BuiltInId;
+
+    public int? TestedCandleIntervalSeconds { get; init; }
 }
 
 public sealed record StrategyCatalogDiagnostic(

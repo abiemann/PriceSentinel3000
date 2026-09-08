@@ -66,6 +66,100 @@ public sealed class FileSystemStrategyCatalogTests : IDisposable
         Assert.Equal(Convert.ToHexStringLower(SHA256.HashData(bytes)), pinned.Descriptor.SourceSha256);
     }
 
+    [Theory]
+    [InlineData("# PriceSentinel: tested-candle-seconds=15", 15)]
+    [InlineData("# PriceSentinel: tested-candle-seconds=30", 30)]
+    [InlineData("# PriceSentinel: tested-candle-seconds=60", 60)]
+    [InlineData("# PriceSentinel: tested-candle-seconds=120", 120)]
+    [InlineData("# PriceSentinel: tested-candle-seconds=300", 300)]
+    [InlineData("  #  pRiCeSeNtInEl : TESTED-CANDLE-SECONDS = 60  ", 60)]
+    [InlineData("// PriceSentinel: tested-candle-seconds=120", 120)]
+    [InlineData("\uFEFF# PriceSentinel: tested-candle-seconds=60", 60)]
+    public void TestedIntervalMetadataPreservesCompatibleSourceAndRawByteHash(string comment, int seconds)
+    {
+        string source = comment + "\r\n" + Source;
+        Write("Metadata.ts", source);
+
+        PinnedStrategy pinned = new FileSystemStrategyCatalog(Scripts).GetPinned("script:metadata.ts");
+
+        Assert.Equal(seconds, pinned.Descriptor.TestedCandleIntervalSeconds);
+        Assert.Equal(source, pinned.Source);
+        Assert.Equal(Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(source))),
+            pinned.Descriptor.SourceSha256);
+        Assert.True(pinned.Program!.IsCompatible);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("# Use completed one-minute candles; requires an 85-bar warmup.\n")]
+    [InlineData("# An example: PriceSentinel: tested-candle-seconds=60\n")]
+    [InlineData("# tested-candle-seconds=60\n")]
+    [InlineData("# OtherApp: tested-candle-seconds=60\n")]
+    public void MissingMetadataAndOrdinaryCommentsLeaveTestedIntervalUnspecified(string prefix)
+    {
+        Write("Unspecified.ts", prefix + Source);
+
+        StrategyCatalogSnapshot snapshot = new FileSystemStrategyCatalog(Scripts).Load();
+
+        Assert.All(snapshot.Strategies, descriptor => Assert.Null(descriptor.TestedCandleIntervalSeconds));
+        Assert.DoesNotContain(snapshot.Diagnostics,
+            diagnostic => diagnostic.Message.StartsWith("Tested candle interval", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void MetadataTextInsideCodeStringsAndTrailingCommentsIsIgnored()
+    {
+        Write("Code.ts", "AddOrder(OrderType.BUY_TO_OPEN, close > close[1], name = \"# PriceSentinel: tested-candle-seconds=60\");\n"
+            + "AddOrder(OrderType.SELL_TO_CLOSE, close < close[1]); # PriceSentinel: tested-candle-seconds=120\n");
+
+        StrategyCatalogSnapshot snapshot = new FileSystemStrategyCatalog(Scripts).Load();
+
+        Assert.Null(Assert.Single(snapshot.Strategies, descriptor => !descriptor.IsBuiltIn).TestedCandleIntervalSeconds);
+        Assert.DoesNotContain(snapshot.Diagnostics,
+            diagnostic => diagnostic.Message.StartsWith("Tested candle interval", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("# PriceSentinel: tested-candle-seconds=10")]
+    [InlineData("# PriceSentinel: tested-candle-seconds=one minute")]
+    [InlineData("# PriceSentinel: tested-candle-seconds=")]
+    [InlineData("# PriceSentinel: tested-candle-seconds 60")]
+    [InlineData("# PriceSentinel: tested-candle-seconds=60 trailing prose")]
+    [InlineData("# PriceSentinel: tested-candle-seconds=60; def ignored = 1;")]
+    public void InvalidMetadataWarnsWithoutExcludingCompatibleScript(string comment)
+    {
+        Write("InvalidMetadata.ts", "# Header\n" + comment + "\n" + Source);
+
+        StrategyCatalogSnapshot snapshot = new FileSystemStrategyCatalog(Scripts).Load();
+
+        Assert.Null(Assert.Single(snapshot.Strategies, descriptor => !descriptor.IsBuiltIn).TestedCandleIntervalSeconds);
+        StrategyCatalogDiagnostic warning = Assert.Single(snapshot.Diagnostics,
+            diagnostic => diagnostic.Message.StartsWith("Tested candle interval", StringComparison.Ordinal));
+        Assert.Equal("InvalidMetadata.ts", warning.FileName);
+        Assert.Equal(2, warning.Line);
+        Assert.False(warning.IsError);
+    }
+
+    [Theory]
+    [InlineData("60", "60")]
+    [InlineData("60", "120")]
+    [InlineData("invalid", "60")]
+    [InlineData("60", "invalid")]
+    public void DuplicateDeclarationsWarnAndNeverChooseOne(string first, string second)
+    {
+        Write("DuplicateMetadata.ts", $"# PriceSentinel: tested-candle-seconds={first}\n"
+            + $"// pricesentinel: tested-candle-seconds={second}\n" + Source);
+
+        StrategyCatalogSnapshot snapshot = new FileSystemStrategyCatalog(Scripts).Load();
+
+        Assert.Null(Assert.Single(snapshot.Strategies, descriptor => !descriptor.IsBuiltIn).TestedCandleIntervalSeconds);
+        StrategyCatalogDiagnostic warning = Assert.Single(snapshot.Diagnostics,
+            diagnostic => diagnostic.Message.StartsWith("Tested candle interval", StringComparison.Ordinal));
+        Assert.Contains("multiple", warning.Message);
+        Assert.Equal(2, warning.Line);
+        Assert.False(warning.IsError);
+    }
+
     [Fact]
     public void PinnedSourceSurvivesEditsWhileNextPinRevalidatesCurrentFile()
     {

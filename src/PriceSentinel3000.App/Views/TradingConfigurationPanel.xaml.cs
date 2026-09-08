@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using PriceSentinel3000.App.ViewModels;
+using PriceSentinel3000.Application.Strategies;
 
 namespace PriceSentinel3000.App.Views;
 
@@ -38,6 +39,15 @@ public partial class TradingConfigurationPanel : UserControl
 
     private void StrategySelector_DropDownOpened(object? sender, EventArgs e) =>
         (DataContext as MainViewModel)?.RefreshScripts();
+
+    private void StrategySelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // An ItemsSource refresh briefly clears selection. Only propagate a real
+        // item so that transient null cannot replace the persisted strategy.
+        if (DataContext is MainViewModel viewModel &&
+            StrategySelector.SelectedItem is StrategyDescriptor selected)
+            viewModel.SelectedStrategyId = selected.Id;
+    }
 
     private bool CommitInputs()
     {

@@ -1,3 +1,4 @@
+# PriceSentinel: tested-candle-seconds=60
 # NFLXConfirmation - experimental research profile, 2026-09-06.
 # Original PriceSentinel logic; derived from our OriginalConfirmation example.
 # Hypothesis: RSI7 falling below 50 exits weakening momentum earlier than 45.

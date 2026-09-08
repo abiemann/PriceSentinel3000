@@ -168,6 +168,10 @@ to evaluate its pinned rules once per newly completed strategy candle after
 warmup. The chart candle interval controls the display; a script's separate
 candle interval controls its calculations.
 
+Scripts can declare a [tested candle interval](docs/strategy-scripting.md#tested-candle-interval).
+Selecting an annotated script applies that interval and displays it beside the
+setting. Overrides show a warning; scripts without metadata are labeled unspecified.
+
 What happens after a decision depends on the operating mode:
 
 - [`PaperTradingEngine`](src/PriceSentinel3000.Core/PaperTrading/PaperTradingEngine.cs)
