@@ -8,7 +8,7 @@
             BorderThickness="0,0,0,1">
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="326" />
+                <ColumnDefinition Width="338" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>

@@ -20,7 +20,7 @@ public sealed class DownloadMemberViewModel(DownloadListMember member) : INotify
 }
 
 /// <summary>The editable UI is separate from the saved collection plan used by background jobs.</summary>
-public sealed class DataRetentionViewModel : INotifyPropertyChanged, IAsyncDisposable
+public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAsyncDisposable
 {
     private readonly IPersonalWatchlistSource _watchlists;
     private readonly IEquityCatalogSource _equities;
@@ -33,6 +33,7 @@ public sealed class DataRetentionViewModel : INotifyPropertyChanged, IAsyncDispo
     private readonly CancellationTokenSource _lifetime = new();
     private CancellationTokenSource? _downloadCancellation;
     private Task? _pollTask;
+    private int _refreshQueued;
     private bool _busy;
     private bool _disposed;
     private string _status = "Choose a list, then save the equities to collect. Existing history is kept when lists change.";
@@ -57,7 +58,7 @@ public sealed class DataRetentionViewModel : INotifyPropertyChanged, IAsyncDispo
         IPersonalWatchlistSource watchlists, IEquityCatalogSource equities,
         Func<string, IMarketDataLibrary> libraryFactory, Func<CancellationToken, Task> connect,
         Func<bool> isConnected, Dispatcher? dispatcher = null,
-        Func<CancellationToken, Task>? reconnect = null)
+        Func<CancellationToken, Task>? reconnect = null, TimeProvider? clock = null)
     {
         Collector = collector;
         Provider = provider;
@@ -68,6 +69,7 @@ public sealed class DataRetentionViewModel : INotifyPropertyChanged, IAsyncDispo
         _reconnect = reconnect ?? connect;
         _isConnected = isConnected;
         _dispatcher = dispatcher ?? Dispatcher.CurrentDispatcher;
+        _clock = clock ?? TimeProvider.System;
         CollectionSettings settings = collector.State.Settings;
         _libraryRoot = settings.LibraryRootPath;
         _automatic = settings.AutomaticDownloadsEnabled;
@@ -86,21 +88,33 @@ public sealed class DataRetentionViewModel : INotifyPropertyChanged, IAsyncDispo
         {
             using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
             _downloadCancellation = cancellation;
+            _connecting = true;
+            RefreshState();
             try { await _reconnect(cancellation.Token); Status = "Robinhood connected. Queued downloads can continue."; }
-            finally { _downloadCancellation = null; }
+            finally { _connecting = false; _downloadCancellation = null; RefreshState(); }
         });
         ImportWatchlistCommand = Command(() => PreviewWatchlistAsync(false));
         RefreshWatchlistCommand = Command(() => PreviewWatchlistAsync(true));
         SaveScheduleCommand = Command(SaveScheduleAsync);
-        DownloadNowCommand = Command(DownloadNowAsync);
-        RetryMissingCommand = Command(async () => { await Collector.RetryMissingAsync(cancellationToken: _lifetime.Token); await RunDownloadsAsync(); });
+        SetThroughDateToNowCommand = new RelayCommand(() => ThroughDate =
+            TimeZoneInfo.ConvertTime(_clock.GetUtcNow(), TimeZoneInfo.FindSystemTimeZoneById(TimeZoneId))
+                .ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+        DownloadNowCommand = Command(DownloadNowAsync, () => !_downloadsPaused);
+        RetryMissingCommand = Command(async () => { await Collector.RetryMissingAsync(cancellationToken: _lifetime.Token); await RunDownloadsAsync(); },
+            () => !_downloadsPaused);
         ScanLibraryCommand = Command(ScanLibraryAsync);
         PinDatasetCommand = new RelayCommand(() => { if (SelectedDataset is { } d) ReplayPinnedHashes = d.DatasetHash; });
         ClearPinsCommand = new RelayCommand(() => ReplayPinnedHashes = "");
         OpenFolderCommand = Command(() => { string root = Collector.State.Settings.LibraryRootPath; Directory.CreateDirectory(root); Process.Start(new ProcessStartInfo(root) { UseShellExecute = true }); return Task.CompletedTask; });
-        CancelDownloadsCommand = new RelayCommand(() => _downloadCancellation?.Cancel());
+        CancelDownloadsCommand = new RelayCommand(() => _downloadCancellation?.Cancel(),
+            () => !_disposed && _downloadCancellation is { IsCancellationRequested: false });
+        PauseDownloadsCommand = new AsyncRelayCommand(ToggleDownloadPauseAsync, CanToggleDownloadPause,
+            () => !_downloadsPaused && _downloadCancellation is { IsCancellationRequested: false });
         _timer = new DispatcherTimer(TimeSpan.FromSeconds(30), DispatcherPriority.Background, OnTimerTick, _dispatcher);
         _timer.Stop();
+        _progressTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background,
+            (_, _) => RefreshDownloadPresentation(), _dispatcher);
+        _progressTimer.Stop();
         Collector.StateChanged += OnCollectorChanged;
         RefreshState();
     }
@@ -112,7 +126,7 @@ public sealed class DataRetentionViewModel : INotifyPropertyChanged, IAsyncDispo
     public ObservableCollection<DownloadList> Lists { get; } = [];
     public ObservableCollection<DownloadMemberViewModel> Members { get; } = [];
     public ObservableCollection<PersonalWatchlist> RobinhoodLists { get; } = [];
-    public ObservableCollection<CollectionJob> Jobs { get; } = [];
+    public ObservableCollection<DownloadJobViewModel> Jobs { get; } = [];
     public ObservableCollection<HistoricalDatasetInfo> Datasets { get; } = [];
     public IReadOnlyList<TimeZoneInfo> TimeZones { get; } = TimeZoneInfo.GetSystemTimeZones();
     public IReadOnlyList<string> SessionChoices { get; } = ["regular", "extended"];
@@ -124,23 +138,23 @@ public sealed class DataRetentionViewModel : INotifyPropertyChanged, IAsyncDispo
     public string ListName { get => _listName; set { _listName = value; Changed(); } }
     public bool ListEnabled { get => _listEnabled; set { _listEnabled = value; Changed(); } }
     public string TickerInput { get => _tickerInput; set { _tickerInput = value; Changed(); } }
-    public string LibraryRootPath { get => _libraryRoot; set { _libraryRoot = value; Changed(); } }
-    public bool AutomaticDownloadsEnabled { get => _automatic; set { _automatic = value; Changed(); } }
+    public string LibraryRootPath { get => _libraryRoot; set { _libraryRoot = value; Changed(); ScheduleDraftChanged(); } }
+    public bool AutomaticDownloadsEnabled { get => _automatic; set { _automatic = value; Changed(); ScheduleDraftChanged(); } }
     public bool SavedAutomaticDownloadsEnabled => Collector.State.Settings.AutomaticDownloadsEnabled;
-    public string DailyTime { get => _dailyTime; set { _dailyTime = value; Changed(); } }
-    public string TimeZoneId { get => _timeZone; set { _timeZone = value; Changed(); } }
-    public string SessionBounds { get => _bounds; set { _bounds = value; Changed(); } }
+    public string DailyTime { get => _dailyTime; set { _dailyTime = value; Changed(); ScheduleDraftChanged(); } }
+    public string TimeZoneId { get => _timeZone; set { _timeZone = value; Changed(); ScheduleDraftChanged(); } }
+    public string SessionBounds { get => _bounds; set { _bounds = value; Changed(); ScheduleDraftChanged(); } }
     public string FromDate { get => _from; set { _from = value; Changed(); } }
     public string ThroughDate { get => _through; set { _through = value; Changed(); } }
     public bool ReplayOfflineOnly { get => _replayOffline; set { _replayOffline = value; Changed(); } }
     public bool ReplayUseLatestRevision { get => _replayLatest; set { _replayLatest = value; Changed(); } }
     public string ReplayPinnedHashes { get => _replayPins; set { _replayPins = value; Changed(); } }
-    public bool IsBusy => _busy || Collector.IsBusy || _pollTask is { IsCompleted: false };
+    public bool IsBusy => _busy || Collector.IsBusy || _downloadCancellation is not null || _pollTask is { IsCompleted: false };
     public string Status { get => _status; private set { _status = value; Changed(); } }
     public string SavedSchedule => SavedAutomaticDownloadsEnabled
         ? $"Automatic downloads enabled: {Collector.State.Settings.DailyDownloadTime:HH:mm} · {Collector.State.Settings.TimeZoneId}. Keep this app open and connected."
         : "Automatic downloads are off. Manual downloads remain available.";
-    public string JobSummary => $"{Jobs.Count(j => j.Status == CollectionJobStatus.Complete)} complete · {Jobs.Count(j => j.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading)} queued / downloading · {Jobs.Count(j => j.Status is CollectionJobStatus.Partial or CollectionJobStatus.Unavailable or CollectionJobStatus.Failed)} need attention";
+    public string JobSummary => $"Retained queue: {DownloadProcessed}/{DownloadTotal} checked · {Jobs.Count(j => j.Status == CollectionJobStatus.Complete)} complete · {Jobs.Count(j => j.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading)} remaining · {Jobs.Count(j => j.Status is CollectionJobStatus.Partial or CollectionJobStatus.Unavailable or CollectionJobStatus.Failed)} need attention";
     public string ContinuityWarnings
     {
         get
@@ -163,6 +177,7 @@ public sealed class DataRetentionViewModel : INotifyPropertyChanged, IAsyncDispo
     public AsyncRelayCommand ImportWatchlistCommand { get; }
     public AsyncRelayCommand RefreshWatchlistCommand { get; }
     public AsyncRelayCommand SaveScheduleCommand { get; }
+    public RelayCommand SetThroughDateToNowCommand { get; }
     public AsyncRelayCommand DownloadNowCommand { get; }
     public AsyncRelayCommand RetryMissingCommand { get; }
     public AsyncRelayCommand ScanLibraryCommand { get; }
@@ -172,7 +187,7 @@ public sealed class DataRetentionViewModel : INotifyPropertyChanged, IAsyncDispo
     public RelayCommand CancelDownloadsCommand { get; }
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public void Start() { _timer.Start(); OnTimerTick(null, EventArgs.Empty); }
+    public void Start() { _started = true; _progressTimer.Start(); OnTimerTick(null, EventArgs.Empty); }
 
     public void NewList()
     {
@@ -299,8 +314,11 @@ public sealed class DataRetentionViewModel : INotifyPropertyChanged, IAsyncDispo
 
     private async Task RunDownloadsAsync()
     {
+        _downloadsPaused = false;
         await PollAsync(connect: true);
-        Status = "Collection updated. Remaining queued work continues while the app is open and connected.";
+        Status = DownloadProcessed == DownloadTotal
+            ? "Queue checked. See the download status for complete files and any dates that need attention."
+            : "Batch checked. The download status shows when queued work will continue.";
     }
 
     public async Task ScanLibraryAsync()
@@ -330,12 +348,7 @@ public sealed class DataRetentionViewModel : INotifyPropertyChanged, IAsyncDispo
 
     private async void OnTimerTick(object? sender, EventArgs e)
     {
-        if (_disposed || IsBusy) return;
-        _pollTask = PollAsync();
-        try { await _pollTask; }
-        catch (OperationCanceledException) { }
-        catch (Exception exception) { Status = $"Collection needs attention: {exception.Message}"; }
-        finally { RefreshState(); }
+        await CheckDownloadsAsync();
     }
 
     private async Task PollAsync(bool connect = false)
@@ -343,39 +356,63 @@ public sealed class DataRetentionViewModel : INotifyPropertyChanged, IAsyncDispo
         if (_downloadCancellation is not null) return;
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         _downloadCancellation = cancellation;
+        _collectionError = null;
         try
         {
-            if (connect) await PrepareConnectionAsync(cancellation.Token);
+            if (connect)
+            {
+                _connecting = true;
+                RefreshState();
+                try { await PrepareConnectionAsync(cancellation.Token); }
+                finally { _connecting = false; RefreshState(); }
+            }
             await Collector.TickAsync(_isConnected(), cancellation.Token);
         }
-        finally { _downloadCancellation = null; RefreshState(); }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _collectionError = exception.Message;
+            throw;
+        }
+        finally { _downloadCancellation = null; ScheduleNextDownloadCheck(); RefreshState(); }
     }
 
     private void OnCollectorChanged(object? sender, EventArgs e)
     {
-        if (!_disposed) _dispatcher.BeginInvoke(RefreshState);
+        if (_disposed || Interlocked.Exchange(ref _refreshQueued, 1) != 0) return;
+        _dispatcher.BeginInvoke(() =>
+        {
+            Interlocked.Exchange(ref _refreshQueued, 0);
+            if (!_disposed) RefreshState();
+        });
     }
 
     private void RefreshState()
     {
-        Jobs.Clear();
-        foreach (CollectionJob job in Collector.State.Jobs.OrderByDescending(j => j.QueuedAtUtc)) Jobs.Add(job);
+        RefreshJobRows();
         Changed(nameof(SavedAutomaticDownloadsEnabled)); Changed(nameof(SavedSchedule)); Changed(nameof(JobSummary)); Changed(nameof(ContinuityWarnings)); Changed(nameof(IsBusy));
+        ScheduleDraftChanged();
+        RefreshDownloadPresentation();
+        Changed(nameof(CanEditPlan));
+        CancelDownloadsCommand?.RaiseCanExecuteChanged();
+        PauseDownloadsCommand?.RaiseCanExecuteChanged();
         NewListCommand?.RaiseCanExecuteChanged();
         foreach (AsyncRelayCommand command in Commands()) command?.RaiseCanExecuteChanged();
     }
 
     private AsyncRelayCommand[] Commands() => [SaveListCommand, DeleteListCommand, AddTickersCommand,
         LoadWatchlistsCommand, ReconnectCommand, ImportWatchlistCommand, RefreshWatchlistCommand, SaveScheduleCommand,
-        DownloadNowCommand, RetryMissingCommand, ScanLibraryCommand, OpenFolderCommand];
-    private AsyncRelayCommand Command(Func<Task> action) => new(() => ExecuteAsync(action), () => !IsBusy && !_disposed);
+        DownloadNowCommand, RetryMissingCommand, ScanLibraryCommand, OpenFolderCommand, PauseDownloadsCommand];
+    private AsyncRelayCommand Command(Func<Task> action, Func<bool>? canExecute = null) =>
+        new(() => ExecuteAsync(action), () => !IsBusy && !_disposed && (canExecute?.Invoke() ?? true));
     public async Task ExecuteAsync(Func<Task> action)
     {
-        if (_busy || _disposed) return;
+        if (IsBusy || _disposed) return;
         _busy = true;
         RefreshState();
         try { await action(); }
-        catch (OperationCanceledException) { Status = "Current request cancelled. Pending work is retained and retries while the app remains open and connected."; }
+        catch (OperationCanceledException) { Status = _downloadsPaused
+            ? "Current request cancelled; downloads are paused. Saved files and queued work are kept. Choose Resume downloads to continue."
+            : "Current request cancelled. Pending work is retained and retries at the next queue check."; }
         catch (Exception exception) { Status = exception.Message; }
         finally { _busy = false; RefreshState(); }
     }
@@ -385,6 +422,7 @@ public sealed class DataRetentionViewModel : INotifyPropertyChanged, IAsyncDispo
         if (_disposed) return;
         _disposed = true;
         _timer.Stop();
+        _progressTimer.Stop();
         Collector.StateChanged -= OnCollectorChanged;
         await _lifetime.CancelAsync();
         Task[] active = Commands().Select(c => c.ExecutionTask).Append(_pollTask).OfType<Task>().ToArray();

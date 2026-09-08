@@ -13,9 +13,21 @@ public partial class DataRetentionDialog : Window
         InitializeComponent();
     }
 
+    private void BrowseLibraryFolder_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not DataRetentionViewModel viewModel) return;
+        var picker = new OpenFolderDialog
+        {
+            Title = "Choose a market data library folder",
+            InitialDirectory = Directory.Exists(viewModel.LibraryRootPath) ? viewModel.LibraryRootPath : "",
+        };
+        if (picker.ShowDialog(this) == true)
+            viewModel.LibraryRootPath = picker.FolderName;
+    }
+
     private async void ImportListFile_Click(object sender, RoutedEventArgs e)
     {
-        if (DataContext is not DataRetentionViewModel viewModel || viewModel.IsBusy) return;
+        if (DataContext is not DataRetentionViewModel { CanEditPlan: true } viewModel) return;
         var picker = new OpenFileDialog { Filter = "Download lists (*.json)|*.json" };
         if (picker.ShowDialog(this) == true)
             await viewModel.ExecuteAsync(async () =>
@@ -27,7 +39,7 @@ public partial class DataRetentionDialog : Window
 
     private async void ExportLists_Click(object sender, RoutedEventArgs e)
     {
-        if (DataContext is not DataRetentionViewModel viewModel || viewModel.IsBusy) return;
+        if (DataContext is not DataRetentionViewModel { CanEditPlan: true } viewModel) return;
         var picker = new SaveFileDialog { Filter = "Download lists (*.json)|*.json", FileName = "download-lists.json" };
         if (picker.ShowDialog(this) == true)
             await viewModel.ExecuteAsync(() => File.WriteAllTextAsync(picker.FileName, viewModel.ExportLists()));

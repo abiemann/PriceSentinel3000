@@ -6,6 +6,12 @@
  <shell:WindowChrome.WindowChrome><shell:WindowChrome CaptionHeight="36" CornerRadius="8" GlassFrameThickness="0" ResizeBorderThickness="6" UseAeroCaptionButtons="False" /></shell:WindowChrome.WindowChrome>
  <Window.Resources>
   <Style TargetType="TextBlock"><Setter Property="TextWrapping" Value="Wrap" /><Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}" /></Style>
+  <BooleanToVisibilityConverter x:Key="BooleanVisibility" />
+  <Style x:Key="DownloadStateText" TargetType="TextBlock">
+   <Setter Property="Foreground" Value="{StaticResource AccentBrush}" /><Setter Property="FontSize" Value="17" /><Setter Property="FontWeight" Value="SemiBold" />
+   <Style.Triggers><DataTrigger Binding="{Binding DownloadState}" Value="Attention"><Setter Property="Foreground" Value="#E8AB4D" /></DataTrigger><DataTrigger Binding="{Binding DownloadState}" Value="Paused"><Setter Property="Foreground" Value="#E8AB4D" /></DataTrigger><DataTrigger Binding="{Binding DownloadState}" Value="Idle"><Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" /></DataTrigger></Style.Triggers>
+  </Style>
+  <Style x:Key="DownloadCell" TargetType="TextBlock"><Setter Property="TextWrapping" Value="NoWrap" /><Setter Property="TextTrimming" Value="CharacterEllipsis" /><Setter Property="VerticalAlignment" Value="Center" /><Setter Property="ToolTip" Value="{Binding DetailsText}" /></Style>
   <Style TargetType="TabItem"><Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}" /><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TabItem">
    <Border x:Name="TabBorder" Background="{StaticResource CardBrush}" Padding="20,12" Margin="0,0,4,0" CornerRadius="6,6,0,0"><ContentPresenter ContentSource="Header" /></Border>
    <ControlTemplate.Triggers><Trigger Property="IsSelected" Value="True"><Setter Property="Foreground" Value="{StaticResource AccentBrush}" /><Setter TargetName="TabBorder" Property="Background" Value="{StaticResource SuccessSurfaceBrush}" /></Trigger></ControlTemplate.Triggers>
@@ -17,16 +23,25 @@
   </Style>
  </Window.Resources>
  <Border BorderBrush="{StaticResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8"><Grid>
-  <Grid.RowDefinitions><RowDefinition Height="36" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+  <Grid.RowDefinitions><RowDefinition Height="36" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
   <Border Background="{StaticResource ChromeSurfaceBrush}" CornerRadius="8,8,0,0"><Grid>
    <TextBlock Margin="14,0,46,0" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold" Text="TOOLS / RETAIN HI-RES DATA" />
    <Button HorizontalAlignment="Right" Style="{StaticResource CloseTitleBarButtonStyle}" shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="CloseButton_Click" Content="&#xE8BB;" AutomationProperties.Name="Close Retain Hi-Res Data" ToolTip="Close" />
   </Grid></Border>
-  <StackPanel Grid.Row="1" Margin="24,20,24,16"><TextBlock FontSize="25" FontWeight="Bold" Foreground="{StaticResource PrimaryTextBrush}" Text="Retain Hi-Res Data" />
-   <TextBlock Margin="0,6,0,0" Text="Keep real daily candles for Replay and strategy analysis. Copy a day, ticker, month, or year to share history." />
-   <TextBlock Margin="0,8,0,0" Foreground="{StaticResource AccentBrush}" Text="{Binding SavedSchedule}" />
+  <StackPanel Grid.Row="1" Margin="24,12,24,12"><TextBlock FontSize="25" FontWeight="Bold" Foreground="{StaticResource PrimaryTextBrush}" Text="Retain Hi-Res Data" />
+   <TextBlock Margin="0,4,0,0" FontSize="12"><Run FontWeight="SemiBold" Text="Saved schedule: " /><Run Text="{Binding SavedSchedule, Mode=OneWay}" /></TextBlock>
   </StackPanel>
-  <TabControl Grid.Row="2" Margin="24,0,24,12" Background="{StaticResource WindowBrush}" BorderBrush="{StaticResource SubtleBorderBrush}">
+  <Border x:Name="DownloadActivityCard" Grid.Row="2" Margin="24,0,24,12" Padding="14,10" Background="{StaticResource CardBrush}" BorderBrush="{StaticResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="8" AutomationProperties.Name="Download activity">
+   <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="170" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+    <StackPanel><TextBlock x:Name="DownloadActivityHeading" Style="{StaticResource DownloadStateText}" Text="{Binding DownloadHeading}" AutomationProperties.LiveSetting="Polite" /><TextBlock x:Name="DownloadActivityDetail" FontSize="12" Margin="0,3,0,0" Text="{Binding DownloadDetail}" /></StackPanel>
+    <Button x:Name="PauseDownloadsButton" Grid.Column="2" VerticalAlignment="Top" Content="{Binding PauseDownloadsLabel}" Command="{Binding PauseDownloadsCommand}" AutomationProperties.Name="{Binding PauseDownloadsLabel}" ToolTip="Pause the queue until you choose Resume. Saved candles are preserved."><Button.Style><Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}"><Style.Triggers><DataTrigger Binding="{Binding IsConnecting}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></Button.Style></Button>
+    <Button x:Name="CancelConnectionButton" Grid.Column="2" VerticalAlignment="Top" Style="{StaticResource SecondaryButtonStyle}" Content="CANCEL CONNECTION" Command="{Binding CancelDownloadsCommand}" Visibility="{Binding IsConnecting, Converter={StaticResource BooleanVisibility}}" ToolTip="Cancel the current Robinhood connection request." />
+    <Grid Grid.Row="1" Grid.ColumnSpan="3" Margin="0,8,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="2*" /><ColumnDefinition Width="12" /><ColumnDefinition Width="5*" /></Grid.ColumnDefinitions><ProgressBar x:Name="DownloadProgress" Height="6" Minimum="0" Maximum="100" Value="{Binding DownloadProgressPercent, Mode=OneWay}" Foreground="{StaticResource AccentBrush}" Background="{StaticResource WindowBrush}" VerticalAlignment="Center" AutomationProperties.Name="Download jobs checked" AutomationProperties.HelpText="{Binding JobSummary}" /><TextBlock Grid.Column="2" FontSize="11" Text="{Binding JobSummary}" /></Grid>
+    <TextBlock x:Name="DownloadActivityTiming" Grid.Row="2" Grid.ColumnSpan="3" Margin="0,5,0,0" FontSize="11" Text="{Binding DownloadTiming}" />
+    <TextBlock x:Name="DownloadInteractionGuidance" Grid.Row="3" Grid.ColumnSpan="3" Margin="0,4,0,0" FontSize="11" Text="{Binding DownloadInteractionHint}" />
+   </Grid>
+  </Border>
+  <TabControl x:Name="RetentionTabs" Grid.Row="3" Margin="24,0,24,12" Background="{StaticResource WindowBrush}" BorderBrush="{StaticResource SubtleBorderBrush}">
    <TabItem Header="EQUITY LISTS"><Grid Margin="16"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="20" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
      <TextBlock Style="{StaticResource SectionLabelStyle}" Text="YOUR DOWNLOAD LISTS" />
@@ -40,7 +55,7 @@
      <TextBlock Margin="0,24,0,10" Style="{StaticResource SectionLabelStyle}" Text="IMPORT FROM ROBINHOOD" />
      <Button HorizontalAlignment="Left" Style="{StaticResource SecondaryButtonStyle}" Content="LOAD ROBINHOOD LISTS" Command="{Binding LoadWatchlistsCommand}" />
      <ComboBox Margin="0,8,0,8" Style="{StaticResource InputComboBoxStyle}" ItemsSource="{Binding RobinhoodLists}" SelectedItem="{Binding SelectedRobinhoodList}" DisplayMemberPath="Name" AutomationProperties.Name="Robinhood list to import" />
-     <WrapPanel><Button Style="{StaticResource SecondaryButtonStyle}" Content="PREVIEW IMPORT" Command="{Binding ImportWatchlistCommand}" Margin="0,0,8,8" /><Button Style="{StaticResource SecondaryButtonStyle}" Content="REFRESH SOURCE" Command="{Binding RefreshWatchlistCommand}" /></WrapPanel>
+     <WrapPanel><Button Style="{StaticResource SecondaryButtonStyle}" Content="PREVIEW IMPORT" Command="{Binding ImportWatchlistCommand}" Margin="0,0,8,8" /><Button Style="{StaticResource SecondaryButtonStyle}" Content="REFRESH SOURCE" Command="{Binding RefreshWatchlistCommand}" Margin="0,0,0,8" /></WrapPanel>
      <TextBlock Margin="0,8,0,0" FontSize="12" Text="Imports create editable local copies. Choose individual equities on the right and save. Refresh previews changes and preserves exclusions." />
     </StackPanel></ScrollViewer>
     <Grid Grid.Column="2"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
@@ -50,41 +65,52 @@
       <ListBox.ItemTemplate><DataTemplate><CheckBox Style="{StaticResource PaperCheckBoxStyle}" IsChecked="{Binding IsIncluded}"><StackPanel><TextBlock Foreground="{StaticResource PrimaryTextBrush}" FontWeight="SemiBold" Text="{Binding Symbol}" /><TextBlock FontSize="11" Text="{Binding CompanyName}" /></StackPanel></CheckBox></DataTemplate></ListBox.ItemTemplate>
      </ListBox>
      <Button Grid.Row="2" Margin="0,12,0,10" Style="{StaticResource PrimaryButtonStyle}" Content="SAVE LIST" Command="{Binding SaveListCommand}" />
-     <WrapPanel Grid.Row="3"><Button Style="{StaticResource SecondaryButtonStyle}" Content="IMPORT LIST FILE" Click="ImportListFile_Click" Margin="0,0,8,0" /><Button Style="{StaticResource SecondaryButtonStyle}" Content="EXPORT LISTS" Click="ExportLists_Click" /></WrapPanel>
+     <WrapPanel Grid.Row="3"><Button Style="{StaticResource SecondaryButtonStyle}" Content="IMPORT LIST FILE" Click="ImportListFile_Click" IsEnabled="{Binding CanEditPlan}" Margin="0,0,8,0" /><Button Style="{StaticResource SecondaryButtonStyle}" Content="EXPORT LISTS" Click="ExportLists_Click" IsEnabled="{Binding CanEditPlan}" /></WrapPanel>
     </Grid>
    </Grid></TabItem>
-   <TabItem Header="SCHEDULE &amp; DOWNLOADS"><Grid Margin="16"><Grid.ColumnDefinitions><ColumnDefinition Width="340" /><ColumnDefinition Width="20" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+   <TabItem x:Name="ScheduleDownloadsTab" Header="SCHEDULE &amp; DOWNLOADS"><Grid Margin="12"><Grid.ColumnDefinitions><ColumnDefinition Width="3*" MinWidth="230" /><ColumnDefinition Width="20" /><ColumnDefinition Width="5*" /></Grid.ColumnDefinitions>
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
      <CheckBox Style="{StaticResource PaperCheckBoxStyle}" Content="Enable automatic daily downloads" IsChecked="{Binding AutomaticDownloadsEnabled}" />
+     <TextBlock x:Name="UnsavedScheduleWarning" Margin="0,8,0,0" FontSize="12" Foreground="#E8AB4D" Text="{Binding ScheduleChangesText}" Visibility="{Binding HasScheduleChanges, Converter={StaticResource BooleanVisibility}}" AutomationProperties.LiveSetting="Polite" />
      <Button Margin="0,12,0,0" HorizontalAlignment="Left" Style="{StaticResource SecondaryButtonStyle}" Content="RECONNECT ROBINHOOD" Command="{Binding ReconnectCommand}" ToolTip="Renew authorization while trading and downloads are idle" />
      <TextBlock Margin="0,16,0,6" Text="Time of day (24-hour HH:mm)" /><TextBox Style="{StaticResource InputTextBoxStyle}" Text="{Binding DailyTime, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Daily download time" />
      <TextBlock Margin="0,12,0,6" Text="Time zone" /><ComboBox Style="{StaticResource InputComboBoxStyle}" ItemsSource="{Binding TimeZones}" SelectedValuePath="Id" DisplayMemberPath="DisplayName" SelectedValue="{Binding TimeZoneId}" AutomationProperties.Name="Daily download time zone" />
      <TextBlock Margin="0,12,0,6" Text="Market session" /><ComboBox Style="{StaticResource InputComboBoxStyle}" ItemsSource="{Binding SessionChoices}" SelectedItem="{Binding SessionBounds}" AutomationProperties.Name="Download session coverage" />
-     <TextBlock Margin="0,12,0,6" Text="Library folder" /><TextBox Style="{StaticResource InputTextBoxStyle}" Text="{Binding LibraryRootPath, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Market data library folder" />
+     <TextBlock Margin="0,12,0,6" Text="Library folder" />
+     <Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+      <TextBox Style="{StaticResource InputTextBoxStyle}" Text="{Binding LibraryRootPath, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Market data library folder" />
+      <Button Grid.Column="1" Width="36" Height="36" Margin="8,0,0,0" Padding="0" Style="{StaticResource SecondaryButtonStyle}" Content="..." Click="BrowseLibraryFolder_Click" ToolTip="Browse for a market data library folder" AutomationProperties.Name="Browse for market data library folder" />
+     </Grid>
      <Button Margin="0,12,0,8" Style="{StaticResource PrimaryButtonStyle}" Content="SAVE SCHEDULE &amp; FOLDER" Command="{Binding SaveScheduleCommand}" />
      <TextBlock FontSize="12" Text="Runs while PriceSentinel is open and connected. Each run checks saved 15-second coverage per equity and retries recent missing sessions. Older gaps remain visible. Collection uses the latest session that closed at least 15 minutes ago; an early scheduled time collects the prior session." />
      <TextBlock Margin="0,16,0,0" FontSize="12" Text="Regular coverage: 9:30–16:00 Eastern (13:00 early close). Extended coverage: 4:00–20:00 Eastern (17:00 early close). Market holidays are skipped." />
      <TextBlock Margin="0,16,0,0" FontSize="12" Foreground="{StaticResource AccentBrush}" Text="{Binding ContinuityWarnings}" />
     </StackPanel></ScrollViewer>
-    <Grid Grid.Column="2"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+    <Grid Grid.Column="2"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
      <StackPanel><TextBlock Style="{StaticResource SectionLabelStyle}" Text="DOWNLOAD SAVED, INCLUDED EQUITIES" />
-      <Grid Margin="0,10,0,10"><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="12" /><ColumnDefinition /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="From (yyyy-MM-dd)" /><TextBox Margin="0,6,0,0" Style="{StaticResource InputTextBoxStyle}" Text="{Binding FromDate, UpdateSourceTrigger=PropertyChanged}" /></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="Through (yyyy-MM-dd)" /><TextBox Margin="0,6,0,0" Style="{StaticResource InputTextBoxStyle}" Text="{Binding ThroughDate, UpdateSourceTrigger=PropertyChanged}" /></StackPanel></Grid>
+      <Grid Margin="0,6,0,6"><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="12" /><ColumnDefinition /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="From (yyyy-MM-dd)" /><TextBox Height="32" Margin="0,4,0,0" Style="{StaticResource InputTextBoxStyle}" Text="{Binding FromDate, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Download from date" /></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="Through (yyyy-MM-dd)" />
+       <Grid Margin="0,4,0,0"><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+        <TextBox Height="32" Style="{StaticResource InputTextBoxStyle}" Text="{Binding ThroughDate, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Download through date" />
+        <Button Grid.Column="1" Height="32" Margin="8,0,0,0" Padding="10,4" Style="{StaticResource SecondaryButtonStyle}" Content="NOW" Command="{Binding SetThroughDateToNowCommand}" ToolTip="Set Through to today's date in the selected time zone" AutomationProperties.Name="Set download through date to today" />
+       </Grid>
+      </StackPanel></Grid>
      </StackPanel>
-     <WrapPanel Grid.Row="1"><Button Style="{StaticResource PrimaryButtonStyle}" Content="DOWNLOAD NOW" Command="{Binding DownloadNowCommand}" Margin="0,0,8,8" /><Button Style="{StaticResource SecondaryButtonStyle}" Content="RETRY MISSING" Command="{Binding RetryMissingCommand}" Margin="0,0,8,8" /><Button Style="{StaticResource SecondaryButtonStyle}" Content="CANCEL REQUEST" Command="{Binding CancelDownloadsCommand}" /></WrapPanel>
-     <TextBlock Grid.Row="2" Margin="0,12,0,10" Text="{Binding JobSummary}" />
-     <DataGrid Grid.Row="3" Style="{StaticResource LibraryGrid}" ItemsSource="{Binding Jobs}"><DataGrid.Columns><DataGridTextColumn Header="Equity" Binding="{Binding Symbol}" Width="65" /><DataGridTextColumn Header="Date" Binding="{Binding SessionDate}" Width="95" /><DataGridTextColumn Header="State" Binding="{Binding Status}" Width="85" /><DataGridTextColumn Header="Secs" Binding="{Binding ActualSourceIntervalSeconds}" Width="50" /><DataGridTextColumn Header="Details" Binding="{Binding Error}" Width="*" MinWidth="120" /></DataGrid.Columns></DataGrid>
+     <WrapPanel Grid.Row="1"><Button Height="32" Style="{StaticResource PrimaryButtonStyle}" Content="DOWNLOAD NOW" Command="{Binding DownloadNowCommand}" Margin="0,0,8,8" /><Button Height="32" Style="{StaticResource SecondaryButtonStyle}" Content="RETRY MISSING" Command="{Binding RetryMissingCommand}" Margin="0,0,0,8" /></WrapPanel>
+     <DataGrid x:Name="DownloadJobsGrid" Grid.Row="2" Style="{StaticResource LibraryGrid}" ItemsSource="{Binding Jobs}" EnableRowVirtualization="True" EnableColumnVirtualization="True" AutomationProperties.Name="Download queue">
+      <DataGrid.Columns><DataGridTextColumn Header="Equity" Binding="{Binding Symbol}" Width="58" ElementStyle="{StaticResource DownloadCell}" /><DataGridTextColumn Header="Date" Binding="{Binding SessionDate, StringFormat=yyyy-MM-dd}" Width="87" ElementStyle="{StaticResource DownloadCell}" /><DataGridTextColumn Header="State" Binding="{Binding StateText}" Width="92" ElementStyle="{StaticResource DownloadCell}" /><DataGridTextColumn Header="Secs" Binding="{Binding ActualSourceIntervalSeconds}" Width="40" ElementStyle="{StaticResource DownloadCell}" /><DataGridTextColumn Header="Details" Binding="{Binding DetailsText}" Width="*" MinWidth="100" ElementStyle="{StaticResource DownloadCell}" /></DataGrid.Columns>
+     </DataGrid>
     </Grid>
    </Grid></TabItem>
    <TabItem Header="LOCAL LIBRARY"><Grid Margin="16"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-    <StackPanel><WrapPanel><Button Style="{StaticResource SecondaryButtonStyle}" Content="RESCAN LIBRARY" Command="{Binding ScanLibraryCommand}" Margin="0,0,8,10" /><Button Style="{StaticResource SecondaryButtonStyle}" Content="OPEN FOLDER" Command="{Binding OpenFolderCommand}" /></WrapPanel><TextBlock Margin="0,0,0,10" Text="Folders: year / 09 - September / TICKER / date.15s.json. Copy files into this library and rescan. Files retain exact prices, timestamps, provenance, coverage and their content hashes." /></StackPanel>
+    <StackPanel><WrapPanel><Button Style="{StaticResource SecondaryButtonStyle}" Content="RESCAN LIBRARY" Command="{Binding ScanLibraryCommand}" Margin="0,0,8,10" /><Button Style="{StaticResource SecondaryButtonStyle}" Content="OPEN FOLDER" Command="{Binding OpenFolderCommand}" Margin="0,0,0,10" /></WrapPanel><TextBlock Margin="0,0,0,10" Text="Folders: year / 09 - September / TICKER / date.15s.json. Copy files into this library and rescan. Files retain exact prices, timestamps, provenance, coverage and their content hashes." /></StackPanel>
     <DataGrid Grid.Row="1" Style="{StaticResource LibraryGrid}" ItemsSource="{Binding Datasets}" SelectedItem="{Binding SelectedDataset}"><DataGrid.Columns><DataGridTextColumn Header="Equity" Binding="{Binding Symbol}" Width="70" /><DataGridTextColumn Header="Date" Binding="{Binding TradingDate}" Width="100" /><DataGridTextColumn Header="Seconds" Binding="{Binding SourceIntervalSeconds}" Width="65" /><DataGridCheckBoxColumn Header="Complete" Binding="{Binding Coverage.Complete}" Width="75" /><DataGridTextColumn Header="Candles" Binding="{Binding Coverage.ActualCandleCount}" Width="65" /><DataGridTextColumn Header="Provider" Binding="{Binding Provider}" Width="80" /><DataGridTextColumn Header="Revision hash" Binding="{Binding DatasetHash}" Width="*" /></DataGrid.Columns></DataGrid>
-    <StackPanel Grid.Row="2" Margin="0,14,0,0"><WrapPanel><CheckBox Style="{StaticResource PaperCheckBoxStyle}" Content="Replay from local files only" IsChecked="{Binding ReplayOfflineOnly}" Margin="0,0,20,10" /><CheckBox Style="{StaticResource PaperCheckBoxStyle}" Content="Use latest fetched revision if there is a conflict" IsChecked="{Binding ReplayUseLatestRevision}" /></WrapPanel>
+    <StackPanel Grid.Row="2" Margin="0,14,0,0"><WrapPanel><CheckBox Style="{StaticResource PaperCheckBoxStyle}" Content="Replay from local files only" IsChecked="{Binding ReplayOfflineOnly}" Margin="0,0,20,10" /><CheckBox Style="{StaticResource PaperCheckBoxStyle}" Content="Use latest fetched revision if there is a conflict" IsChecked="{Binding ReplayUseLatestRevision}" Margin="0,0,0,10" /></WrapPanel>
      <TextBlock Text="Optional Replay dataset hashes (comma-separated). Pins restrict the next Replay to these exact files." /><TextBox Margin="0,6,0,8" Style="{StaticResource InputTextBoxStyle}" Text="{Binding ReplayPinnedHashes, UpdateSourceTrigger=PropertyChanged}" />
-     <WrapPanel><Button Style="{StaticResource SecondaryButtonStyle}" Content="PIN SELECTED FOR REPLAY" Command="{Binding PinDatasetCommand}" Margin="0,0,8,8" /><Button Style="{StaticResource SecondaryButtonStyle}" Content="CLEAR PINS" Command="{Binding ClearPinsCommand}" /></WrapPanel>
+     <WrapPanel><Button Style="{StaticResource SecondaryButtonStyle}" Content="PIN SELECTED FOR REPLAY" Command="{Binding PinDatasetCommand}" Margin="0,0,8,8" /><Button Style="{StaticResource SecondaryButtonStyle}" Content="CLEAR PINS" Command="{Binding ClearPinsCommand}" Margin="0,0,0,8" /></WrapPanel>
      <TextBlock FontSize="11" Text="Robinhood supplies split-adjusted history without a versioned adjustment basis. Hashes preserve the exact revision used; corrected prices remain separate files. Missing candles or volume are never invented." />
     </StackPanel>
    </Grid></TabItem>
   </TabControl>
-  <Border Grid.Row="3" Background="{StaticResource HeaderSurfaceBrush}" Padding="24,12"><TextBlock Text="{Binding Status}" Foreground="{StaticResource AccentBrush}" FontSize="12" /></Border>
+  <Border Grid.Row="4" Background="{StaticResource HeaderSurfaceBrush}" Padding="24,8"><TextBlock Text="{Binding Status}" Foreground="{StaticResource AccentBrush}" FontSize="12" /></Border>
  </Grid></Border>
 </Window>

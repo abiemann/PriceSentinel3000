@@ -13,6 +13,7 @@ public sealed class MarketDataCollector
     private readonly SemaphoreSlim _gate = new(1, 1);
     private CollectionState _state;
     private int _isBusy;
+    private CollectionActivity? _activity;
     private DateTimeOffset? _lastRequestAt;
 
     public MarketDataCollector(ICollectionStateStore store, IMarketHistoryProvider provider,
@@ -40,6 +41,7 @@ public sealed class MarketDataCollector
 
     public CollectionState State => Snapshot(Volatile.Read(ref _state));
     public bool IsBusy => Volatile.Read(ref _isBusy) != 0;
+    public CollectionActivity? Activity => Volatile.Read(ref _activity);
     public event EventHandler? StateChanged;
 
     public Task SaveSettingsAsync(CollectionSettings settings, CancellationToken cancellationToken = default)
@@ -108,7 +110,7 @@ public sealed class MarketDataCollector
         Interlocked.Exchange(ref _isBusy, 1);
         try
         {
-            StateChanged?.Invoke(this, EventArgs.Empty);
+            SetActivity("CheckingSchedule");
             QueueScheduled();
             if (!isConnected) return;
             int remaining = _options.MaximumRequestsPerTick;
@@ -125,6 +127,7 @@ public sealed class MarketDataCollector
         }
         finally
         {
+            Volatile.Write(ref _activity, null);
             Interlocked.Exchange(ref _isBusy, 0);
             _gate.Release();
             StateChanged?.Invoke(this, EventArgs.Empty);
@@ -146,6 +149,7 @@ public sealed class MarketDataCollector
         DownloadListMember[] members = _state.Settings.Lists.Where(l => l.IsEnabled).SelectMany(l => l.Members)
             .Where(m => m.IsIncluded).GroupBy(m => m.Symbol, StringComparer.Ordinal)
             .Select(g => g.FirstOrDefault(m => m.ProviderInstrumentId is not null) ?? g.First()).ToArray();
+        SetActivity("CheckingLocalHistory");
         MarketDataLibraryScan scan = _libraryFactory(_state.Settings.LibraryRootPath).Scan();
         if (scan.Diagnostics.Any(d => d.Code is "scan_limit" or "scan_failed"))
             throw new InvalidDataException("The library must scan completely before checking download continuity.");
@@ -202,6 +206,7 @@ public sealed class MarketDataCollector
         CollectionJob active = job;
         try
         {
+            SetActivity("CheckingLocalHistory", job);
             IMarketDataLibrary library = _libraryFactory(job.LibraryRootPath);
             HistoricalDataQueryResult saved = library.Query(new(job.Symbol, window.FromUtc, window.ThroughUtc,
                 15, AdjustmentPolicy: job.AdjustmentPolicy, AdjustmentBasis: job.AdjustmentBasis,
@@ -228,13 +233,18 @@ public sealed class MarketDataCollector
             if (_lastRequestAt is { } last)
             {
                 TimeSpan delay = last + _options.MinimumRequestInterval - _clock.GetUtcNow();
-                if (delay > TimeSpan.Zero) await Task.Delay(delay, _clock, cancellationToken).ConfigureAwait(false);
+                if (delay > TimeSpan.Zero)
+                {
+                    SetActivity("WaitingForRateLimit", job);
+                    await Task.Delay(delay, _clock, cancellationToken).ConfigureAwait(false);
+                }
             }
             // Start at the earliest hole, not merely after the newest stored candle: an earlier
             // outage still needs repair when later candles/days have already been downloaded.
             DateTimeOffset from = saved.Coverage.Gaps.Count > 0 ? saved.Coverage.Gaps.Min(g => g.FromUtc) : window.FromUtc;
             _lastRequestAt = _clock.GetUtcNow();
             requests++;
+            SetActivity("Downloading", job);
             HistoricalDownload downloaded = await _provider.DownloadHistoryAsync(new(job.Symbol, from, window.ThroughUtc,
                 15, job.SessionBounds, job.AdjustmentPolicy, job.ProviderInstrumentId), cancellationToken).ConfigureAwait(false);
             if (downloaded.Symbol != job.Symbol || downloaded.SourceIntervalSeconds != 15 ||
@@ -267,6 +277,7 @@ public sealed class MarketDataCollector
             }
             downloaded = downloaded with { RequestedFromUtc = window.FromUtc,
                 Candles = candles.Values.OrderBy(c => c.StartsAtUtc).ToArray() };
+            SetActivity("Saving", job);
             IReadOnlyList<HistoricalDatasetInfo> datasets = library.Save(downloaded);
             bool complete = datasets.Count > 0 &&
                 datasets.All(d => d.Coverage.Complete) && datasets.Min(d => d.Coverage.RequestedFromUtc) <= window.FromUtc &&
@@ -311,6 +322,12 @@ public sealed class MarketDataCollector
         try { mutation(); }
         finally { _gate.Release(); }
     }, cancellationToken);
+
+    private void SetActivity(string stage, CollectionJob? job = null)
+    {
+        Volatile.Write(ref _activity, new(stage, job?.Symbol, job?.SessionDate, _clock.GetUtcNow()));
+        StateChanged?.Invoke(this, EventArgs.Empty);
+    }
 
     private void Update(CollectionJob job) => Commit(_state with
     {
