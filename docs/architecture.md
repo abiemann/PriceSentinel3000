@@ -98,6 +98,11 @@ Chart candle selection is a presentation concern. The 15-, 30-, 60-, and
 120-second display intervals do not change the strategy's source observations or
 risk rules. Historical chart choices are restricted to exact multiples of the
 actual source interval; smaller candles are never reconstructed from coarse data.
+The configured buffer duration defines the chart's candle count at 15 seconds.
+Longer display intervals expand the visible time span to preserve that count and
+candle width. Chart retention covers the widest selectable view plus RSI warmup;
+time-axis ticks adapt to the visible duration and chart width. This extra chart
+history does not extend the execution buffer or the script's startup seed window.
 
 The Built-In observation buffer retains at least 16 observations for RSI and its prior value,
 even when slow polling puts those observations outside the configured time window.

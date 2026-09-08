@@ -43,7 +43,7 @@ public sealed class RsiWarmupRetentionTests
         int intervalSeconds)
     {
         TimeSpan interval = TimeSpan.FromSeconds(intervalSeconds);
-        TimeSpan visibleWindow = TimeSpan.FromMinutes(15);
+        TimeSpan visibleWindow = PriceChartViewportCalculator.GetVisibleDuration(intervalSeconds, 15);
         TimeSpan warmup = PriceChartHistoryCalculator.GetRsiLookback(
             intervalSeconds);
         var buffer = new PriceRingBuffer(
@@ -68,11 +68,12 @@ public sealed class RsiWarmupRetentionTests
             PriceChartViewportCalculator.CreateTimeWindow(
                 candles[^1].StartsAtUtc,
                 intervalSeconds,
-                visibleWindow.TotalMinutes);
+                15);
         int firstVisibleIndex = Enumerable.Range(0, candles.Count)
             .First(index => viewport.ContainsCandle(candles[index].StartsAtUtc));
 
         Assert.NotNull(rsiValues[firstVisibleIndex]);
+        Assert.Equal(60, candles.Count(candle => viewport.ContainsCandle(candle.StartsAtUtc)));
     }
 
     private static MarketQuote Quote(DateTimeOffset timestamp, decimal last) =>

@@ -6,7 +6,8 @@ namespace PriceSentinel3000.Application.Sessions;
 public sealed record RealtimeSessionUpdate(
     IReadOnlyList<MarketQuote> WarmStart,
     MarketQuote Quote,
-    IReadOnlyList<MarketQuote> Reconciliation);
+    IReadOnlyList<MarketQuote> Reconciliation,
+    DateTimeOffset WarmStartRequestedAtUtc);
 
 public sealed class RealtimeSessionRunner(
     IMarketDataSource marketDataSource,
@@ -37,7 +38,7 @@ public sealed class RealtimeSessionRunner(
             _timeProvider.GetUtcNow(),
             cancellationToken);
 
-        yield return new(history, current, []);
+        yield return new(history, current, [], now);
 
         DateTimeOffset nextReconciliation = _timeProvider.GetUtcNow()
             .AddSeconds(reconciliationSeconds);
@@ -82,7 +83,7 @@ public sealed class RealtimeSessionRunner(
                     reconciliation = await completed;
                 }
 
-                yield return new([], quote, reconciliation);
+                yield return new([], quote, reconciliation, now);
             }
         }
         finally

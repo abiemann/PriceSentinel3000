@@ -30,11 +30,38 @@ public sealed class RealtimeSessionRunnerTests
         Assert.Equal([warmQuote], update.WarmStart);
         Assert.Equal(currentQuote, update.Quote);
         Assert.Empty(update.Reconciliation);
+        Assert.Equal(Now, update.WarmStartRequestedAtUtc);
         HistoryCall history = Assert.Single(source.HistoryCalls);
         Assert.Equal(Now.AddMinutes(-15), history.FromUtc);
         Assert.Equal(Now, history.ThroughUtc);
         Assert.Equal(Now, history.ObservedAtUtc);
         Assert.Equal(Now, Assert.Single(source.QuoteObservations));
+    }
+
+    [Fact]
+    public async Task RunAsync_PreservesWarmStartRequestBoundaryWhenHistoryFetchDelaysTheQuote()
+    {
+        var clock = new FixedTimeProvider(Now);
+        var source = new RecordingMarketDataSource([Quote(Now.AddMinutes(-43), 9m)], Quote(Now, 10m))
+        {
+            AfterHistoryRequested = () => clock.UtcNow = Now.AddSeconds(20),
+        };
+        var runner = new RealtimeSessionRunner(source, clock);
+        var request = new MarketDataRequest(Instrument, TimeSpan.FromSeconds(5), TimeSpan.FromMinutes(148));
+        await using IAsyncEnumerator<RealtimeSessionUpdate> enumerator = runner
+            .RunAsync(request, 45, 300, 30, CancellationToken.None)
+            .GetAsyncEnumerator();
+
+        Assert.True(await enumerator.MoveNextAsync());
+
+        RealtimeSessionUpdate update = enumerator.Current;
+        Assert.Equal(Now, update.WarmStartRequestedAtUtc);
+        Assert.Equal(Now.AddSeconds(20), update.Quote.SourceTimestampUtc);
+        Assert.Equal(Now.AddMinutes(-148), Assert.Single(source.HistoryCalls).FromUtc);
+        Assert.True(Assert.Single(update.WarmStart).SourceTimestampUtc >=
+            update.WarmStartRequestedAtUtc.AddMinutes(-43));
+        Assert.True(Assert.Single(update.WarmStart).SourceTimestampUtc <
+            update.Quote.SourceTimestampUtc.AddMinutes(-43));
     }
 
     [Fact]
@@ -174,7 +201,8 @@ public sealed class RealtimeSessionRunnerTests
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow() => now;
+        public DateTimeOffset UtcNow { get; set; } = now;
+        public override DateTimeOffset GetUtcNow() => UtcNow;
 
         public override ITimer CreateTimer(
             TimerCallback callback,
@@ -242,6 +270,7 @@ public sealed class RealtimeSessionRunnerTests
         public CancellationToken ReconciliationToken { get; private set; }
         public List<HistoryCall> HistoryCalls { get; } = [];
         public List<DateTimeOffset> QuoteObservations { get; } = [];
+        public Action? AfterHistoryRequested { get; init; }
 
         public Task ConnectAsync(CancellationToken cancellationToken) =>
             Task.CompletedTask;
@@ -254,6 +283,7 @@ public sealed class RealtimeSessionRunnerTests
             CancellationToken cancellationToken)
         {
             HistoryCalls.Add(new(fromUtc, throughUtc, observedAtUtc));
+            AfterHistoryRequested?.Invoke();
 
             if (HistoryCalls.Count > 1 && PendingReconciliation is not null)
             {

@@ -80,6 +80,9 @@ execution path to the authenticated Robinhood data foundation:
   by every selectable chart candle interval, expanding for a selected script's
   warmup when needed; configurable delayed-lookback
   reconciliation uses real 15-second Robinhood equity bars
+- Chart candles keep the same width when changing display interval. With a
+  15-minute buffer, the chart shows 60 candles: 15 minutes at 15 seconds per candle,
+  or two hours at two minutes per candle. Time labels adjust to the visible span.
 - Replay accepts a ticker plus an exact local date/time and checks saved history
   before provider history at 15 seconds, 30 seconds, then one minute. It preserves
   the source duration and can be paused, resumed, or stopped without losing the
@@ -207,10 +210,13 @@ and
 2. Select **Paper Trader**, enter a stock or ETF symbol and paper starting balance,
    choose **Built-In** or a compatible script, configure the risk and timing
    settings, then click **Start Paper Trader**.
-3. The app requests real 15-second warm-start history covering at least the
-   configured 5–15 minute buffer plus 28 minutes for chart RSI(14). For a script,
-   it requests the longer of that duration and the script's required warmup plus
-   two candles at the selected strategy interval. A script history requirement
+3. The app requests real 15-second warm-start history covering the widest chart
+   view plus 28 minutes for chart RSI(14). A 15-minute buffer needs 148 minutes of
+   chart history so switching to two-minute candles can show two hours. The
+   request expands further when the script needs more warmup. Chart-only history
+   does not extend the strategy's seed window: scripts retain the longer of the
+   configured buffer plus 28 minutes and their required warmup plus two strategy
+   candles. A script history requirement
    over 24 hours blocks startup. Available completed history seeds the script;
    it waits for enough consecutive candles before proposing trades. The app
    obtains the current quote and polls it at the configured interval.

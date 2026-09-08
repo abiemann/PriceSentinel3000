@@ -603,19 +603,31 @@ public sealed class PriceChart : FrameworkElement
 
         DateTimeOffset firstUtc = firstTimestamp.ToUniversalTime();
         DateTimeOffset lastUtc = lastTimestamp.ToUniversalTime();
-        long alignedMinuteTicks =
-            firstUtc.Ticks - firstUtc.Ticks % TimeSpan.TicksPerMinute;
-        var minuteTick = new DateTimeOffset(alignedMinuteTicks, TimeSpan.Zero);
+        double minimumTickMinutes = (lastUtc - firstUtc).TotalMinutes /
+            Math.Max(1d, plotWidth / 56d);
+        int[] tickMinuteOptions = [1, 2, 5, 10, 15, 30, 60, 120, 240, 360, 720, 1440];
+        double tickMinutes = tickMinuteOptions.FirstOrDefault(
+            minutes => minutes >= minimumTickMinutes);
 
-        if (minuteTick < firstUtc)
+        if (tickMinutes == 0d)
         {
-            minuteTick = minuteTick.AddMinutes(1);
+            tickMinutes = Math.Ceiling(minimumTickMinutes / 1440d) * 1440d;
         }
 
-        while (minuteTick <= lastUtc)
+        TimeSpan tickInterval = TimeSpan.FromMinutes(tickMinutes);
+        long alignedTicks = firstUtc.Ticks - firstUtc.Ticks % tickInterval.Ticks;
+        var timeTick = new DateTimeOffset(alignedTicks, TimeSpan.Zero);
+
+        if (timeTick < firstUtc)
+        {
+            timeTick += tickInterval;
+        }
+
+        double previousLabelRight = double.NegativeInfinity;
+        while (timeTick <= lastUtc)
         {
             double x = MapTimestamp(
-                minuteTick,
+                timeTick,
                 firstTimestamp,
                 lastTimestamp,
                 plotLeft,
@@ -626,7 +638,7 @@ public sealed class PriceChart : FrameworkElement
                 new(x, chartBottom));
 
             FormattedText timeLabel = CreateLabel(
-                minuteTick.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture),
+                timeTick.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture),
                 typeface,
                 labelBrush,
                 pixelsPerDip);
@@ -634,8 +646,13 @@ public sealed class PriceChart : FrameworkElement
                 x - timeLabel.Width / 2d,
                 plotLeft,
                 Math.Max(plotLeft, plotRight - timeLabel.Width));
-            drawingContext.DrawText(timeLabel, new(labelX, chartBottom + 7d));
-            minuteTick = minuteTick.AddMinutes(1);
+            if (labelX >= previousLabelRight + 8d)
+            {
+                drawingContext.DrawText(timeLabel, new(labelX, chartBottom + 7d));
+                previousLabelRight = labelX + timeLabel.Width;
+            }
+
+            timeTick += tickInterval;
         }
 
         drawingContext.DrawLine(axisPen, new(plotRight, plotTop), new(plotRight, chartBottom));

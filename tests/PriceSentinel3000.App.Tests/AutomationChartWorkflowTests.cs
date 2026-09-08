@@ -74,7 +74,7 @@ public sealed partial class SessionWorkflowTests
             Assert.False(capture.GetProperty("strategy").TryGetProperty("Source", out _));
             Assert.Equal(30, capture.GetProperty("candleIntervalSeconds").GetInt32());
             Assert.Equal(first.AddMinutes(20), capture.GetProperty("visibleToUtc").GetDateTimeOffset());
-            Assert.Equal(first.AddMinutes(20 - vm.BufferMinutes), capture.GetProperty("visibleFromUtc").GetDateTimeOffset());
+            Assert.Equal(first.AddMinutes(20 - vm.BufferMinutes * 2), capture.GetProperty("visibleFromUtc").GetDateTimeOffset());
             Assert.Equal(40, capture.GetProperty("pointCount").GetInt32());
             Assert.True(capture.GetProperty("rsiShown").GetBoolean());
             Assert.Equal(SimpleRsiCalculator.Calculate(vm.ChartPoints.Select(point => point.Close).ToArray()), capture.GetProperty("rsiLatestValue").GetDecimal());

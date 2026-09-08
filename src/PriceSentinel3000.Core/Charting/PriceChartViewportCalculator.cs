@@ -17,6 +17,20 @@ public readonly record struct PriceChartTimeWindow(
 
 public static class PriceChartViewportCalculator
 {
+    private const int BaseCandleIntervalSeconds = 15;
+
+    // Window minutes define density at 15 seconds; scale time, not candle width.
+    public static TimeSpan GetVisibleDuration(int candleIntervalSeconds, double windowMinutes)
+    {
+        int normalizedIntervalSeconds = Math.Clamp(candleIntervalSeconds, 1, 3600);
+        double normalizedWindowMinutes = double.IsFinite(windowMinutes)
+            ? Math.Clamp(windowMinutes, 1d, 60d)
+            : 7d;
+
+        return TimeSpan.FromMinutes(
+            normalizedWindowMinutes * normalizedIntervalSeconds / BaseCandleIntervalSeconds);
+    }
+
     public static PriceChartTimeWindow CreateTimeWindow(
         DateTimeOffset latestCandleTimestamp,
         int candleIntervalSeconds,
@@ -24,13 +38,11 @@ public static class PriceChartViewportCalculator
     {
         TimeSpan candleInterval = TimeSpan.FromSeconds(
             Math.Clamp(candleIntervalSeconds, 1, 3600));
-        double normalizedWindowMinutes = double.IsFinite(windowMinutes)
-            ? Math.Clamp(windowMinutes, 1d, 60d)
-            : 7d;
+        TimeSpan visibleDuration = GetVisibleDuration(candleIntervalSeconds, windowMinutes);
         DateTimeOffset lastTimestamp = latestCandleTimestamp + candleInterval;
 
         return new(
-            lastTimestamp.AddMinutes(-normalizedWindowMinutes),
+            lastTimestamp - visibleDuration,
             lastTimestamp,
             candleInterval);
     }

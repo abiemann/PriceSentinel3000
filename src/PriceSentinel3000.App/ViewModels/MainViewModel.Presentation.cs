@@ -123,7 +123,8 @@ public sealed partial class MainViewModel
         int bufferMinutes,
         int candleIntervalSeconds)
     {
-        TimeSpan historyDuration = TimeSpan.FromMinutes(bufferMinutes) +
+        TimeSpan historyDuration = PriceChartViewportCalculator.GetVisibleDuration(
+            candleIntervalSeconds, bufferMinutes) +
             PriceChartHistoryCalculator.GetRsiLookback(candleIntervalSeconds);
         DateTimeOffset cutoff = snapshot[^1].SourceTimestampUtc - historyDuration;
         return
@@ -136,7 +137,8 @@ public sealed partial class MainViewModel
     {
         int maximumCandleIntervalSeconds =
             ChartCandleIntervalOptions.Max(option => option.Value);
-        return TimeSpan.FromMinutes(bufferMinutes) +
+        return PriceChartViewportCalculator.GetVisibleDuration(
+            maximumCandleIntervalSeconds, bufferMinutes) +
             PriceChartHistoryCalculator.GetRsiLookback(
                 maximumCandleIntervalSeconds);
     }

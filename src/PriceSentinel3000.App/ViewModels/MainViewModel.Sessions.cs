@@ -1,6 +1,7 @@
 using System.Text.Json;
 using PriceSentinel3000.Application.LiveTrading;
 using PriceSentinel3000.Application.Sessions;
+using PriceSentinel3000.Core.Charting;
 using PriceSentinel3000.Core.Configuration;
 using PriceSentinel3000.Core.Journaling;
 using PriceSentinel3000.Core.LiveTrading;
@@ -278,13 +279,18 @@ public sealed partial class MainViewModel
                 return;
             }
         }
-        TimeSpan warmStart = GetMaximumChartHistoryDuration(
-            settings.BufferMinutes);
+        // Keep the existing strategy seed independent of expanded chart history.
+        TimeSpan strategyWarmStart = TimeSpan.FromMinutes(settings.BufferMinutes) +
+            PriceChartHistoryCalculator.GetRsiLookback(
+                ChartCandleIntervalOptions.Max(option => option.Value));
         if (_pinnedStrategy?.Program is { } program)
         {
-            warmStart = TimeSpan.FromSeconds(Math.Max(warmStart.TotalSeconds,
+            strategyWarmStart = TimeSpan.FromSeconds(Math.Max(strategyWarmStart.TotalSeconds,
                 (program.RequiredWarmupBars + 2) * settings.ScriptBarIntervalSeconds));
         }
+        TimeSpan warmStart = TimeSpan.FromSeconds(Math.Max(
+            strategyWarmStart.TotalSeconds,
+            GetMaximumChartHistoryDuration(settings.BufferMinutes).TotalSeconds));
         _marketDataRequest = new(
             instrument,
             TimeSpan.FromSeconds(settings.QuotePollingSeconds),
@@ -327,7 +333,10 @@ public sealed partial class MainViewModel
             }
 
             SetQuoteMarketState(update.Quote);
-            ObserveScriptQuote(update.Quote, isFirstUpdate ? update.WarmStart : null);
+            ObserveScriptQuote(update.Quote, isFirstUpdate
+                ? update.WarmStart.Where(quote => quote.SourceTimestampUtc >=
+                    update.WarmStartRequestedAtUtc - strategyWarmStart).ToArray()
+                : null);
             if (isLive)
             {
                 await ProcessLiveObservationAsync(update.Quote, token);

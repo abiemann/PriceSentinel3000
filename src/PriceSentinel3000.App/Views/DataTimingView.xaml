@@ -61,7 +61,7 @@
                     <TextBlock Style="{StaticResource FieldLabelStyle}"
                                Text="Buffer minutes" />
                     <TextBox Style="{StaticResource InputTextBoxStyle}"
-                             ToolTip="Minutes of recent market data kept for charting and strategy analysis. Allowed range: 5-15 minutes."
+                             ToolTip="Built-In strategy lookback and chart span at 15-second candles. Longer chart intervals expand the visible time span. Allowed range: 5-15 minutes."
                              ToolTipService.ShowOnDisabled="True"
                              Text="{Binding BufferMinutes, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True, NotifyOnValidationError=True}" />
                 </StackPanel>
