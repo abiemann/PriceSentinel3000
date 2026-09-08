@@ -26,6 +26,7 @@ public sealed class DataRetentionViewModel : INotifyPropertyChanged, IAsyncDispo
     private readonly IEquityCatalogSource _equities;
     private readonly Func<string, IMarketDataLibrary> _libraryFactory;
     private readonly Func<CancellationToken, Task> _connect;
+    private readonly Func<CancellationToken, Task> _reconnect;
     private readonly Func<bool> _isConnected;
     private readonly Dispatcher _dispatcher;
     private readonly DispatcherTimer _timer;
@@ -55,7 +56,8 @@ public sealed class DataRetentionViewModel : INotifyPropertyChanged, IAsyncDispo
     public DataRetentionViewModel(MarketDataCollector collector, IMarketHistoryProvider provider,
         IPersonalWatchlistSource watchlists, IEquityCatalogSource equities,
         Func<string, IMarketDataLibrary> libraryFactory, Func<CancellationToken, Task> connect,
-        Func<bool> isConnected, Dispatcher? dispatcher = null)
+        Func<bool> isConnected, Dispatcher? dispatcher = null,
+        Func<CancellationToken, Task>? reconnect = null)
     {
         Collector = collector;
         Provider = provider;
@@ -63,6 +65,7 @@ public sealed class DataRetentionViewModel : INotifyPropertyChanged, IAsyncDispo
         _equities = equities;
         _libraryFactory = libraryFactory;
         _connect = connect;
+        _reconnect = reconnect ?? connect;
         _isConnected = isConnected;
         _dispatcher = dispatcher ?? Dispatcher.CurrentDispatcher;
         CollectionSettings settings = collector.State.Settings;
@@ -79,6 +82,13 @@ public sealed class DataRetentionViewModel : INotifyPropertyChanged, IAsyncDispo
         DeleteListCommand = Command(DeleteListAsync);
         AddTickersCommand = Command(AddTickersAsync);
         LoadWatchlistsCommand = Command(LoadWatchlistsAsync);
+        ReconnectCommand = Command(async () =>
+        {
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+            _downloadCancellation = cancellation;
+            try { await _reconnect(cancellation.Token); Status = "Robinhood connected. Queued downloads can continue."; }
+            finally { _downloadCancellation = null; }
+        });
         ImportWatchlistCommand = Command(() => PreviewWatchlistAsync(false));
         RefreshWatchlistCommand = Command(() => PreviewWatchlistAsync(true));
         SaveScheduleCommand = Command(SaveScheduleAsync);
@@ -136,6 +146,7 @@ public sealed class DataRetentionViewModel : INotifyPropertyChanged, IAsyncDispo
     public AsyncRelayCommand DeleteListCommand { get; }
     public AsyncRelayCommand AddTickersCommand { get; }
     public AsyncRelayCommand LoadWatchlistsCommand { get; }
+    public AsyncRelayCommand ReconnectCommand { get; }
     public AsyncRelayCommand ImportWatchlistCommand { get; }
     public AsyncRelayCommand RefreshWatchlistCommand { get; }
     public AsyncRelayCommand SaveScheduleCommand { get; }
@@ -342,7 +353,7 @@ public sealed class DataRetentionViewModel : INotifyPropertyChanged, IAsyncDispo
     }
 
     private AsyncRelayCommand[] Commands() => [SaveListCommand, DeleteListCommand, AddTickersCommand,
-        LoadWatchlistsCommand, ImportWatchlistCommand, RefreshWatchlistCommand, SaveScheduleCommand,
+        LoadWatchlistsCommand, ReconnectCommand, ImportWatchlistCommand, RefreshWatchlistCommand, SaveScheduleCommand,
         DownloadNowCommand, RetryMissingCommand, ScanLibraryCommand, OpenFolderCommand];
     private AsyncRelayCommand Command(Func<Task> action) => new(() => ExecuteAsync(action), () => !IsBusy && !_disposed);
     public async Task ExecuteAsync(Func<Task> action)

@@ -16,6 +16,8 @@ In **Schedule & downloads**, choose the daily time in `HH:mm`, its time zone, re
 
 Automatic collection requires the app to remain open and connected. It uses one deduplicated union of saved, enabled lists and included equities. At the chosen time it targets the latest session whose close plus 15 minutes has passed. A time before today's finalization collects the prior eligible session. Regular sessions are 09:30–16:00 Eastern, or 13:00 on early-close days. Extended coverage is 04:00–20:00 Eastern, or 17:00 on early-close days. The calendar includes recurring US exchange holidays and early closes; unscheduled closures are not predicted.
 
+If authorization expires, use **Reconnect Robinhood** while trading and downloads are idle. This is an explicit login action; scheduled collection never opens a browser for authorization. Reconnecting is refused while a provider request is active.
+
 Missed runs catch up within seven calendar days, bounded by when automatic collection was enabled. Pending work and progress survive restarts. Disconnected jobs wait for a connection; background requests cannot open a login prompt. Turn off and save automatic downloads to pause automatic queued work. This version does not download while the app is closed.
 
 **Download now** queues the saved equities for an explicit date range, then connects if needed. Ending weekends/holidays are skipped; unfinished trading sessions are rejected. **Retry missing** requeues partial, unavailable and failed jobs. **Cancel request** cancels the active request, including login; pending work is retained and can retry on the next polling cycle. Requests are serial and rate limited, transient retries are bounded, and failures are isolated by ticker.

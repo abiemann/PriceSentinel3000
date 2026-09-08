@@ -29,13 +29,20 @@ public sealed partial class RobinhoodMcpGateway :
     private readonly SemaphoreSlim _connectionGate = new(1, 1);
     private readonly SemaphoreSlim _twentyFourHourEligibilityGate = new(1, 1);
     private readonly ProtectedRobinhoodAuthStore _authStore;
+    private readonly Func<bool, CancellationToken, Task<McpClient>>? _clientFactory;
     private volatile IReadOnlySet<string>? _twentyFourHourEligibleSymbols;
     private McpClient? _client;
 
     public RobinhoodMcpGateway(
-        ProtectedRobinhoodAuthStore authStore)
+        ProtectedRobinhoodAuthStore authStore) : this(authStore, null)
+    {
+    }
+
+    internal RobinhoodMcpGateway(ProtectedRobinhoodAuthStore authStore,
+        Func<bool, CancellationToken, Task<McpClient>>? clientFactory)
     {
         _authStore = authStore ?? throw new ArgumentNullException(nameof(authStore));
+        _clientFactory = clientFactory;
     }
 
     public string Name => "ROBINHOOD MCP";
@@ -88,6 +95,12 @@ public sealed partial class RobinhoodMcpGateway :
         {
             if (_client is not null)
             {
+                return;
+            }
+
+            if (_clientFactory is not null)
+            {
+                _client = await _clientFactory(allowInteractiveAuthorization, cancellationToken).ConfigureAwait(false);
                 return;
             }
 
@@ -626,12 +639,13 @@ public sealed partial class RobinhoodMcpGateway :
         IReadOnlyDictionary<string, object?> arguments,
         CancellationToken cancellationToken)
     {
-        await ConnectAsync(cancellationToken).ConfigureAwait(false);
-        CallToolResult result = await _client!.CallToolAsync(
-                toolName,
-                arguments,
-                cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
+        McpClient client = await AcquireToolClientAsync(allowConnect: true, cancellationToken).ConfigureAwait(false);
+        CallToolResult result;
+        try
+        {
+            result = await client.CallToolAsync(toolName, arguments, cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        finally { ReleaseToolClient(); }
 
         if (result.IsError is true)
         {

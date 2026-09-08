@@ -56,6 +56,7 @@
    <TabItem Header="SCHEDULE &amp; DOWNLOADS"><Grid Margin="16"><Grid.ColumnDefinitions><ColumnDefinition Width="340" /><ColumnDefinition Width="20" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
      <CheckBox Style="{StaticResource PaperCheckBoxStyle}" Content="Enable automatic daily downloads" IsChecked="{Binding AutomaticDownloadsEnabled}" />
+     <Button Margin="0,12,0,0" HorizontalAlignment="Left" Style="{StaticResource SecondaryButtonStyle}" Content="RECONNECT ROBINHOOD" Command="{Binding ReconnectCommand}" ToolTip="Renew authorization while trading and downloads are idle" />
      <TextBlock Margin="0,16,0,6" Text="Time of day (24-hour HH:mm)" /><TextBox Style="{StaticResource InputTextBoxStyle}" Text="{Binding DailyTime, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Daily download time" />
      <TextBlock Margin="0,12,0,6" Text="Time zone" /><ComboBox Style="{StaticResource InputComboBoxStyle}" ItemsSource="{Binding TimeZones}" SelectedValuePath="Id" DisplayMemberPath="DisplayName" SelectedValue="{Binding TimeZoneId}" AutomationProperties.Name="Daily download time zone" />
      <TextBlock Margin="0,12,0,6" Text="Market session" /><ComboBox Style="{StaticResource InputComboBoxStyle}" ItemsSource="{Binding SessionChoices}" SelectedItem="{Binding SessionBounds}" AutomationProperties.Name="Download session coverage" />

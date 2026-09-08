@@ -178,6 +178,36 @@ public sealed partial class SessionWorkflowTests
         Assert.Equal(CollectionJobStatus.Pending, Assert.Single(fixture.Collector.State.Jobs).Status);
     });
 
+    [Fact]
+    public Task ExplicitReconnect_IsIdleOnlyAndDoesNotQueueDownloads() => host.RunAsync(async () =>
+    {
+        await using var fixture = new RetentionFixture();
+        Assert.Equal(0, fixture.ConnectionCalls);
+        await fixture.ViewModel.ReconnectCommand.ExecuteAsync();
+        Assert.Equal(1, fixture.ConnectionCalls);
+        Assert.True(fixture.Connected);
+        Assert.Empty(fixture.Collector.State.Jobs);
+        Assert.Equal(0, fixture.Provider.DownloadCalls);
+        Assert.Contains("connected", fixture.ViewModel.Status);
+    });
+
+    [Fact]
+    public Task ExplicitReconnect_CanBeCancelledAndDoesNotRunTwice() => host.RunAsync(async () =>
+    {
+        await using var fixture = new RetentionFixture();
+        fixture.HoldConnection = true;
+        Task reconnect = fixture.ViewModel.ReconnectCommand.ExecuteAsync();
+        await fixture.ConnectionStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(fixture.ViewModel.ReconnectCommand.CanExecute(null));
+        Assert.False(fixture.ViewModel.DownloadNowCommand.CanExecute(null));
+        fixture.ViewModel.CancelDownloadsCommand.Execute(null);
+        await reconnect.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(fixture.Connected);
+        Assert.False(fixture.ViewModel.IsBusy);
+        Assert.Equal(1, fixture.ConnectionCalls);
+        Assert.Equal(0, fixture.Provider.DownloadCalls);
+    });
+
     private sealed class RetentionFixture : IAsyncDisposable
     {
         public string Root { get; } = Path.Combine(Path.GetTempPath(), "pricesentinel-retention-tests", Guid.NewGuid().ToString("N"));

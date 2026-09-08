@@ -40,9 +40,15 @@ public partial class App : System.Windows.Application
             viewModel.DataRetention = new DataRetentionViewModel(collector, robinhoodGateway,
                 robinhoodGateway, robinhoodGateway, root => new JsonMarketDataLibrary(root),
                 async token => { if (!robinhoodGateway.HasActiveConnection) await viewModel.ConnectRobinhoodAtStartupAsync(token); },
-                () => robinhoodGateway.HasActiveConnection, Dispatcher);
+                () => robinhoodGateway.HasActiveConnection, Dispatcher, async token =>
+                {
+                    if (viewModel.IsSessionRunning || viewModel.StartSessionCommand.ExecutionTask is { IsCompleted: false })
+                        throw new InvalidOperationException("Stop the trading session before reconnecting Robinhood.");
+                    await robinhoodGateway.ReconnectAsync(token);
+                    await viewModel.ConnectRobinhoodAtStartupAsync(token);
+                });
         }
-        catch (Exception exception) when (exception is System.IO.IOException or UnauthorizedAccessException or ArgumentException or System.Text.Json.JsonException)
+        catch (Exception exception) when (exception is System.IO.IOException or UnauthorizedAccessException or ArgumentException or System.Text.Json.JsonException or TimeZoneNotFoundException or InvalidTimeZoneException)
         {
             MessageBox.Show($"The saved data-collection settings could not be loaded: {exception.Message}\n\nRestore collection-state.json from a valid copy before using automatic downloads.",
                 "Data library settings", MessageBoxButton.OK, MessageBoxImage.Error);

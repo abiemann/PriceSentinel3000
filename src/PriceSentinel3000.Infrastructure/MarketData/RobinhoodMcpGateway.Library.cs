@@ -96,7 +96,7 @@ public sealed partial class RobinhoodMcpGateway :
         string toolName, IReadOnlyDictionary<string, object?> arguments, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var client = _client ?? throw new MarketDataConnectionUnavailableException("Connect to Robinhood before using the market-data library.");
+        var client = await AcquireToolClientAsync(allowConnect: false, cancellationToken).ConfigureAwait(false);
         CallToolResult result;
         bool previousScope = LibraryReadOnlyScope.Value;
         LibraryReadOnlyScope.Value = true;
@@ -107,6 +107,7 @@ public sealed partial class RobinhoodMcpGateway :
         finally
         {
             LibraryReadOnlyScope.Value = previousScope;
+            ReleaseToolClient();
         }
         if (result.IsError is true)
             throw new InvalidOperationException($"Robinhood MCP rejected {toolName}." +
