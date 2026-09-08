@@ -138,7 +138,7 @@ public sealed class MarketDataCollector
             CollectionSchedule.GetSessionWindow(j.SessionDate, j.SessionBounds).ThroughUtc < oldest))
             Commit(_state with { Jobs = _state.Jobs.Select(j => j.IsAutomatic && j.Status == CollectionJobStatus.Pending &&
                 CollectionSchedule.GetSessionWindow(j.SessionDate, j.SessionBounds).ThroughUtc < oldest
-                ? j with { Status = CollectionJobStatus.Unavailable, Error = "Missed the configured automatic catch-up window. Retry manually to check remaining provider history." }
+                ? j with { Status = CollectionJobStatus.Unavailable, Error = "Outside the automatic retry window. Missing 15-second history is unresolved; retry manually to check provider availability." }
                 : j).ToArray() });
         IReadOnlyList<DueCollectionSession> due = CollectionSchedule.GetDueSessions(
             _state.Settings, _state.LastScheduledOccurrenceUtc, _clock.GetUtcNow());
@@ -146,10 +146,28 @@ public sealed class MarketDataCollector
         DownloadListMember[] members = _state.Settings.Lists.Where(l => l.IsEnabled).SelectMany(l => l.Members)
             .Where(m => m.IsIncluded).GroupBy(m => m.Symbol, StringComparer.Ordinal)
             .Select(g => g.FirstOrDefault(m => m.ProviderInstrumentId is not null) ?? g.First()).ToArray();
+        MarketDataLibraryScan scan = _libraryFactory(_state.Settings.LibraryRootPath).Scan();
+        if (scan.Diagnostics.Any(d => d.Code is "scan_limit" or "scan_failed"))
+            throw new InvalidDataException("The library must scan completely before checking download continuity.");
         var jobs = _state.Jobs.ToList();
-        foreach (DueCollectionSession item in due)
-            AddJobs(jobs, members, item.SessionDate, _state.Settings.SessionBounds, automatic: true);
-        Commit(_state with { Jobs = jobs.ToArray(), LastScheduledOccurrenceUtc = due[^1].OccurrenceUtc });
+        var gaps = _state.ContinuityGaps.Where(g => !SamePath(g.LibraryRootPath, _state.Settings.LibraryRootPath) ||
+            g.SessionBounds != _state.Settings.SessionBounds || !members.Any(m => m.Symbol == g.Symbol)).ToList();
+        foreach (DownloadListMember member in members)
+        {
+            DateOnly? trackedFrom = jobs.Where(j => j.Symbol == member.Symbol &&
+                j.SessionBounds == _state.Settings.SessionBounds && SamePath(j.LibraryRootPath, _state.Settings.LibraryRootPath))
+                .Select(j => (DateOnly?)j.SessionDate)
+                .Concat(_state.ContinuityGaps.Where(g => g.Symbol == member.Symbol &&
+                    g.SessionBounds == _state.Settings.SessionBounds && SamePath(g.LibraryRootPath, _state.Settings.LibraryRootPath))
+                    .Select(g => (DateOnly?)g.FromSessionDate)).Min();
+            CollectionBackfillPlan plan = CollectionBackfillPlanner.Plan(member, scan.Datasets, due[^1].SessionDate,
+                _state.Settings.SessionBounds, _clock.GetUtcNow(), _state.Settings.CatchUpCalendarDays, trackedFrom);
+            foreach (DateOnly day in plan.MissingSessions)
+                AddJobs(jobs, [member], day, _state.Settings.SessionBounds, automatic: true);
+            gaps.AddRange(plan.ExpiredGaps.Select(g => new CollectionContinuityGap(member.Symbol,
+                g.FromSessionDate, g.ThroughSessionDate, _state.Settings.SessionBounds, _state.Settings.LibraryRootPath)));
+        }
+        Commit(_state with { Jobs = jobs.ToArray(), ContinuityGaps = gaps.ToArray(), LastScheduledOccurrenceUtc = due[^1].OccurrenceUtc });
     }
 
     private void AddJobs(List<CollectionJob> jobs, IReadOnlyList<DownloadListMember> members, DateOnly day,
@@ -170,8 +188,9 @@ public sealed class MarketDataCollector
                     throw new InvalidOperationException("The pending queue is limited to 10,000 downloads. Complete queued work before adding another range.");
                 jobs.Add(next);
             }
-            else if (!automatic && jobs[existing].Status != CollectionJobStatus.Complete)
-                jobs[existing] = jobs[existing] with { IsAutomatic = false, Status = CollectionJobStatus.Pending,
+            else if (!automatic ||
+                (automatic && jobs[existing].Status is not (CollectionJobStatus.Pending or CollectionJobStatus.Downloading)))
+                jobs[existing] = jobs[existing] with { IsAutomatic = automatic && jobs[existing].IsAutomatic, Status = CollectionJobStatus.Pending,
                     Attempts = 0, NextSourceIntervalSeconds = 15, RetryAfterUtc = null, Error = null };
         }
     }
@@ -185,50 +204,71 @@ public sealed class MarketDataCollector
         {
             IMarketDataLibrary library = _libraryFactory(job.LibraryRootPath);
             HistoricalDataQueryResult saved = library.Query(new(job.Symbol, window.FromUtc, window.ThroughUtc,
-                job.SourceIntervalSeconds, AdjustmentPolicy: job.AdjustmentPolicy, AdjustmentBasis: job.AdjustmentBasis,
+                15, AdjustmentPolicy: job.AdjustmentPolicy, AdjustmentBasis: job.AdjustmentBasis,
                 SessionBounds: job.SessionBounds, RevisionPolicy: HistoricalRevisionPolicy.LatestFetched));
+            if (!saved.Succeeded)
+                throw new InvalidDataException("Saved history could not be validated for gap recovery. Review the local library diagnostics.");
+            if (job.ProviderInstrumentId is not null && saved.Datasets.Any(d => d.InstrumentId != job.ProviderInstrumentId))
+                throw new InvalidDataException("Saved history belongs to a different instrument; it cannot be used for gap recovery.");
             if (saved.Succeeded && saved.Coverage.Complete && (job.ProviderInstrumentId is null ||
                 saved.Datasets.All(d => d.InstrumentId == job.ProviderInstrumentId)))
             {
-                Update(job with { Status = CollectionJobStatus.Complete, ActualSourceIntervalSeconds = job.SourceIntervalSeconds,
+                Update(job with { Status = CollectionJobStatus.Complete, ActualSourceIntervalSeconds = 15,
                     DatasetHashes = saved.Datasets.Select(d => d.DatasetHash).ToArray(), Error = null });
                 return (0, false);
             }
             active = job with { Status = CollectionJobStatus.Downloading, Attempts = job.Attempts + 1,
-                LastAttemptAtUtc = _clock.GetUtcNow(), RetryAfterUtc = null, Error = null };
+                LastAttemptAtUtc = _clock.GetUtcNow(), NextSourceIntervalSeconds = 15, RetryAfterUtc = null, Error = null };
             Update(active);
-            HistoricalDownload? downloaded = null;
-            foreach (int interval in new[] { 15, 30, 60 }.Where(i => i >= job.NextSourceIntervalSeconds))
+            if (requestBudget < 1)
             {
-                if (requests >= requestBudget)
-                {
-                    Update(active with { Status = CollectionJobStatus.Pending, Error = "Waiting for the next request allowance." });
-                    return (requests, false);
-                }
-                if (_lastRequestAt is { } last)
-                {
-                    TimeSpan delay = last + _options.MinimumRequestInterval - _clock.GetUtcNow();
-                    if (delay > TimeSpan.Zero) await Task.Delay(delay, _clock, cancellationToken).ConfigureAwait(false);
-                }
-                _lastRequestAt = _clock.GetUtcNow();
-                requests++;
-                active = active with { NextSourceIntervalSeconds = interval };
-                downloaded = await _provider.DownloadHistoryAsync(new(job.Symbol, window.FromUtc, window.ThroughUtc,
-                    interval, job.SessionBounds, job.AdjustmentPolicy, job.ProviderInstrumentId), cancellationToken).ConfigureAwait(false);
-                if (downloaded.Symbol != job.Symbol || downloaded.SourceIntervalSeconds != interval ||
-                    downloaded.SessionBounds != job.SessionBounds || downloaded.AdjustmentPolicy != job.AdjustmentPolicy ||
-                    downloaded.RequestedFromUtc != window.FromUtc || downloaded.RequestedThroughUtc != window.ThroughUtc)
-                    throw new InvalidDataException("The provider returned mismatched history provenance.");
-                if (downloaded.Candles.Count > 0) break;
-                active = active with { NextSourceIntervalSeconds = interval == 15 ? 30 : 60 };
-            }
-            if (downloaded is null || downloaded.Candles.Count == 0)
-            {
-                Update(active with { Status = CollectionJobStatus.Unavailable, Error = "No genuine 15-second, 30-second, or one-minute history is available for this session." });
+                Update(active with { Status = CollectionJobStatus.Pending, Error = "Waiting for the next request allowance." });
                 return (requests, false);
             }
+            if (_lastRequestAt is { } last)
+            {
+                TimeSpan delay = last + _options.MinimumRequestInterval - _clock.GetUtcNow();
+                if (delay > TimeSpan.Zero) await Task.Delay(delay, _clock, cancellationToken).ConfigureAwait(false);
+            }
+            // Start at the earliest hole, not merely after the newest stored candle: an earlier
+            // outage still needs repair when later candles/days have already been downloaded.
+            DateTimeOffset from = saved.Coverage.Gaps.Count > 0 ? saved.Coverage.Gaps.Min(g => g.FromUtc) : window.FromUtc;
+            _lastRequestAt = _clock.GetUtcNow();
+            requests++;
+            HistoricalDownload downloaded = await _provider.DownloadHistoryAsync(new(job.Symbol, from, window.ThroughUtc,
+                15, job.SessionBounds, job.AdjustmentPolicy, job.ProviderInstrumentId), cancellationToken).ConfigureAwait(false);
+            if (downloaded.Symbol != job.Symbol || downloaded.SourceIntervalSeconds != 15 ||
+                downloaded.SessionBounds != job.SessionBounds || downloaded.AdjustmentPolicy != job.AdjustmentPolicy ||
+                downloaded.AdjustmentBasis != job.AdjustmentBasis ||
+                (job.ProviderInstrumentId is not null && downloaded.InstrumentId != job.ProviderInstrumentId) ||
+                downloaded.RequestedFromUtc != from || downloaded.RequestedThroughUtc != window.ThroughUtc ||
+                downloaded.Candles.Any(c => c.StartsAtUtc < from || c.EndsAtUtc > window.ThroughUtc))
+                throw new InvalidDataException("The provider returned mismatched 15-second history provenance.");
+            if (downloaded.Candles.Count == 0)
+            {
+                Update(active with { Status = saved.Candles.Count > 0 ? CollectionJobStatus.Partial : CollectionJobStatus.Unavailable,
+                    ActualSourceIntervalSeconds = saved.Candles.Count > 0 ? 15 : null,
+                    DatasetHashes = saved.Datasets.Select(d => d.DatasetHash).ToArray(),
+                    Error = "No 15-second candles were returned for the missing range. Provider retention may have expired; the gap remains unresolved. Coarser data is not substituted." });
+                return (requests, false);
+            }
+            if (saved.Datasets.Any(d => d.Provider != downloaded.Provider || d.InstrumentId != downloaded.InstrumentId ||
+                d.AdjustmentPolicy != downloaded.AdjustmentPolicy || d.AdjustmentBasis != downloaded.AdjustmentBasis))
+                throw new InvalidDataException("Downloaded and saved history have different provenance; they cannot be merged.");
+            var candles = saved.Candles.ToDictionary(c => c.StartsAtUtc);
+            var received = new HashSet<DateTimeOffset>();
+            foreach (HistoricalCandle candle in downloaded.Candles)
+            {
+                if (!received.Add(candle.StartsAtUtc))
+                    throw new InvalidDataException("The provider returned duplicate candle timestamps.");
+                if (candles.TryGetValue(candle.StartsAtUtc, out HistoricalCandle? previous) && previous != candle)
+                    throw new InvalidDataException("Provider revisions changed overlapping saved candles. Gap recovery cannot blend different revisions; existing files were preserved.");
+                candles[candle.StartsAtUtc] = candle;
+            }
+            downloaded = downloaded with { RequestedFromUtc = window.FromUtc,
+                Candles = candles.Values.OrderBy(c => c.StartsAtUtc).ToArray() };
             IReadOnlyList<HistoricalDatasetInfo> datasets = library.Save(downloaded);
-            bool complete = downloaded.SourceIntervalSeconds == job.SourceIntervalSeconds && datasets.Count > 0 &&
+            bool complete = datasets.Count > 0 &&
                 datasets.All(d => d.Coverage.Complete) && datasets.Min(d => d.Coverage.RequestedFromUtc) <= window.FromUtc &&
                 datasets.Max(d => d.Coverage.RequestedThroughUtc) >= window.ThroughUtc;
             Update(active with
@@ -237,9 +277,7 @@ public sealed class MarketDataCollector
                 ActualSourceIntervalSeconds = downloaded.SourceIntervalSeconds,
                 AdjustmentBasis = downloaded.AdjustmentBasis,
                 DatasetHashes = datasets.Select(d => d.DatasetHash).ToArray(),
-                Error = complete ? null : downloaded.SourceIntervalSeconds != job.SourceIntervalSeconds
-                    ? $"Saved genuine {downloaded.SourceIntervalSeconds}-second history; 15-second coverage is unavailable."
-                    : "Saved available history; coverage has gaps.",
+                Error = complete ? null : "Saved genuine 15-second history; coverage has gaps. Recent gaps are checked again on the next scheduled run.",
             });
         }
         catch (MarketDataConnectionUnavailableException exception)
@@ -277,7 +315,24 @@ public sealed class MarketDataCollector
     private void Update(CollectionJob job) => Commit(_state with
     {
         Jobs = _state.Jobs.Select(j => j.Id == job.Id ? job : j).ToArray(),
+        ContinuityGaps = job.Status == CollectionJobStatus.Complete
+            ? _state.ContinuityGaps.SelectMany(g => RemoveRepairedSession(g, job)).ToArray() : _state.ContinuityGaps,
     });
+
+    private static IEnumerable<CollectionContinuityGap> RemoveRepairedSession(CollectionContinuityGap gap, CollectionJob job)
+    {
+        if (gap.Symbol != job.Symbol || gap.SessionBounds != job.SessionBounds || !SamePath(gap.LibraryRootPath, job.LibraryRootPath) ||
+            job.SessionDate < gap.FromSessionDate || job.SessionDate > gap.ThroughSessionDate)
+        {
+            yield return gap;
+            yield break;
+        }
+        DateOnly before = job.SessionDate.AddDays(-1), after = job.SessionDate.AddDays(1);
+        while (before >= gap.FromSessionDate && !UsEquityTradingCalendar.IsTradingDay(before)) before = before.AddDays(-1);
+        while (after <= gap.ThroughSessionDate && !UsEquityTradingCalendar.IsTradingDay(after)) after = after.AddDays(1);
+        if (before >= gap.FromSessionDate) yield return gap with { ThroughSessionDate = before };
+        if (after <= gap.ThroughSessionDate) yield return gap with { FromSessionDate = after };
+    }
 
     private void Commit(CollectionState state)
     {
@@ -307,5 +362,6 @@ public sealed class MarketDataCollector
     {
         Settings = state.Settings with { Lists = state.Settings.Lists.Select(l => l with { Members = l.Members.ToArray() }).ToArray() },
         Jobs = state.Jobs.Select(j => j with { DatasetHashes = j.DatasetHashes.ToArray() }).ToArray(),
+        ContinuityGaps = state.ContinuityGaps.ToArray(),
     };
 }

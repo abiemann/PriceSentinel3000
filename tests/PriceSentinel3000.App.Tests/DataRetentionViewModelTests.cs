@@ -208,6 +208,21 @@ public sealed partial class SessionWorkflowTests
         Assert.Equal(0, fixture.Provider.DownloadCalls);
     });
 
+    [Fact]
+    public Task OlderContinuityGap_RemainsVisibleAndSplitsWhenOneSessionIsRecovered() => host.RunAsync(async () =>
+    {
+        await using var fixture = new RetentionFixture(new(2026, 8, 24), new(2026, 8, 26));
+        Assert.Contains("NFLX: 2026-08-24 through 2026-08-26", fixture.ViewModel.ContinuityWarnings);
+        await fixture.SaveSingleSymbol();
+        fixture.ViewModel.FromDate = fixture.ViewModel.ThroughDate = "2026-08-25";
+        await fixture.ViewModel.DownloadNowAsync();
+        Assert.Equal(CollectionJobStatus.Complete, Assert.Single(fixture.Collector.State.Jobs).Status);
+        Assert.Contains("NFLX: 2026-08-24 through 2026-08-24", fixture.ViewModel.ContinuityWarnings);
+        Assert.Contains("NFLX: 2026-08-26 through 2026-08-26", fixture.ViewModel.ContinuityWarnings);
+        Assert.DoesNotContain("2026-08-25", fixture.ViewModel.ContinuityWarnings);
+        Assert.Equal(2, new JsonCollectionStateStore(fixture.StatePath).Load().ContinuityGaps.Count);
+    });
+
     private sealed class RetentionFixture : IAsyncDisposable
     {
         public string Root { get; } = Path.Combine(Path.GetTempPath(), "pricesentinel-retention-tests", Guid.NewGuid().ToString("N"));
@@ -220,11 +235,13 @@ public sealed partial class SessionWorkflowTests
         public RetentionProvider Provider { get; }
         public MarketDataCollector Collector { get; }
         public DataRetentionViewModel ViewModel { get; }
-        public RetentionFixture()
+        public RetentionFixture(DateOnly? gapFrom = null, DateOnly? gapThrough = null)
         {
             Provider = new(() => Connected);
             var store = new JsonCollectionStateStore(StatePath);
-            store.Save(new CollectionState { Settings = new CollectionSettings { LibraryRootPath = LibraryRoot } });
+            store.Save(new CollectionState { Settings = new CollectionSettings { LibraryRootPath = LibraryRoot },
+                ContinuityGaps = gapFrom is { } from && gapThrough is { } through
+                    ? [new("NFLX", from, through, "regular", LibraryRoot)] : [] });
             Collector = new(store, Provider, root => new JsonMarketDataLibrary(root),
                 new TestClock { Now = new(2026, 9, 7, 20, 0, 0, TimeSpan.Zero) },
                 new CollectionRunOptions { MinimumRequestInterval = TimeSpan.Zero });

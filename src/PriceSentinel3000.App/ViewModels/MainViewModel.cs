@@ -98,7 +98,19 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
     private Task? _shutdownTask;
     private bool _disposed;
 
-    public DataRetentionViewModel? DataRetention { get; internal set; }
+    public DataRetentionViewModel? DataRetention
+    {
+        get => _dataRetention;
+        internal set
+        {
+            if (ReferenceEquals(_dataRetention, value)) return;
+            if (_dataRetention is not null) _dataRetention.PropertyChanged -= OnRetentionAvailabilityChanged;
+            _dataRetention = value;
+            if (_dataRetention is not null) _dataRetention.PropertyChanged += OnRetentionAvailabilityChanged;
+            _replayRetentionScope = RetentionAvailabilityScope();
+            InvalidateReplayAvailability(clearCalendar: true);
+        }
+    }
 
     internal MainViewModel(
         IMarketDataSource marketDataSource,
@@ -215,6 +227,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
                    EffectiveMode == SelectedMode &&
                    !IsSessionRunning &&
                    !_isStartingSession &&
+                   (SelectedMode != TradingMode.Replay || !IsCheckingReplayAvailability) &&
                    !HasConfigurationErrors),
             () => IsReplayPaused);
         StopSessionCommand = new AsyncRelayCommand(
@@ -644,6 +657,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
             return false;
         }
 
+        if (mode != SelectedMode) InvalidateReplayAvailability(clearCalendar: false);
         _modeState = mode is TradingMode.Live
             ? _modeState.Select(mode)
             : _modeState.ActivateSafeMode(mode);
@@ -941,7 +955,14 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
 
         try
         {
-            if (DataRetention is not null) await DataRetention.DisposeAsync();
+            _replayAvailabilityCancellation?.Cancel();
+            _replayCalendarCancellation?.Cancel();
+            await Task.WhenAll(_replayAvailabilityWork.ToArray());
+            if (DataRetention is not null)
+            {
+                DataRetention.PropertyChanged -= OnRetentionAvailabilityChanged;
+                await DataRetention.DisposeAsync();
+            }
             await _marketDataSource.DisposeAsync();
         }
         catch (Exception exception)
@@ -1059,6 +1080,10 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
             return false;
         }
 
+        if (propertyName is nameof(Symbol) or nameof(ReplayTime) or nameof(ReplayEndTime))
+            InvalidateReplayAvailability(clearCalendar: true);
+        else if (propertyName == nameof(ReplayDate))
+            InvalidateReplayAvailability(clearCalendar: false);
         if (!_applyingAutomationConfiguration) SavePreferences();
         return true;
     }

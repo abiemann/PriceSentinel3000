@@ -2,6 +2,9 @@ namespace PriceSentinel3000.Application.MarketDataLibrary;
 
 public enum CollectionJobStatus { Pending, Downloading, Complete, Partial, Unavailable, Failed }
 
+public sealed record CollectionContinuityGap(string Symbol, DateOnly FromSessionDate, DateOnly ThroughSessionDate,
+    string SessionBounds, string LibraryRootPath);
+
 public sealed record CollectionJob
 {
     public Guid Id { get; init; } = Guid.NewGuid();
@@ -30,6 +33,7 @@ public sealed record CollectionState
     public int SchemaVersion { get; init; } = 1;
     public CollectionSettings Settings { get; init; } = new();
     public IReadOnlyList<CollectionJob> Jobs { get; init; } = [];
+    public IReadOnlyList<CollectionContinuityGap> ContinuityGaps { get; init; } = [];
     public DateTimeOffset? LastScheduledOccurrenceUtc { get; init; }
 }
 

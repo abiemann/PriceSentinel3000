@@ -252,6 +252,59 @@ public sealed class JsonMarketDataLibraryTests : IDisposable
     }
 
     [Fact]
+    public void LargeLibrary_DoesNotStopCollectingOrReadingAfterTenThousandFiles()
+    {
+        HistoricalDatasetInfo original = Assert.Single(Library.Save(Download()));
+        string otherFiles = Path.Combine(_directory, "notes");
+        Directory.CreateDirectory(otherFiles);
+        for (int i = 0; i < 10_001; i++)
+            File.WriteAllText(Path.Combine(otherFiles, $"note-{i}.txt"), "");
+
+        Assert.Empty(Library.Scan().Diagnostics);
+        Assert.Equal(original.DatasetHash, Assert.Single(Library.Scan().Datasets).DatasetHash);
+        Assert.True(Library.Query(Query()).Coverage.Complete);
+        Assert.Equal(original.DatasetHash, Library.Read(original.DatasetHash).DatasetHash);
+        Assert.Single(Library.Save(Download() with { Symbol = "SOXL", InstrumentId = "instrument-soxl" }));
+        Assert.Equal(2, Library.Scan().Datasets.Count);
+    }
+
+    [Fact]
+    public void CopiedDuplicateFiles_AreValidatedAndReturnedOnce()
+    {
+        HistoricalDatasetInfo saved = Assert.Single(Library.Save(Download()));
+        string source = Path.Combine(_directory, saved.RelativePath);
+        for (int i = 0; i < 20; i++)
+            File.Copy(source, Path.Combine(_directory, $"copied-{i}.json"));
+
+        MarketDataLibraryScan scan = Library.Scan();
+
+        Assert.Empty(scan.Diagnostics);
+        Assert.Equal(saved.DatasetHash, Assert.Single(scan.Datasets).DatasetHash);
+        Assert.True(Library.Query(Query()).Coverage.Complete);
+    }
+
+    [Fact]
+    public void AggregateFileSize_DoesNotImposeALifetimeLibraryLimit()
+    {
+        HistoricalDatasetInfo original = Assert.Single(Library.Save(Download()));
+        for (int i = 0; i < 33; i++)
+        {
+            using var stream = File.Create(Path.Combine(_directory, $"invalid-{i}.json"));
+            // These files meet the individual size limit but fail JSON validation
+            // immediately. Their total exceeds the former 256 MiB library cap.
+            stream.SetLength(8 * 1024 * 1024);
+        }
+
+        MarketDataLibraryScan scan = Library.Scan();
+
+        Assert.Equal(33, scan.Diagnostics.Count);
+        Assert.All(scan.Diagnostics, item => Assert.Equal("invalid_dataset", item.Code));
+        Assert.Equal(original.DatasetHash, Assert.Single(scan.Datasets).DatasetHash);
+        Assert.True(Library.Query(Query()).Coverage.Complete);
+        Assert.Single(Library.Save(Download() with { Symbol = "SOXL", InstrumentId = "instrument-soxl" }));
+    }
+
+    [Fact]
     public void Query_DoesNotMergeProvidersOrAdjustmentBases()
     {
         HistoricalDownload download = Download();

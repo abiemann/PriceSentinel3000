@@ -13,8 +13,6 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
     private const int SchemaVersion = 1;
     private const string GroupingZone = "America/New_York";
     private const long MaximumFileBytes = 8 * 1024 * 1024;
-    private const long MaximumScanBytes = 256 * 1024 * 1024;
-    private const int MaximumFiles = 10_000;
     private static readonly TimeZoneInfo Eastern = TimeZoneInfo.FindSystemTimeZoneById(GroupingZone);
     private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
     private readonly object _saveLock = new();
@@ -31,11 +29,10 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
     public MarketDataLibraryScan Scan()
     {
         var datasets = new List<HistoricalDatasetInfo>();
+        var hashes = new HashSet<string>(StringComparer.Ordinal);
         var diagnostics = new List<MarketDataLibraryDiagnostic>();
         if (!Directory.Exists(RootPath)) return new(datasets, diagnostics);
         EnsureNoReparsePoint(RootPath);
-        long bytes = 0;
-        int files = 0;
         try
         {
             foreach (string path in Directory.EnumerateFiles(RootPath, "*", new EnumerationOptions
@@ -44,11 +41,6 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
                          AttributesToSkip = FileAttributes.ReparsePoint, IgnoreInaccessible = false,
                      }))
             {
-                if (++files > MaximumFiles)
-                {
-                    diagnostics.Add(new("", "scan_limit", "The library exceeds the bounded scan file count."));
-                    break;
-                }
                 string relative = Path.GetRelativePath(RootPath, path);
                 if (Path.GetFileName(path).Contains(".tmp-", StringComparison.Ordinal))
                 {
@@ -60,14 +52,8 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
                 {
                     long length = new FileInfo(path).Length;
                     if (length > MaximumFileBytes) throw new InvalidDataException("The candle file exceeds the 8 MiB limit.");
-                    bytes += length;
-                    if (bytes > MaximumScanBytes)
-                    {
-                        diagnostics.Add(new(relative, "scan_limit", "The library exceeds the bounded scan byte limit."));
-                        break;
-                    }
                     HistoricalDataset dataset = Load(path);
-                    if (datasets.All(item => item.DatasetHash != dataset.DatasetHash))
+                    if (hashes.Add(dataset.DatasetHash))
                         datasets.Add(Describe(dataset, relative));
                 }
                 catch (Exception exception) when (IsFileError(exception))
@@ -94,7 +80,7 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
         lock (_saveLock)
         {
             MarketDataLibraryScan scan = Scan();
-            if (scan.Diagnostics.Any(item => item.Code is "scan_limit" or "scan_failed"))
+            if (scan.Diagnostics.Any(item => item.Code == "scan_failed"))
                 throw new InvalidDataException("The library must scan completely before saving another dataset.");
             var saved = new List<HistoricalDatasetInfo>();
             foreach (DateOnly day in Dates(download.RequestedFromUtc, download.RequestedThroughUtc))
@@ -153,7 +139,7 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
             diagnostics.Add(new("", code, message));
             return new(false, [], [], Coverage(query.FromUtc, query.ThroughUtc, query.SourceIntervalSeconds, []), diagnostics);
         }
-        if (diagnostics.Any(item => item.Code is "scan_limit" or "scan_failed"))
+        if (diagnostics.Any(item => item.Code == "scan_failed"))
             return Failed("incomplete_scan", "The library could not be completely scanned; no dataset selection was made.");
         bool Matches(HistoricalDatasetInfo item) => item.Symbol == query.Symbol &&
             item.SourceIntervalSeconds == query.SourceIntervalSeconds &&

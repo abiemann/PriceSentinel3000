@@ -23,6 +23,8 @@ pause/step boundaries and fast playback.
 
 Open **Tools > Retain Hi-Res Data** to create download lists, import individual equities from Robinhood lists, and choose a daily collection time and time zone. The app stores portable daily candles under year / numbered English month / ticker folders, then reuses them for Replay and read-only MCP analysis. Automatic collection requires the app to stay open and connected; copied history can be replayed offline. See the [market-data library guide](docs/market-data-library.md).
 
+In Replay, press **Enter** after entering a date or time, click **CHECK**, or choose a calendar date to check coverage before starting. Dark green means complete local 15-second data, light green means verified broker 15-second data, orange means 30–60-second data, and red means two-minute data. Neutral dates have details explaining unchecked, partial, or unavailable coverage.
+
 ## Reviewer tour
 
 A Robinhood Agentic Trading account is required to run the connected workspace,
@@ -300,14 +302,17 @@ them later; they are not a promise that the labeled regions can be captured live
 
 ## Replay workflow
 
-1. After the required startup login, select **Replay** and enter the ticker,
+1. Connect to Robinhood, or continue offline for saved history, then select **Replay** and enter the ticker,
    local date (`yyyy-MM-dd`), local start/end times (`HH:mm`), and playback
-   speed, then click **Start Replay**.
-2. The app requests actual 15-second Robinhood bars for precisely that range,
-   using `24_5` historical bounds. If none are usable, it retries at 30 seconds,
-   then one minute. It uses the first resolution with complete bars inside the
-   range after excluding null/interpolated bars; invalid prices remain errors.
-   It never mixes resolutions, widens the range, or fills strategy gaps.
+   speed. Press **Enter**, click **CHECK**, or select a calendar date to inspect
+   availability, then click **Start Replay**.
+2. The check considers saved history and the broker for precisely that range and
+   the library's selected session bounds. Complete 15-second coverage takes
+   priority over complete 30-second, one-minute, or imported two-minute coverage.
+   Partial results are explicitly marked. START reuses the checked snapshot;
+   starting without a check uses the existing local-first lookup. Offline mode
+   uses saved files only. Null/interpolated bars are excluded and invalid prices
+   remain errors. Replay never mixes resolutions or fills strategy gaps.
 3. The returned observations are replayed in source-time order. Each historical
    candle becomes available at its actual close, with delays compressed by the
    selected speed. Session Status labels the source duration, and the chart

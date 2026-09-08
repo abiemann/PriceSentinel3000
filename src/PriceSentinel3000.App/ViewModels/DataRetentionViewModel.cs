@@ -141,6 +141,19 @@ public sealed class DataRetentionViewModel : INotifyPropertyChanged, IAsyncDispo
         ? $"Automatic downloads enabled: {Collector.State.Settings.DailyDownloadTime:HH:mm} · {Collector.State.Settings.TimeZoneId}. Keep this app open and connected."
         : "Automatic downloads are off. Manual downloads remain available.";
     public string JobSummary => $"{Jobs.Count(j => j.Status == CollectionJobStatus.Complete)} complete · {Jobs.Count(j => j.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading)} queued / downloading · {Jobs.Count(j => j.Status is CollectionJobStatus.Partial or CollectionJobStatus.Unavailable or CollectionJobStatus.Failed)} need attention";
+    public string ContinuityWarnings
+    {
+        get
+        {
+            CollectionState state = Collector.State;
+            CollectionContinuityGap[] gaps = state.ContinuityGaps.Where(g =>
+                string.Equals(g.LibraryRootPath, state.Settings.LibraryRootPath, StringComparison.OrdinalIgnoreCase) &&
+                g.SessionBounds == state.Settings.SessionBounds).ToArray();
+            if (gaps.Length == 0) return "Only genuine 15-second candles are downloaded. Missing coverage is checked per equity on each scheduled run.";
+            return "Unresolved gaps outside the automatic retry window (provider availability is not guaranteed). Use Download now with these dates to retry:\n" +
+                string.Join("\n", gaps.Select(g => FormattableString.Invariant($"{g.Symbol}: {g.FromSessionDate:yyyy-MM-dd} through {g.ThroughSessionDate:yyyy-MM-dd}")));
+        }
+    }
     public RelayCommand NewListCommand { get; }
     public AsyncRelayCommand SaveListCommand { get; }
     public AsyncRelayCommand DeleteListCommand { get; }
@@ -347,7 +360,7 @@ public sealed class DataRetentionViewModel : INotifyPropertyChanged, IAsyncDispo
     {
         Jobs.Clear();
         foreach (CollectionJob job in Collector.State.Jobs.OrderByDescending(j => j.QueuedAtUtc)) Jobs.Add(job);
-        Changed(nameof(SavedAutomaticDownloadsEnabled)); Changed(nameof(SavedSchedule)); Changed(nameof(JobSummary)); Changed(nameof(IsBusy));
+        Changed(nameof(SavedAutomaticDownloadsEnabled)); Changed(nameof(SavedSchedule)); Changed(nameof(JobSummary)); Changed(nameof(ContinuityWarnings)); Changed(nameof(IsBusy));
         NewListCommand?.RaiseCanExecuteChanged();
         foreach (AsyncRelayCommand command in Commands()) command?.RaiseCanExecuteChanged();
     }

@@ -62,8 +62,9 @@
      <TextBlock Margin="0,12,0,6" Text="Market session" /><ComboBox Style="{StaticResource InputComboBoxStyle}" ItemsSource="{Binding SessionChoices}" SelectedItem="{Binding SessionBounds}" AutomationProperties.Name="Download session coverage" />
      <TextBlock Margin="0,12,0,6" Text="Library folder" /><TextBox Style="{StaticResource InputTextBoxStyle}" Text="{Binding LibraryRootPath, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Market data library folder" />
      <Button Margin="0,12,0,8" Style="{StaticResource PrimaryButtonStyle}" Content="SAVE SCHEDULE &amp; FOLDER" Command="{Binding SaveScheduleCommand}" />
-     <TextBlock FontSize="12" Text="Runs while PriceSentinel is open and connected. The saved time zone follows daylight saving time. Missed runs catch up within 7 days. Collection uses the latest session that closed at least 15 minutes ago; an early scheduled time collects the prior session." />
+     <TextBlock FontSize="12" Text="Runs while PriceSentinel is open and connected. Each run checks saved 15-second coverage per equity and retries recent missing sessions. Older gaps remain visible. Collection uses the latest session that closed at least 15 minutes ago; an early scheduled time collects the prior session." />
      <TextBlock Margin="0,16,0,0" FontSize="12" Text="Regular coverage: 9:30–16:00 Eastern (13:00 early close). Extended coverage: 4:00–20:00 Eastern (17:00 early close). Market holidays are skipped." />
+     <TextBlock Margin="0,16,0,0" FontSize="12" Foreground="{StaticResource AccentBrush}" Text="{Binding ContinuityWarnings}" />
     </StackPanel></ScrollViewer>
     <Grid Grid.Column="2"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
      <StackPanel><TextBlock Style="{StaticResource SectionLabelStyle}" Text="DOWNLOAD SAVED, INCLUDED EQUITIES" />

@@ -43,7 +43,14 @@ public sealed partial class MainViewModel
                 return retention.PrepareConnectionAsync(cancellation);
             }).Task.Unwrap());
         SetMarketDataState("LOCAL LIBRARY", "READING HISTORY", isConnected: false);
-        _resolvedReplayHistory = await Task.Run(() => resolver.ResolveAsync(query, offline, token), token);
+        ReplayCheckContext current = CreateReplayCheckContext(ReplayDate);
+        PreparedReplay? prepared = _preparedReplay;
+        if (prepared is not null && prepared.Key == current.Key &&
+            (prepared.Availability.HasData || _timeProvider.GetUtcNow() - prepared.CheckedAtUtc < TimeSpan.FromMinutes(5)) &&
+            current.Query.Symbol == instrument.Symbol && current.Query.FromUtc == from && current.Query.ThroughUtc == through)
+            _resolvedReplayHistory = await Task.Run(() => prepared.Service.LoadPreparedAsync(prepared.Availability, token), token);
+        else
+            _resolvedReplayHistory = await Task.Run(() => resolver.ResolveAsync(query, offline, token), token);
         foreach (MarketDataLibraryDiagnostic diagnostic in _resolvedReplayHistory.Diagnostics)
             AddActivity(diagnostic.Message, "WARNING");
         DateTimeOffset observedAt = _timeProvider.GetUtcNow();

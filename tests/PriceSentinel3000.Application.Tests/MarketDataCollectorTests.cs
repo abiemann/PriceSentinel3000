@@ -15,15 +15,16 @@ public sealed class MarketDataCollectorTests
         await collector.SaveSettingsAsync(Settings() with { AutomaticDownloadsEnabled = true });
         clock.Now = DateTimeOffset.Parse("2026-09-04T20:15:00Z");
         await collector.TickAsync(false);
-        Assert.Equal(new[] { "SOFI", "NVDA" }, collector.State.Jobs.Select(j => j.Symbol));
+        Assert.Equal(new[] { "SOFI", "NVDA" }, collector.State.Jobs.Select(j => j.Symbol).Distinct());
         Assert.Empty(provider.Requests);
         await collector.SaveSettingsAsync(collector.State.Settings with { Lists = [] });
         var restarted = new MarketDataCollector(store, provider, _ => library, clock, Options());
         await restarted.TickAsync(true);
-        Assert.Equal(2, provider.Requests.Count);
+        await restarted.TickAsync(true);
+        Assert.Equal(collector.State.Jobs.Count, provider.Requests.Count);
         Assert.All(restarted.State.Jobs, j => Assert.Equal(CollectionJobStatus.Complete, j.Status));
         await restarted.TickAsync(true);
-        Assert.Equal(2, provider.Requests.Count);
+        Assert.Equal(collector.State.Jobs.Count, provider.Requests.Count);
     }
 
     [Fact]
@@ -57,18 +58,18 @@ public sealed class MarketDataCollectorTests
     }
 
     [Fact]
-    public async Task CoarseFallbackIsPartialAndRequestBudgetResumesAtNextResolution()
+    public async Task EmptyFineHistoryNeverFallsBackToCoarseEvenAcrossTicks()
     {
         var (collector, _, provider, _, _) = Create(Options() with { MaximumRequestsPerTick = 1 });
         provider.EmptyIntervals.Add(15);
         await collector.QueueManualAsync(["SOFI"], Day, Day);
         await collector.TickAsync(true);
-        Assert.Equal(CollectionJobStatus.Pending, Assert.Single(collector.State.Jobs).Status);
+        Assert.Equal(CollectionJobStatus.Unavailable, Assert.Single(collector.State.Jobs).Status);
         await collector.TickAsync(true);
         CollectionJob job = Assert.Single(collector.State.Jobs);
-        Assert.Equal(CollectionJobStatus.Partial, job.Status);
-        Assert.Equal(30, job.ActualSourceIntervalSeconds);
-        Assert.Equal(new[] { 15, 30 }, provider.Requests.Select(r => r.SourceIntervalSeconds));
+        Assert.Equal(CollectionJobStatus.Unavailable, job.Status);
+        Assert.Null(job.ActualSourceIntervalSeconds);
+        Assert.Equal(new[] { 15 }, provider.Requests.Select(r => r.SourceIntervalSeconds));
     }
 
     [Fact]
@@ -80,7 +81,7 @@ public sealed class MarketDataCollectorTests
         await collector.TickAsync(true);
         Assert.Equal(CollectionJobStatus.Unavailable, Assert.Single(collector.State.Jobs).Status);
         await collector.TickAsync(true);
-        Assert.Equal(3, provider.Requests.Count);
+        Assert.Single(provider.Requests);
         provider.EmptyIntervals.Clear();
         await collector.RetryMissingAsync();
         await collector.TickAsync(true);

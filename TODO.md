@@ -38,6 +38,8 @@ See the [user guide](docs/market-data-library.md) and [design](DESIGN.md#local-m
 - [x] User-selected daily time and saved time zone, holiday/early-close/DST handling, app-open collection, durable deduplicated jobs, bounded retries, restart/disconnection recovery, and manual date-range downloads.
 - [x] Portable symbol-only list transfer and year / numbered English month / ticker / daily JSON history with exact candles, source-close timing, provenance, gaps, nullable volume and immutable revisions.
 - [x] Local-first and offline Replay, explicit revision selection and dataset pins, actual-resolution enforcement, and read-only paginated MCP library discovery/candle access without an active session.
+- [x] Per-equity continuity from saved coverage, genuine 15-second-only collection, partial-day repair, and persistent reporting of older unresolved gaps.
+- [x] Replay preflight on Enter/CHECK/date selection, a colored availability calendar, exact-range coverage checks, and reuse of checked data at START without another broker download.
 - [x] Automated storage, scheduler, import, Replay, MCP and UI integration checks; authenticated read-only list/candle provider smoke checks.
 - [ ] Compare fixed scripts empirically across retained source resolutions using the same period and strategy interval. Preserving finer data does not guarantee higher P&L.
 - [ ] Consider a separately installed background worker if users need collection while the app is closed. Current scheduling explicitly requires an open, connected app.

@@ -14,8 +14,8 @@ host position/risk safeguards, history availability, immutable artifacts, WPF
 selection, and sample seeding. Windows publication includes the original source.
 Local MCP control, research telemetry, and source-duration-aware Replay fallback
 are also implemented. Remaining release checks and follow-ups are tracked in
-[TODO.md](TODO.md). The local market-data library described below is a proposal,
-not a current application feature.
+[TODO.md](TODO.md). The local market-data library, automatic collection, and
+Replay availability calendar described below are also implemented.
 
 ## Product scope
 
@@ -141,7 +141,7 @@ Implemented September 7, 2026. The [user guide](docs/market-data-library.md) cov
 
 Manual lists accept pasted symbols. Connected resolution validates equities and resolves company names; offline entries remain visibly unresolved until download. Per-member and per-list inclusion control the collection union independently of strategy selection and trade eligibility. Robinhood import retrieves personal lists, validates response completeness, previews individual equity checkboxes, and creates an editable local snapshot. Explicit refresh preserves exclusions and previews membership changes before Save. Portable list exports omit private remote IDs. Removing lists never deletes candles.
 
-The collector persists settings, queued membership and progress atomically in `collection-state.json`. At the user's chosen time and saved zone, it collects the latest selected session finalized at least 15 minutes earlier. It preserves the chosen clock time, follows DST and the exchange holiday/early-close calendar, catches up within seven calendar days after enablement, skips complete saved sessions, and serializes requests with bounded retry. Skipped clock times run at the first valid minute; repeated times run once at the earlier occurrence. Regular coverage is default; extended coverage is explicit. The app must be open and connected. Background calls cannot initiate interactive authorization. Running while the app is closed remains separate future work.
+The collector persists settings, queued membership, progress and older unresolved gap ranges atomically in `collection-state.json`. At the user's chosen time and saved zone, it checks each equity's actual saved coverage through the latest selected session finalized at least 15 minutes earlier. It requests only genuine 15-second candles, skips complete sessions and retries missing/partial sessions within seven calendar days, independently of when collection was enabled. New equities start with that recent window. This retry horizon is not a provider retention guarantee; older gaps remain visible and can be retried manually. Partial days resume at the earliest hole and preserve compatible saved candles in an immutable merged revision; differing provenance or changed overlapping candles cannot be blended. Requests are serialized with bounded transient retry. Skipped clock times run at the first valid minute; repeated times run once at the earlier occurrence. Regular coverage is default; extended coverage is explicit. The app must be open and connected. Background calls cannot initiate interactive authorization. Running while the app is closed remains separate future work.
 
 ### Portable folder layout
 
@@ -166,6 +166,8 @@ Copies of files or whole folders work without the original journal, sidecars, pr
 ### Replay lookup and script-analysis access
 
 Explicit hashes take precedence and never permit silent substitution. Otherwise Replay checks local 15-second files, then provider 15-second history, local/provider 30-second, local/provider 60-second, and finally actual imported local 120-second data. The adapter has no 120-second request. Provider results are validated and archived before use. Usable sparse local fine data is retained with visible gaps; requesting missing/corrected data is an explicit collection action. Offline mode skips all provider requests, and the welcome screen permits local use without authentication.
+
+Before START, Enter in the date/start/end fields, CHECK, or selecting a calendar date checks the exact dashboard range. Complete local 15-second coverage is dark green; verified broker 15-second coverage is light green; 30/60-second coverage is orange; actual 120-second coverage is red. Partial, unchecked, unavailable, and conflicting data remain neutral with details. Opening a month scans local metadata without broker requests for every day. Selected-date checks use the existing connection, preserve the checked provider candles in memory, and prefer complete coverage before partial results. START archives that exact prepared snapshot or rereads the pinned local files. Ticker, range, library, and selection-policy changes invalidate preparation. Broker calendar results expire after five minutes; source availability is verified rather than inferred from a fixed retention age. Starting without a check retains the direct lookup behavior above.
 
 One genuine source interval is used per run, with existing strategy-interval compatibility and completed-bar aggregation. Missing price groups remain gaps; no finer prices are synthesized. Exact selected hashes, coverage, resolution and source provenance are retained in journal/MCP results. The read-only `library_datasets` and `library_candles` tools use the same validated reader without an active session or connection; catalog pagination detects changes and candle pages are pinned by immutable hash. No MCP library tool accepts arbitrary filesystem paths.
 
