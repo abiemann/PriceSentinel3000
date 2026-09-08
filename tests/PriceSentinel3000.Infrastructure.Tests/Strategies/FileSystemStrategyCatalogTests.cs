@@ -160,7 +160,7 @@ public sealed class FileSystemStrategyCatalogTests : IDisposable
         var catalog = new FileSystemStrategyCatalog(Scripts, packaged);
 
         StrategyDescriptor sample = Assert.Single(catalog.Load().Strategies, item => !item.IsBuiltIn);
-        Assert.Equal("OriginalConfirmation (experimental)", sample.Name);
+        Assert.Equal("Original Confirmation - experimental", sample.Name);
         Assert.Equal("script:originalconfirmation.thinkscript", sample.Id);
         Assert.Equal(FileSystemStrategyCatalog.SampleFileName, sample.FileName);
         Assert.False(File.Exists(Path.Combine(Scripts, "Unrelated.ts")));

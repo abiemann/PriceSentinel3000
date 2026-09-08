@@ -1,0 +1,39 @@
+{
+  "protocolCommit": "9138edb",
+  "scripts": [
+    {
+      "symbol": "NU",
+      "name": "Nu Holdings (NU) Breakout - experimental",
+      "file": "../../../research/strategies/Nu Holdings (NU) Breakout - experimental.thinkscript",
+      "profile": "B1",
+      "strategyId": "script:nu holdings (nu) breakout - experimental.thinkscript",
+      "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+      "requiredWarmupBars": 84,
+      "exactCandidateCopy": true,
+      "symbolEnforcedByScript": false
+    },
+    {
+      "symbol": "SOFI",
+      "name": "SoFi Technologies (SOFI) Breakout - experimental",
+      "file": "../../../research/strategies/SoFi Technologies (SOFI) Breakout - experimental.thinkscript",
+      "profile": "B1",
+      "strategyId": "script:sofi technologies (sofi) breakout - experimental.thinkscript",
+      "sourceSha256": "ddb3eef3af8aad0c5b6091cdea4a0e02d39e48fe2b857fc879124daa4fd16ad2",
+      "requiredWarmupBars": 84,
+      "exactCandidateCopy": true,
+      "symbolEnforcedByScript": false
+    },
+    {
+      "symbol": "AAL",
+      "name": "American Airlines (AAL) Confirmation - experimental",
+      "file": "../../../research/strategies/American Airlines (AAL) Confirmation - experimental.thinkscript",
+      "profile": "C1",
+      "strategyId": "script:american airlines (aal) confirmation - experimental.thinkscript",
+      "sourceSha256": "e5c76250cd82438ec3c2fa4f8c73230ac067d2292a6803ababf64cae48547abc",
+      "requiredWarmupBars": 85,
+      "exactCandidateCopy": true,
+      "symbolEnforcedByScript": false
+    }
+  ],
+  "note": "Filenames identify the intended stocks. Nu and SoFi independently select identical B1 formulas. Match the app symbol manually."
+}

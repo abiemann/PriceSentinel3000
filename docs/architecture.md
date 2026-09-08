@@ -216,10 +216,10 @@ All mutable application data lives under `%LOCALAPPDATA%\PriceSentinel3000`:
   weaken the limit.
 - JSON preferences contain ordinary UI and research settings only.
 
-Replay currently requests history from the provider, rather than reusing the
-journal as a symbol/date market-data library. The [proposed local history design](../DESIGN.md#proposed-local-market-data-library)
-is not implemented. Sampled quote rows and their default duration must not be
-treated as authoritative historical OHLCV candles.
+Replay reuses verified candle files from the [local market-data library](market-data-library.md)
+and requests broker history when needed. The activity journal is separate:
+sampled quote rows and their default duration must not be treated as
+authoritative historical OHLCV candles.
 
 Passwords are never requested or stored. Runtime databases, token files, and local
 preferences are excluded from source control.

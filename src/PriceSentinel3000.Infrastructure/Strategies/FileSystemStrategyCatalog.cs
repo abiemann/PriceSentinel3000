@@ -133,9 +133,12 @@ public sealed class FileSystemStrategyCatalog : IStrategyCatalog
 
             var descriptor = new StrategyDescriptor(
                 "script:" + fileName.ToLowerInvariant(),
-                fileName.Equals(SampleFileName, StringComparison.OrdinalIgnoreCase)
-                    ? "OriginalConfirmation (experimental)"
-                    : Path.GetFileNameWithoutExtension(fileName),
+                fileName.ToLowerInvariant() switch
+                {
+                    "originalconfirmation.thinkscript" => "Original Confirmation - experimental",
+                    "nflxconfirmation.thinkscript" => "Netflix (NFLX) Confirmation - experimental",
+                    _ => Path.GetFileNameWithoutExtension(fileName),
+                },
                 fileName,
                 Convert.ToHexStringLower(SHA256.HashData(bytes)),
                 ThinkScriptCompiler.RuntimeVersion);

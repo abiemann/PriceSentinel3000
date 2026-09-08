@@ -362,7 +362,12 @@ rules. Volume, secondary timeframes, custom functions, shorting, and other unsup
 features are rejected. Two small public forum strategies have passed unchanged-source
 compatibility checks. That does not imply every thinkScript works unchanged.
 See the [compatibility guide](docs/strategy-scripting.md) and
-[research and validation results](docs/strategy-research.md).
+[source research and compatibility checks](archive/research/strategy-sources-and-compatibility.md).
+
+Repository script sources are collected in [research/strategies](research/strategies/README.md).
+Current application guides are indexed in [docs](docs/README.md), and reusable
+research tools in [research](research/README.md). Past app verification and stock
+experiments share one [archive](archive/README.md), grouped by topic.
 
 For scripts, Paper and LIVE evaluate completed price candles built from incoming quotes.
 These sampled candles can differ from exchange tick candles. Initial history can

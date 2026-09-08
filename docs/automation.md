@@ -253,18 +253,18 @@ Real-time Paper Trader validation during an open market remains outstanding;
 passing historical Replay checks does not complete it. The remaining release
 checks are tracked in [TODO](../TODO.md#next-release-verification).
 
-The [MCP research validation](automation-research-validation-2026-09-06.md)
+The [MCP telemetry validation](../archive/app/automation-telemetry-validation-2026-09-06.md)
 records exact candle aggregation, indicator warmup, event correlation, host
 risk overrides, and native chart captures against the running app.
 
-The [September 7 fallback verification](history-fallback-validation-2026-09-07.md)
+The [September 7 fallback verification](../archive/app/history-fallback-validation-2026-09-07.md)
 retrieved 390 real one-minute NFLX candles
 for August 24, 2026, 06:30–13:00 Pacific, where finer history was unavailable.
 Automated coverage verifies source-close timing, compatible aggregation,
 incompatible-script rejection, source-duration provenance, and migration of
 existing journal observations with their 15-second default.
 
-The [September 6 MCP Replay validation](automation-validation-2026-09-06.md)
+The [September 6 MCP Replay validation](../archive/app/automation-validation-2026-09-06.md)
 records ten passing test groups against the running desktop app, including risk
 exits, exact Replay boundaries, source pinning, and startup recovery.
 

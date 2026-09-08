@@ -6,7 +6,9 @@ This interpreter is not the thinkorswim strategy engine. A script passing compat
 
 ## Loading a strategy
 
-Use **SCRIPTS FOLDER** to open `%LOCALAPPDATA%\PriceSentinel3000\Strategies`. Place UTF-8 `.thinkscript`, `.ts`, or `.txt` source files directly in that folder, then refresh the list while the session is stopped. Subdirectories are not searched. The filename supplies the display name; the bundled example additionally displays `(experimental)`. The folder supports at most 128 files, including its sample-seeding marker, and each source file is limited to 256 KiB before decoding.
+Use **SCRIPTS FOLDER** to open `%LOCALAPPDATA%\PriceSentinel3000\Strategies`. Place UTF-8 `.thinkscript`, `.ts`, or `.txt` source files directly in that folder, then refresh the list while the session is stopped. Subdirectories are not searched. The filename normally supplies the display name. The folder supports at most 128 files, including its sample-seeding marker, and each source file is limited to 256 KiB before decoding.
+
+For compatibility with existing installations, the legacy filename `NFLXConfirmation.thinkscript` displays as `Netflix (NFLX) Confirmation - experimental`, and `OriginalConfirmation.thinkscript` displays as `Original Confirmation - experimental`. These display aliases preserve existing strategy IDs and source hashes. A renamed file gets a new strategy ID and must be selected again after refreshing. The compiled default is still **Built-In**. Stock-specific naming and experiments are documented in the [research index](../research/README.md).
 
 The bundled `OriginalConfirmation.thinkscript` is an original educational example using EMA trend, price recovery, and RSI conditions. It is separate from the compiled built-in default. Start with Paper/Replay to inspect its decisions; synthetic validation fixtures demonstrate language behavior and make no performance claim.
 

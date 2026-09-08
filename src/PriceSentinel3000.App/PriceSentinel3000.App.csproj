@@ -23,7 +23,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="..\..\samples\strategies\OriginalConfirmation.thinkscript"
+    <Content Include="..\..\research\strategies\OriginalConfirmation.thinkscript"
              Link="Strategies\OriginalConfirmation.thinkscript"
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="PreserveNewest" />

@@ -2,8 +2,8 @@
 
 This specification incorporates decisions through September 7, 2026. Implementation
 has been delivered in validated milestones. The [compatibility guide](docs/strategy-scripting.md)
-identifies the implemented subset and resource limits; [research results](docs/strategy-research.md)
-record the unchanged-source checks and original example fixtures. The existing compiled price-action strategy
+identifies the implemented subset and resource limits; [source research](archive/research/strategy-sources-and-compatibility.md)
+records the unchanged-source checks and original example fixtures. The existing compiled price-action strategy
 remains enabled by default and appears as **Built-In**. Converting it to an
 external script is future work.
 
