@@ -219,21 +219,23 @@ public sealed partial class SessionWorkflowTests
     });
 
     [Theory]
-    [InlineData("automatic")]
-    [InlineData("time")]
-    [InlineData("zone")]
-    [InlineData("bounds")]
-    [InlineData("folder")]
-    public Task DownloadProgress_EachScheduleDraftFieldRequiresSave(string field) => host.RunAsync(async () =>
+    [InlineData("automatic", "UTC")]
+    [InlineData("time", "UTC")]
+    [InlineData("zone", "UTC")]
+    [InlineData("zone", "Pacific Standard Time")]
+    [InlineData("bounds", "UTC")]
+    [InlineData("folder", "UTC")]
+    public Task DownloadProgress_EachScheduleDraftFieldRequiresSave(string field, string savedTimeZone) => host.RunAsync(async () =>
     {
-        await using var fixture = new RetentionFixture();
+        await using var fixture = new RetentionFixture(timeZoneId: savedTimeZone);
         DataRetentionViewModel vm = fixture.ViewModel;
+        Assert.Equal(savedTimeZone, vm.TimeZoneId);
         Assert.False(vm.HasScheduleChanges);
         switch (field)
         {
             case "automatic": vm.AutomaticDownloadsEnabled = !vm.AutomaticDownloadsEnabled; break;
             case "time": vm.DailyTime = "12:34"; break;
-            case "zone": vm.TimeZoneId = "UTC"; break;
+            case "zone": vm.TimeZoneId = savedTimeZone == "UTC" ? "Pacific Standard Time" : "UTC"; break;
             case "bounds": vm.SessionBounds = "extended"; break;
             case "folder": vm.LibraryRootPath = Path.Combine(fixture.Root, "other-library"); break;
         }

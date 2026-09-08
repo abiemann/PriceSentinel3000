@@ -21,7 +21,7 @@ public sealed class AutomationPipeTests
 
         for (int index = 1; index <= 3; index++)
         {
-            var response = await client.SendAsync(Request("status"));
+            var response = await SendToRunningServerAsync(client, Request("status"));
             Assert.True(response.Success, response.Error);
             Assert.Equal("status", response.Result!.Value.GetProperty("command").GetString());
             Assert.Equal(index, response.Result.Value.GetProperty("calls").GetInt32());
@@ -39,7 +39,7 @@ public sealed class AutomationPipeTests
         await first.DisposeAsync();
         await first.DisposeAsync();
         second.Start();
-        Assert.True((await new AutomationPipeClient(name).SendAsync(Request("status"))).Success);
+        Assert.True((await SendToRunningServerAsync(new AutomationPipeClient(name), Request("status"))).Success);
     }
 
     [Theory]
@@ -61,7 +61,7 @@ public sealed class AutomationPipeTests
             Assert.Equal("invalid_request", response.ErrorCode);
         }
 
-        Assert.True((await new AutomationPipeClient(name).SendAsync(Request("status"))).Success);
+        Assert.True((await SendToRunningServerAsync(new AutomationPipeClient(name), Request("status"))).Success);
     }
 
     [Fact]
@@ -84,7 +84,7 @@ public sealed class AutomationPipeTests
         await using var server = new AutomationPipeServer((_, _) => Task.FromResult(
             AutomationResponse.Ok(new { text = new string('x', 1024 * 1024) })), name);
         server.Start();
-        var response = await new AutomationPipeClient(name).SendAsync(Request("results"));
+        var response = await SendToRunningServerAsync(new AutomationPipeClient(name), Request("results"));
         Assert.Equal("response_too_large", response.ErrorCode);
     }
 
@@ -119,7 +119,7 @@ public sealed class AutomationPipeTests
         }
 
         await canceled.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        Assert.True((await new AutomationPipeClient(name).SendAsync(Request("status"))).Success);
+        Assert.True((await SendToRunningServerAsync(new AutomationPipeClient(name), Request("status"))).Success);
     }
 
     [Fact]
@@ -134,7 +134,7 @@ public sealed class AutomationPipeTests
             return AutomationResponse.Ok(new { });
         }, name);
         server.Start();
-        var pending = new AutomationPipeClient(name).SendAsync(Request("status"));
+        var pending = SendToRunningServerAsync(new AutomationPipeClient(name), Request("status"));
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await server.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));
         Assert.False((await pending.WaitAsync(TimeSpan.FromSeconds(5))).Success);
@@ -156,6 +156,20 @@ public sealed class AutomationPipeTests
         new(command, JsonSerializer.SerializeToElement(new { }));
 
     private static string UniquePipe() => $"PriceSentinel3000.Tests.{Guid.NewGuid():N}";
+
+    private static async Task<AutomationResponse> SendToRunningServerAsync(
+        AutomationPipeClient client, AutomationRequest request)
+    {
+        var response = await client.SendAsync(request);
+        // A busy CI worker can exceed the client's two-second connection deadline while the
+        // server releases its previous connection. Retry only failures before a request is sent.
+        for (int retry = 0; response.ErrorCode == "app_not_running" && retry < 2; retry++)
+        {
+            response = await client.SendAsync(request);
+        }
+
+        return response;
+    }
 
     private static async Task<NamedPipeClientStream> ConnectAsync(string name)
     {

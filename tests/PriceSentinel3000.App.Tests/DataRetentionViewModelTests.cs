@@ -235,11 +235,12 @@ public sealed partial class SessionWorkflowTests
         public RetentionProvider Provider { get; }
         public MarketDataCollector Collector { get; }
         public DataRetentionViewModel ViewModel { get; }
-        public RetentionFixture(DateOnly? gapFrom = null, DateOnly? gapThrough = null)
+        public RetentionFixture(DateOnly? gapFrom = null, DateOnly? gapThrough = null, string? timeZoneId = null)
         {
             Provider = new(() => Connected);
             var store = new JsonCollectionStateStore(StatePath);
-            store.Save(new CollectionState { Settings = new CollectionSettings { LibraryRootPath = LibraryRoot },
+            store.Save(new CollectionState { Settings = new CollectionSettings
+                { LibraryRootPath = LibraryRoot, TimeZoneId = timeZoneId ?? TimeZoneInfo.Local.Id },
                 ContinuityGaps = gapFrom is { } from && gapThrough is { } through
                     ? [new("NFLX", from, through, "regular", LibraryRoot)] : [] });
             Collector = new(store, Provider, root => new JsonMarketDataLibrary(root),
