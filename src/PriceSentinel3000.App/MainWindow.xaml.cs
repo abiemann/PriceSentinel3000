@@ -12,6 +12,7 @@ public partial class MainWindow : Window
     private readonly MainViewModel _viewModel;
     private readonly IAsyncDisposable? _automationServer;
     private DataRetentionDialog? _dataRetentionDialog;
+    private int _dataRetentionTabIndex;
     private bool _closeAfterShutdown;
     private bool _shutdownInProgress;
 
@@ -63,12 +64,20 @@ public partial class MainWindow : Window
     {
         if (_dataRetentionDialog is not null)
         {
+            if (_viewModel.DataRetention?.HasDownloadWork is true)
+                ((TabItem)_dataRetentionDialog.FindName("ScheduleDownloadsTab")).IsSelected = true;
             _dataRetentionDialog.Activate();
             return;
         }
 
         _dataRetentionDialog = new DataRetentionDialog { Owner = this, DataContext = _viewModel.DataRetention };
-        _dataRetentionDialog.Closed += (_, _) => _dataRetentionDialog = null;
+        ((TabControl)_dataRetentionDialog.FindName("RetentionTabs")).SelectedIndex =
+            _viewModel.DataRetention?.HasDownloadWork is true ? 1 : _dataRetentionTabIndex;
+        _dataRetentionDialog.Closed += (sender, _) =>
+        {
+            _dataRetentionTabIndex = ((TabControl)((DataRetentionDialog)sender!).FindName("RetentionTabs")).SelectedIndex;
+            _dataRetentionDialog = null;
+        };
         // Keep the trading workspace, including STOP, accessible while viewing tools.
         _dataRetentionDialog.Show();
     }
@@ -180,7 +189,8 @@ public partial class MainWindow : Window
             await _viewModel.ShutdownAsync(
                 forceUnresolvedLiveOrder: !safeToClose);
             _closeAfterShutdown = true;
-            Close();
+            // Leave the current Closing event before issuing the final Close.
+            _ = Dispatcher.BeginInvoke(new Action(Close));
         }
         catch (Exception exception)
         {

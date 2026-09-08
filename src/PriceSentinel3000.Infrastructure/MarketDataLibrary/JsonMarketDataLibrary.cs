@@ -166,6 +166,11 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
         {
             if (group.Count() > 1 && (query.PinnedHashes is { Count: > 0 } || query.RevisionPolicy == HistoricalRevisionPolicy.RejectConflicts))
                 return Failed("revision_selection_required", "Multiple daily revisions match. Pin one hash per day or explicitly choose LatestFetched.");
+            if (query.RevisionPolicy == HistoricalRevisionPolicy.CompatibleCoverage)
+            {
+                selected.AddRange(group.OrderBy(item => item.FetchedAtUtc).ThenBy(item => item.DatasetHash, StringComparer.Ordinal));
+                continue;
+            }
             selected.Add(group.OrderByDescending(item => item.FetchedAtUtc)
                 .ThenBy(item => item.DatasetHash, StringComparer.Ordinal).First());
         }
@@ -178,6 +183,12 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
                 return dataset.Candles;
             }).Where(item => item.StartsAtUtc >= query.FromUtc && item.EndsAtUtc <= query.ThroughUtc)
                 .OrderBy(item => item.StartsAtUtc).ToArray();
+            if (query.RevisionPolicy == HistoricalRevisionPolicy.CompatibleCoverage)
+            {
+                if (candles.GroupBy(item => item.StartsAtUtc).Any(group => group.Distinct().Skip(1).Any()))
+                    return Failed("revision_selection_required", "Saved revisions disagree on candle prices or volume. Choose one revision or explicitly use the latest fetched revision.");
+                candles = candles.Distinct().ToArray();
+            }
             return new(true, selected.OrderBy(item => item.TradingDate).ToArray(), candles,
                 Coverage(query.FromUtc, query.ThroughUtc, query.SourceIntervalSeconds, candles), diagnostics);
         }

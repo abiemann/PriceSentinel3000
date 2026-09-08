@@ -37,7 +37,7 @@ public sealed class LibraryReplayHistoryResolverTests : IDisposable
     }
 
     [Fact]
-    public async Task PartialFineLocal_IsUsedWithGapsInsteadOfCoarseSubstitutionOrLogin()
+    public async Task PartialFineLocal_UsesCompleteLocalCoarseWithoutLogin()
     {
         HistoricalDownload fine = Download(15) with { Candles = [Download(15).Candles[1]] };
         Library.Save(fine);
@@ -45,6 +45,22 @@ public sealed class LibraryReplayHistoryResolverTests : IDisposable
         _provider.Downloads[15] = Download(15);
 
         LibraryReplayHistoryResult result = await Resolver.ResolveAsync(Query, false, default);
+
+        Assert.Equal(30, result.SourceIntervalSeconds);
+        Assert.Equal(Download(30).Candles, result.Candles);
+        Assert.True(result.Coverage.Complete);
+        Assert.Empty(result.Coverage.Gaps);
+        AssertNoNetwork();
+    }
+
+    [Fact]
+    public async Task PartialFineLocal_OfflinePreservesGapsWithoutLogin()
+    {
+        HistoricalDownload fine = Download(15) with { Candles = [Download(15).Candles[1]] };
+        Library.Save(fine);
+        _provider.Downloads[15] = Download(15);
+
+        LibraryReplayHistoryResult result = await Resolver.ResolveAsync(Query, true, default);
 
         Assert.Equal(15, result.SourceIntervalSeconds);
         Assert.Equal(fine.Candles, result.Candles);
@@ -69,26 +85,24 @@ public sealed class LibraryReplayHistoryResolverTests : IDisposable
     }
 
     [Fact]
-    public async Task Online_ProviderFineIsPreferredOverLocalCoarseAndSavedBeforeUse()
+    public async Task Online_CompleteLocalCoarsePreventsAuthenticationAndFinerBrokerRequest()
     {
         Library.Save(Download(30));
         _provider.Downloads[15] = Download(15);
         LibraryReplayHistoryResult result = await Resolver.ResolveAsync(Query, false, default);
-        Assert.Equal("provider-saved-library", result.Source);
-        Assert.Equal(15, result.SourceIntervalSeconds);
-        Assert.Equal(new[] { 15 }, _provider.Requests.Select(item => item.SourceIntervalSeconds));
-        Assert.Equal(1, _connections);
+        Assert.Equal("local-library", result.Source);
+        Assert.Equal(30, result.SourceIntervalSeconds);
+        AssertNoNetwork();
         Assert.Equal(result.Candles, Library.Read(Assert.Single(result.Datasets).DatasetHash).Candles);
     }
 
     [Fact]
-    public async Task FineProviderEmpty_UsesLocalThirtyBeforeRequestingThirty()
+    public async Task CompleteLocalThirty_DoesNotNeedAnyBrokerAvailabilityProbe()
     {
         Library.Save(Download(30));
         LibraryReplayHistoryResult result = await Resolver.ResolveAsync(Query, false, default);
         Assert.Equal(30, result.SourceIntervalSeconds);
-        Assert.Equal(new[] { 15 }, _provider.Requests.Select(item => item.SourceIntervalSeconds));
-        Assert.Equal(1, _connections);
+        AssertNoNetwork();
     }
 
     [Fact]
@@ -110,13 +124,13 @@ public sealed class LibraryReplayHistoryResolverTests : IDisposable
     }
 
     [Fact]
-    public async Task LocalTwoMinute_IsLastAndProviderNeverReceivesUnsupportedTwoMinuteRequest()
+    public async Task CompleteLocalTwoMinute_PreventsAllBrokerRequests()
     {
         Library.Save(Download(120));
         LibraryReplayHistoryResult result = await Resolver.ResolveAsync(Query, false, default);
         Assert.Equal(120, result.SourceIntervalSeconds);
         Assert.Single(result.Candles);
-        Assert.Equal(new[] { 15, 30, 60 }, _provider.Requests.Select(item => item.SourceIntervalSeconds));
+        AssertNoNetwork();
     }
 
     [Fact]
@@ -180,7 +194,7 @@ public sealed class LibraryReplayHistoryResolverTests : IDisposable
     [Fact]
     public async Task ProviderFailure_IsNotTreatedAsProofThatFineDataIsUnavailable()
     {
-        Library.Save(Download(30));
+        Library.Save(Download(30) with { Candles = [Download(30).Candles[0]] });
         _provider.Error = new HttpRequestException("Network unavailable");
         await Assert.ThrowsAsync<HttpRequestException>(() => Resolver.ResolveAsync(Query, false, default));
         Assert.Equal(new[] { 15 }, _provider.Requests.Select(item => item.SourceIntervalSeconds));
@@ -201,6 +215,45 @@ public sealed class LibraryReplayHistoryResolverTests : IDisposable
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Resolver.ResolveAsync(Query, false, cancellation.Token));
         AssertNoNetwork();
+    }
+
+    [Fact]
+    public async Task PartialLocal_OnlineAuthenticatesOnce_AndDownloadsOnlyMissingFineTail()
+    {
+        HistoricalCandle[] prefix = Download(15).Candles.Take(4).ToArray();
+        string localHash = Assert.Single(Library.Save(Download(15) with { Candles = prefix })).DatasetHash;
+        _provider.Downloads[15] = Download(15);
+
+        LibraryReplayHistoryResult result = await Resolver.ResolveAsync(Query, false, default);
+
+        Assert.Equal("local-and-provider-saved-library", result.Source);
+        Assert.Equal(15, result.SourceIntervalSeconds);
+        Assert.True(result.Coverage.Complete);
+        Assert.Equal(Download(15).Candles, result.Candles);
+        HistoricalDataRequest request = Assert.Single(_provider.Requests);
+        Assert.Equal(Start.AddMinutes(1), request.FromUtc);
+        Assert.Equal(Start.AddMinutes(2), request.ThroughUtc);
+        Assert.Equal(1, _connections);
+        Assert.Equal(prefix, Library.Read(localHash).Candles);
+    }
+
+    [Fact]
+    public async Task MissingFineTail_FallsBackToMinuteWithBothNativeDatasetsRetained()
+    {
+        string fine = Assert.Single(Library.Save(Download(15) with { Candles = Download(15).Candles.Take(4).ToArray() })).DatasetHash;
+        _provider.Downloads[60] = Download(60);
+
+        LibraryReplayHistoryResult result = await Resolver.ResolveAsync(Query, false, default);
+
+        Assert.True(result.Coverage.Complete);
+        Assert.Equal(60, result.SourceIntervalSeconds);
+        Assert.Equal(2, result.Candles.Count);
+        Assert.Equal(4000m, result.Candles[0].Volume);
+        Assert.Equal(1000m, result.Candles[1].Volume);
+        Assert.Contains(result.Datasets, item => item.DatasetHash == fine && item.SourceIntervalSeconds == 15);
+        Assert.Single(result.Datasets, item => item.SourceIntervalSeconds == 60);
+        Assert.Equal(new[] { 15, 30, 60 }, _provider.Requests.Select(item => item.SourceIntervalSeconds));
+        Assert.Equal(1, _connections);
     }
 
     private void AssertNoNetwork()
@@ -226,8 +279,17 @@ public sealed class LibraryReplayHistoryResolverTests : IDisposable
         {
             Requests.Add(request);
             if (Error is not null) throw Error;
-            return Task.FromResult(Downloads.GetValueOrDefault(request.SourceIntervalSeconds) ??
-                Download(request.SourceIntervalSeconds) with { Candles = [] });
+            HistoricalDownload download = Downloads.GetValueOrDefault(request.SourceIntervalSeconds) ??
+                Download(request.SourceIntervalSeconds) with { Candles = [] };
+            if (download.RequestedFromUtc == Start && download.RequestedThroughUtc == Start.AddMinutes(2) &&
+                request.FromUtc >= Start && request.ThroughUtc <= Start.AddMinutes(2) &&
+                (request.FromUtc != Start || request.ThroughUtc != Start.AddMinutes(2)))
+                download = download with
+                {
+                    RequestedFromUtc = request.FromUtc, RequestedThroughUtc = request.ThroughUtc,
+                    Candles = download.Candles.Where(item => item.StartsAtUtc >= request.FromUtc && item.EndsAtUtc <= request.ThroughUtc).ToArray(),
+                };
+            return Task.FromResult(download);
         }
     }
 

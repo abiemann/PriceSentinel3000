@@ -11,6 +11,9 @@ public sealed partial class MainViewModel
     private string _historicalLibraryDescription = "";
     private LibraryReplayHistoryResult? _resolvedReplayHistory;
     private bool ReplayUsesLocalFiles => _resolvedReplayHistory?.Source is "local-library" or "pinned-library";
+    private string ReplaySourceDescription => _resolvedReplayHistory?.Source == "local-and-provider-saved-library"
+        ? "local files and Robinhood gap fills" : ReplayUsesLocalFiles ? "the local library" : "Robinhood";
+    private int[] ReplayNativeIntervals => _resolvedReplayHistory?.Datasets.Select(item => item.SourceIntervalSeconds).Distinct().Order().ToArray() ?? [];
 
     private async Task<IReadOnlyList<MarketQuote>> LoadReplayHistoryAsync(
         Instrument instrument, DateTimeOffset from, DateTimeOffset through, CancellationToken token)
@@ -34,7 +37,7 @@ public sealed partial class MainViewModel
             AdjustmentPolicy: "split", SessionBounds: retention.Collector.State.Settings.SessionBounds,
             PinnedHashes: pins,
             RevisionPolicy: retention.ReplayUseLatestRevision
-                ? HistoricalRevisionPolicy.LatestFetched : HistoricalRevisionPolicy.RejectConflicts);
+                ? HistoricalRevisionPolicy.LatestFetched : HistoricalRevisionPolicy.CompatibleCoverage);
         Dispatcher dispatcher = Dispatcher.CurrentDispatcher;
         var resolver = new LibraryReplayHistoryResolver(library, retention.Provider, cancellation =>
             dispatcher.InvokeAsync(() =>
@@ -63,6 +66,8 @@ public sealed partial class MainViewModel
     private object ReplayHistoryProvenance(int sourceInterval) => new
     {
         SourceIntervalSeconds = sourceInterval,
+        ReplayIntervalSeconds = sourceInterval,
+        NativeSourceIntervals = ReplayNativeIntervals,
         IsFallback = sourceInterval > 15,
         Availability = "source-candle-close",
         ExecutionModel = "completed-source-candle-close",
@@ -80,18 +85,18 @@ public sealed partial class MainViewModel
     };
 
     public string DataResolutionLabel => _historicalSourceIntervalSeconds is { } interval
-        ? $"{interval} SEC CANDLES"
+        ? ReplayNativeIntervals.Length > 1 ? $"{interval} SEC REPLAY (COMBINED)" : $"{interval} SEC CANDLES"
         : _chartRingBuffer is null ? "--" : "SAMPLED QUOTES";
 
     public string DataResolutionDescription => _historicalSourceIntervalSeconds is { } interval
-        ? $"Historical data: {interval}-second candles. Prices become available at each candle's close. Signals, risk checks, and simulated fills cannot see movements inside a source candle.{_historicalLibraryDescription}"
+        ? $"Replay uses {interval}-second candles. Prices become available at each candle's close. Signals, risk checks, and simulated fills cannot see movements inside a replay candle.{_historicalLibraryDescription}"
         : "Paper and Live use sampled current quotes; historical warmup uses completed candles.";
 
     private void SetHistoricalSourceInterval(int? interval)
     {
         _historicalSourceIntervalSeconds = interval;
         _historicalLibraryDescription = interval is not null && _resolvedReplayHistory is { } result
-            ? $" Source: {(ReplayUsesLocalFiles ? "local data library" : "Robinhood, saved to the local library")}. " +
+            ? $" Source: {ReplaySourceDescription}. Native source intervals: {string.Join(", ", ReplayNativeIntervals)} seconds. " +
               $"Coverage: {result.Coverage.ActualCandleCount}/{result.Coverage.ExpectedCandleCount} candles ({(result.Coverage.Complete ? "complete" : "partial")}). " +
               $"Dataset hashes: {string.Join(", ", result.Datasets.Select(item => item.DatasetHash))}."
             : "";

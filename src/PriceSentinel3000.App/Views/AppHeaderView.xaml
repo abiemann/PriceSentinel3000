@@ -36,20 +36,40 @@
                         Height="34"
                         Padding="10,4"
                         Click="RetainHighResolutionDataButton_Click"
-                        AutomationProperties.Name="Retain high-resolution data">
+                        AutomationProperties.Name="Retain high-resolution data"
+                        AutomationProperties.HelpText="{Binding DataRetention.DownloadHeading}">
+                    <Button.ToolTip>
+                        <ToolTip DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                 Background="{StaticResource CardBrush}" Foreground="{StaticResource PrimaryTextBrush}"
+                                 BorderBrush="{StaticResource SubtleBorderBrush}" BorderThickness="1">
+                            <ToolTip.Template>
+                                <ControlTemplate TargetType="ToolTip">
+                                    <Border Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}"
+                                            BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                                            CornerRadius="6" SnapsToDevicePixels="True">
+                                        <ContentPresenter />
+                                    </Border>
+                                </ControlTemplate>
+                            </ToolTip.Template>
+                            <StackPanel MaxWidth="340">
+                                <TextBlock FontWeight="SemiBold" Text="{Binding DataRetention.DownloadHeading}" />
+                                <TextBlock Margin="0,4,0,0" TextWrapping="Wrap" Text="{Binding DataRetention.JobSummary}" />
+                                <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" Text="{Binding DataRetention.SavedSchedule}" />
+                            </StackPanel>
+                        </ToolTip>
+                    </Button.ToolTip>
                     <Button.Style>
                         <Style BasedOn="{StaticResource SecondaryButtonStyle}" TargetType="Button">
-                            <Setter Property="ToolTip" Value="Retain high-resolution data. Automatic downloads are off." />
                             <Setter Property="AutomationProperties.ItemStatus" Value="Automatic downloads off" />
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding IsAutomaticDownloadEnabled, RelativeSource={RelativeSource AncestorType=views:AppHeaderView}}" Value="True">
-                                    <Setter Property="ToolTip" Value="Retain high-resolution data. Automatic downloads are enabled." />
                                     <Setter Property="AutomationProperties.ItemStatus" Value="Automatic downloads enabled" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
                     </Button.Style>
-                    <StackPanel Orientation="Horizontal">
+                    <Grid>
+                     <StackPanel Orientation="Horizontal">
                         <Border x:Name="DownloadClock"
                                 Width="24"
                                 Height="24"
@@ -78,7 +98,58 @@
                             </Grid>
                         </Border>
                         <TextBlock VerticalAlignment="Center" Text="RETAIN HI-RES DATA" />
-                    </StackPanel>
+                     </StackPanel>
+                     <ProgressBar x:Name="HeaderDownloadProgress"
+                                  Height="4" Margin="0,0,0,-3" VerticalAlignment="Bottom"
+                                  Minimum="0" Maximum="100"
+                                  Value="{Binding DataRetention.DownloadProgressPercent, Mode=OneWay, FallbackValue=0}"
+                                  Background="{StaticResource SubtleBorderBrush}"
+                                  AutomationProperties.Name="Background download progress"
+                                  AutomationProperties.HelpText="{Binding DataRetention.JobSummary}">
+                         <ProgressBar.Style>
+                             <Style TargetType="ProgressBar">
+                                 <Setter Property="Visibility" Value="Collapsed" />
+                                 <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                                 <Style.Triggers>
+                                     <DataTrigger Binding="{Binding DataRetention.HasDownloadWork}" Value="True">
+                                         <Setter Property="Visibility" Value="Visible" />
+                                     </DataTrigger>
+                                     <DataTrigger Binding="{Binding DataRetention.DownloadState}" Value="Waiting">
+                                         <Setter Property="Foreground" Value="#E8AB4D" />
+                                     </DataTrigger>
+                                     <DataTrigger Binding="{Binding DataRetention.DownloadState}" Value="Paused">
+                                         <Setter Property="Foreground" Value="#E8AB4D" />
+                                     </DataTrigger>
+                                     <MultiDataTrigger>
+                                         <MultiDataTrigger.Conditions>
+                                             <Condition Binding="{Binding DataRetention.DownloadState}" Value="Working" />
+                                             <Condition Binding="{Binding DataRetention.DownloadProgressPercent}" Value="0" />
+                                         </MultiDataTrigger.Conditions>
+                                         <Setter Property="IsIndeterminate" Value="True" />
+                                     </MultiDataTrigger>
+                                 </Style.Triggers>
+                             </Style>
+                         </ProgressBar.Style>
+                         <ProgressBar.Template>
+                             <ControlTemplate TargetType="ProgressBar">
+                                 <Grid>
+                                     <Border x:Name="PART_Track" Background="{TemplateBinding Background}" CornerRadius="2" />
+                                     <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}" CornerRadius="2" HorizontalAlignment="Left" />
+                                 </Grid>
+                                 <ControlTemplate.Triggers>
+                                     <Trigger Property="IsIndeterminate" Value="True">
+                                         <Trigger.EnterActions>
+                                             <BeginStoryboard x:Name="DownloadActivityPulse">
+                                                 <Storyboard><DoubleAnimation Storyboard.TargetName="PART_Indicator" Storyboard.TargetProperty="Opacity" From="0.35" To="1" Duration="0:0:0.8" AutoReverse="True" RepeatBehavior="Forever" /></Storyboard>
+                                             </BeginStoryboard>
+                                         </Trigger.EnterActions>
+                                         <Trigger.ExitActions><RemoveStoryboard BeginStoryboardName="DownloadActivityPulse" /></Trigger.ExitActions>
+                                     </Trigger>
+                                 </ControlTemplate.Triggers>
+                             </ControlTemplate>
+                         </ProgressBar.Template>
+                     </ProgressBar>
+                    </Grid>
                 </Button>
             </StackPanel>
             <StackPanel Grid.Column="2"

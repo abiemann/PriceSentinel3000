@@ -4,11 +4,47 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using PriceSentinel3000.App.Dialogs;
+using PriceSentinel3000.Application.MarketDataLibrary;
 
 namespace PriceSentinel3000.App.Tests;
 
 public sealed partial class SessionWorkflowTests
 {
+    [Fact]
+    public Task RetentionDialog_LibraryShowsFullDayCoverageAndStillPinsTheSelectedRevision() => host.RunAsync(async () =>
+    {
+        await using var fixture = new ProgressFixture();
+        var vm = fixture.ViewModel;
+        var date = new DateOnly(2026, 9, 8);
+        DateTimeOffset from = CollectionSchedule.GetSessionWindow(date).FromUtc;
+        DateTimeOffset through = from.AddMinutes(195);
+        var dataset = new HistoricalDatasetInfo(new string('a', 64), "NFLX.json", "Robinhood", "nflx", "NFLX",
+            date, 15, "split", "unversioned", "regular", through,
+            new(from, through, from, through, 780, 780, true, true, []));
+        vm.Datasets.Add(dataset);
+        var dialog = new DataRetentionDialog { DataContext = vm, ShowActivated = false };
+        try
+        {
+            dialog.Show();
+            ((TabControl)dialog.FindName("RetentionTabs")).SelectedIndex = 2;
+            await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+            var grid = (DataGrid)dialog.FindName("LocalLibraryGrid");
+            Assert.DoesNotContain(FindRetentionVisuals<CheckBox>(dialog), checkbox =>
+                Equals(checkbox.Content, "Replay from local files only"));
+            var coverage = Assert.IsType<DataGridTextColumn>(Assert.Single(grid.Columns,
+                column => Equals(column.Header, "Day coverage")));
+            var cell = Assert.IsType<TextBlock>(coverage.GetCellContent(dataset));
+            Assert.Equal("50%", cell.Text);
+            Assert.Contains("780", Assert.IsType<string>(cell.ToolTip));
+            Assert.Contains("1,560", Assert.IsType<string>(cell.ToolTip));
+            Assert.DoesNotContain(grid.Columns, column => Equals(column.Header, "Revision hash") || Equals(column.Header, "Complete"));
+            grid.SelectedItem = dataset;
+            vm.PinDatasetCommand.Execute(null);
+            Assert.Equal(dataset.DatasetHash, vm.ReplayPinnedHashes);
+        }
+        finally { dialog.Close(); }
+    });
+
     [Theory]
     [InlineData(1080, 790)]
     [InlineData(860, 620)]
@@ -19,8 +55,7 @@ public sealed partial class SessionWorkflowTests
         fixture.Connected = true;
         await fixture.SaveSingleSymbol();
         fixture.Provider.HoldDownloads = true;
-        vm.DownloadNowCommand.Execute(null);
-        Task download = vm.DownloadNowCommand.ExecutionTask!;
+        Task download = StartQueuedRetentionDownloadsAsync(vm);
         Task first = await Task.WhenAny(fixture.Provider.DownloadStarted.Task, download).WaitAsync(TimeSpan.FromSeconds(5));
         Assert.True(ReferenceEquals(first, fixture.Provider.DownloadStarted.Task), vm.Status);
         vm.AutomaticDownloadsEnabled = !vm.SavedAutomaticDownloadsEnabled;
@@ -47,6 +82,14 @@ public sealed partial class SessionWorkflowTests
             Assert.False(string.IsNullOrWhiteSpace(guidance.Text));
             Assert.Equal(Visibility.Visible, ((TextBlock)dialog.FindName("UnsavedScheduleWarning")).Visibility);
             Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting((TextBlock)dialog.FindName("DownloadActivityHeading")));
+            Assert.DoesNotContain(FindRetentionVisuals<TextBox>(dialog), field =>
+                AutomationProperties.GetName(field) is "Download from date" or "Download through date");
+            Assert.DoesNotContain(FindRetentionVisuals<Button>(dialog), button => Equals(button.Content, "NOW"));
+            Button downloadAvailable = Assert.Single(FindRetentionVisuals<Button>(dialog),
+                button => Equals(button.Content, "DOWNLOAD NOW"));
+            Assert.Same(vm.DownloadNowCommand, downloadAvailable.Command);
+            Assert.DoesNotContain(FindRetentionVisuals<Button>(dialog), button => Equals(button.Content, "RETRY MISSING"));
+            AssertInsideWindow(dialog, (TextBlock)dialog.FindName("DownloadAvailableGuidance"));
 
             var tabs = (TabControl)dialog.FindName("RetentionTabs");
             tabs.SelectedIndex = 0;

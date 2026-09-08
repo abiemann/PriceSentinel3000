@@ -16,20 +16,27 @@ public sealed class DownloadJobViewModel(CollectionJob job) : INotifyPropertyCha
     public int? ActualSourceIntervalSeconds => _job.ActualSourceIntervalSeconds;
     public string? Error => _job.Error;
     public bool IsAutomatic => _job.IsAutomatic;
+    public bool IsAvailabilityProbe => _job.IsAvailabilityProbe;
+    public DateTimeOffset? RequestedThroughUtc => _job.RequestedThroughUtc;
+    public bool NeedsAttention => Status is CollectionJobStatus.Partial or CollectionJobStatus.Failed ||
+        Status == CollectionJobStatus.Unavailable && !IsAvailabilityProbe;
     public DateTimeOffset? RetryAfterUtc => _job.RetryAfterUtc;
     public string StateText => Status switch
     {
         CollectionJobStatus.Pending => RetryAfterUtc is null ? "Queued" : "Retry waiting",
         CollectionJobStatus.Downloading => "In progress",
-        CollectionJobStatus.Complete => "Complete",
+        CollectionJobStatus.Complete => RequestedThroughUtc is null ? "Complete" : "Saved so far",
         CollectionJobStatus.Partial => "Saved with gaps",
-        CollectionJobStatus.Unavailable => "Unavailable",
+        CollectionJobStatus.Unavailable => IsAvailabilityProbe ? "No data" : "Unavailable",
         _ => "Failed",
     };
-    public string DetailsText => !string.IsNullOrEmpty(Error) ? Error : Status switch
+    public string DetailsText => Status == CollectionJobStatus.Complete && RequestedThroughUtc is { } through
+        ? $"Completed 15-second candles saved through {through.ToLocalTime():yyyy-MM-dd HH:mm:ss}. Download again to collect newer candles."
+        : !string.IsNullOrEmpty(Error) ? Error : Status switch
     {
         CollectionJobStatus.Pending => "Waiting for its turn in the download queue.",
         CollectionJobStatus.Downloading => "Checking or downloading genuine 15-second history.",
+        CollectionJobStatus.Unavailable when IsAvailabilityProbe => "The broker returned no 15-second history for this date.",
         CollectionJobStatus.Complete => ActualSourceIntervalSeconds is { } interval
             ? $"Complete {interval}-second coverage saved on disk." : "Complete coverage saved on disk.",
         _ => "See the download status for details.",
@@ -40,7 +47,8 @@ public sealed class DownloadJobViewModel(CollectionJob job) : INotifyPropertyCha
         bool progress = (Status != next.Status || _job.LastAttemptAtUtc != next.LastAttemptAtUtc) &&
             next.Status is CollectionJobStatus.Complete or CollectionJobStatus.Partial or CollectionJobStatus.Unavailable or CollectionJobStatus.Failed;
         bool changed = Status != next.Status || ActualSourceIntervalSeconds != next.ActualSourceIntervalSeconds ||
-            Error != next.Error || IsAutomatic != next.IsAutomatic || RetryAfterUtc != next.RetryAfterUtc;
+            Error != next.Error || IsAutomatic != next.IsAutomatic || RetryAfterUtc != next.RetryAfterUtc ||
+            IsAvailabilityProbe != next.IsAvailabilityProbe || RequestedThroughUtc != next.RequestedThroughUtc;
         _job = next;
         if (changed) PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
         return progress;
@@ -61,12 +69,14 @@ public sealed partial class DataRetentionViewModel
     private string? _collectionError;
     private string _downloadState = "Idle";
     private string _downloadHeading = "Ready to download";
-    private string _downloadDetail = "Choose saved equities and dates, then select Download now.";
+    private string _downloadDetail = "Save your equity list, then select Download now to collect missing 15-second history.";
     private string _downloadTiming = "";
 
     public bool CanEditPlan => !IsBusy && !_disposed;
     public bool IsConnecting => _connecting;
-    public bool IsDownloadActive => _connecting || Collector.IsBusy;
+    public bool IsDownloadActive => _connecting || Collector.IsBusy || _downloadCancellation is not null;
+    public bool HasDownloadWork => IsDownloadActive || Jobs.Any(j =>
+        j.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading);
     public string DownloadState => _downloadState;
     public string DownloadHeading => _downloadHeading;
     public string DownloadDetail => _downloadDetail;
@@ -140,9 +150,21 @@ public sealed partial class DataRetentionViewModel
         }
     }
 
-    private void ScheduleNextDownloadCheck()
+    private void ScheduleNextDownloadCheck(bool waitingForRetry = false)
     {
-        _nextDownloadCheckAt = _clock.GetUtcNow().AddSeconds(30);
+        DateTimeOffset now = _clock.GetUtcNow();
+        TimeSpan delay = TimeSpan.FromSeconds(30);
+        if (waitingForRetry && !_downloadsPaused && _isConnected() && _collectionError is null)
+        {
+            CollectionState state = Collector.State;
+            DateTimeOffset? retry = state.Jobs.Where(j => j.Status == CollectionJobStatus.Pending &&
+                (!j.IsAutomatic || state.Settings.AutomaticDownloadsEnabled) && j.RetryAfterUtc is not null)
+                .Select(j => j.RetryAfterUtc).Min();
+            if (retry is { } at && at - now < delay)
+                delay = at > now ? at - now : TimeSpan.FromMilliseconds(1);
+        }
+        _nextDownloadCheckAt = now + delay;
+        _timer.Interval = delay;
         if (!_started || _disposed) return;
         _timer.Stop();
         _timer.Start();
@@ -181,7 +203,8 @@ public sealed partial class DataRetentionViewModel
         CollectionActivity? activity = Collector.Activity;
         CollectionJob[] pending = state.Jobs.Where(j => j.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading).ToArray();
         CollectionJob[] eligible = pending.Where(j => !j.IsAutomatic || state.Settings.AutomaticDownloadsEnabled).ToArray();
-        int attention = state.Jobs.Count(j => j.Status is CollectionJobStatus.Partial or CollectionJobStatus.Unavailable or CollectionJobStatus.Failed);
+        int attention = state.Jobs.Count(j => j.Status is CollectionJobStatus.Partial or CollectionJobStatus.Failed ||
+            j.Status == CollectionJobStatus.Unavailable && !j.IsAvailabilityProbe);
         string status, heading, detail;
         if (_downloadsPaused)
         {
@@ -223,10 +246,10 @@ public sealed partial class DataRetentionViewModel
             else
             {
                 bool retryWaiting = eligible.All(j => j.RetryAfterUtc > now);
-                heading = retryWaiting ? "Waiting to retry" : "Waiting for the next download batch";
+                heading = retryWaiting ? "Waiting to retry" : "Continuing queued downloads";
                 detail = retryWaiting
                     ? $"The broker request will be retried after {eligible.Min(j => j.RetryAfterUtc)!.Value.ToLocalTime():HH:mm:ss}. Queued work is kept."
-                    : $"{eligible.Length} date/equity downloads remain. A 30-second pause between batches limits broker requests.";
+                    : $"{eligible.Length} date/equity downloads remain. Requests run one at a time with brief pacing between them.";
             }
         }
         else if (pending.Length > 0)
@@ -237,29 +260,33 @@ public sealed partial class DataRetentionViewModel
         else if (attention > 0)
         {
             status = "Attention"; heading = "Queue finished with items to review";
-            detail = $"{attention} dates have gaps, unavailable data, or errors. See Details in the table; Retry missing checks them again.";
+            detail = $"{attention} dates have gaps, unavailable data, or errors. See Details in the table; Download now checks missing coverage again.";
         }
         else if (state.Jobs.Count > 0)
         {
-            status = "Complete"; heading = "All queued downloads complete";
-            detail = "Completed history is saved in the local library. You can replay it or close this window.";
+            status = "Complete";
+            bool availabilityChecked = state.Jobs.Any(j => j.IsAvailabilityProbe);
+            heading = availabilityChecked ? "Available-history check complete" : "All queued downloads complete";
+            detail = availabilityChecked
+                ? "The availability check finished. Earlier dates are checked until three consecutive broker checks return no 15-second data. Download again to collect newer completed candles."
+                : "Completed history is saved in the local library. You can replay it or close this window.";
         }
         else
         {
             status = "Idle"; heading = "Ready to download";
-            detail = "Save your equity list, choose dates, then select Download now.";
+            detail = "Save your equity list, then select Download now. The app finds missing 15-second history and skips coverage already saved.";
         }
         string timing = _lastDownloadProgressAt is { } last
             ? $"Last job finished {Elapsed(now - last)} ago ({last.ToLocalTime():HH:mm:ss})."
             : "No job has finished since this window's data was loaded.";
         if (activity is not null) timing = $"Current step: {Elapsed(now - activity.SinceUtc)}. " + timing;
-        else if (!_downloadsPaused && eligible.Length > 0 && _started && _nextDownloadCheckAt is { } next)
+        else if (!IsDownloadActive && !_downloadsPaused && eligible.Length > 0 && _started && _nextDownloadCheckAt is { } next)
             timing += $" Next queue check in {Math.Max(0, (int)Math.Ceiling((next - now).TotalSeconds))}s.";
         SetProgressText(ref _downloadState, status, nameof(DownloadState));
         SetProgressText(ref _downloadHeading, heading, nameof(DownloadHeading));
         SetProgressText(ref _downloadDetail, detail, nameof(DownloadDetail));
         SetProgressText(ref _downloadTiming, timing, nameof(DownloadTiming));
-        Changed(nameof(IsConnecting)); Changed(nameof(IsDownloadActive)); Changed(nameof(DownloadTotal)); Changed(nameof(DownloadProcessed));
+        Changed(nameof(IsConnecting)); Changed(nameof(IsDownloadActive)); Changed(nameof(HasDownloadWork)); Changed(nameof(DownloadTotal)); Changed(nameof(DownloadProcessed));
         Changed(nameof(DownloadProgressPercent)); Changed(nameof(DownloadInteractionHint)); Changed(nameof(PauseDownloadsLabel));
     }
 

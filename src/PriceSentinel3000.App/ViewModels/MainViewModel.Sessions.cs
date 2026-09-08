@@ -398,7 +398,7 @@ public sealed partial class MainViewModel
             throw new InvalidOperationException("The Replay date, start, or end time is invalid.");
         }
 
-        StatusMessage = $"Loading {instrument.Symbol} history from {replayStart:g}; trying 15-second candles, then coarser available history...";
+        StatusMessage = $"Loading {instrument.Symbol} history from {replayStart:g}; checking disk before filling missing coverage from Robinhood...";
         IReadOnlyList<MarketQuote> historicalQuotes =
             await LoadReplayHistoryAsync(instrument, replayStart, replayEnd, token);
 
@@ -431,7 +431,7 @@ public sealed partial class MainViewModel
         DateTimeOffset lastSource = historicalQuotes[^1].SourceEndsAtUtc;
         StatusMessage = $"Replaying {historicalQuotes.Count} real {instrument.Symbol} observations from {firstSource.ToLocalTime():g} at {settings.ReplaySpeed:0.#}x speed.";
         AddActivity(
-            $"Historical Replay loaded {historicalQuotes.Count} real {sourceInterval}-second candles from {(ReplayUsesLocalFiles ? "the local library" : "Robinhood")} for the requested {replayStart:g} start through {lastSource.ToLocalTime():g}.");
+            $"Historical Replay loaded {historicalQuotes.Count} {sourceInterval}-second replay candles from {ReplaySourceDescription} for the requested {replayStart:g} start through {lastSource.ToLocalTime():g}.");
         if (sourceInterval > 15)
             AddActivity($"Historical data fallback: {sourceInterval}-second candles. Signals, risk checks, and simulated fills use completed source candles; intrabar movements are unavailable. Results can differ from a 15-second replay.", "WARNING");
 

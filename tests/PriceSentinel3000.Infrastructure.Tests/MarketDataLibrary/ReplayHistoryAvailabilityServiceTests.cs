@@ -44,7 +44,7 @@ public sealed class ReplayHistoryAvailabilityServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ProviderFine_ReplacesIncompleteLocalOnlyForPreparedChoice_WithoutWriting()
+    public async Task ProviderFine_ComplementsIncompleteLocalForPreparedChoice_WithoutWriting()
     {
         string partialHash = Assert.Single(Library.Save(Download(15) with { Candles = [Download(15).Candles[1]] })).DatasetHash;
         _provider.Downloads[15] = Download(15);
@@ -53,7 +53,7 @@ public sealed class ReplayHistoryAvailabilityServiceTests : IDisposable
 
         Assert.True(result.Complete);
         Assert.False(result.IsLocal);
-        Assert.Equal("provider", result.Source);
+        Assert.Equal("local-and-provider", result.Source);
         Assert.Equal(15, result.SourceIntervalSeconds);
         Assert.NotNull(result.PendingDownload);
         Assert.Equal(partialHash, Assert.Single(Library.Scan().Datasets).DatasetHash);
@@ -161,7 +161,7 @@ public sealed class ReplayHistoryAvailabilityServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task LocalTwoMinute_IsLastChoice_AndNeverRequestedFromBroker()
+    public async Task CompleteLocalTwoMinute_PreventsBrokerRequests()
     {
         Library.Save(Download(120));
 
@@ -170,11 +170,11 @@ public sealed class ReplayHistoryAvailabilityServiceTests : IDisposable
         Assert.True(result.Complete);
         Assert.Equal(120, result.SourceIntervalSeconds);
         Assert.True(result.IsLocal);
-        Assert.Equal(new[] { 15, 30, 60 }, _provider.Requests.Select(item => item.SourceIntervalSeconds));
+        Assert.Empty(_provider.Requests);
     }
 
     [Fact]
-    public async Task NoCompleteSource_ReturnsFinestPartialAndItsExactGaps()
+    public async Task NoCompleteSource_ReturnsBestCoveredPartialAndItsExactGaps()
     {
         Library.Save(Download(15) with { Candles = [Download(15).Candles[0]] });
         _provider.Downloads[15] = Download(15) with { Candles = Download(15).Candles.Take(3).ToArray() };
@@ -184,9 +184,9 @@ public sealed class ReplayHistoryAvailabilityServiceTests : IDisposable
 
         Assert.False(result.Complete);
         Assert.True(result.HasData);
-        Assert.Equal(15, result.SourceIntervalSeconds);
+        Assert.Equal(30, result.SourceIntervalSeconds);
         Assert.Equal(3, result.Candles.Count);
-        Assert.Equal(new HistoricalGap(Start.AddSeconds(45), Start.AddMinutes(2)), Assert.Single(result.Coverage.Gaps));
+        Assert.Equal(new HistoricalGap(Start.AddSeconds(90), Start.AddMinutes(2)), Assert.Single(result.Coverage.Gaps));
         Assert.Contains(result.Diagnostics, item => item.Code == "partial_replay_history");
     }
 
@@ -251,7 +251,7 @@ public sealed class ReplayHistoryAvailabilityServiceTests : IDisposable
     [Fact]
     public async Task BrokerFailure_IsUnknown_NotProofThatOnlyCoarseHistoryExists()
     {
-        Library.Save(Download(60));
+        Library.Save(Download(60) with { Candles = [Download(60).Candles[0]] });
         _provider.Error = new MarketDataConnectionUnavailableException("Not connected");
         await Assert.ThrowsAsync<MarketDataConnectionUnavailableException>(() => Service.CheckAsync(Query, false, default));
         Assert.Equal(new[] { 15 }, _provider.Requests.Select(item => item.SourceIntervalSeconds));
@@ -313,6 +313,144 @@ public sealed class ReplayHistoryAvailabilityServiceTests : IDisposable
         Assert.False(Directory.Exists(_root));
     }
 
+    [Fact]
+    public async Task FineLocalPrefix_RequestsOnlyMissingTail_AndPreparedStartIsReproducible()
+    {
+        HistoricalCandle[] prefix = Download(15).Candles.Take(4).ToArray();
+        string localHash = Assert.Single(Library.Save(Download(15) with { Candles = prefix })).DatasetHash;
+        _provider.Downloads[15] = Download(15);
+
+        ReplayHistoryAvailability prepared = await Service.CheckAsync(Query, false, default);
+
+        HistoricalDataRequest request = Assert.Single(_provider.Requests);
+        Assert.Equal(Start.AddMinutes(1), request.FromUtc);
+        Assert.Equal(Start.AddMinutes(2), request.ThroughUtc);
+        Assert.Equal(15, request.SourceIntervalSeconds);
+        Assert.Equal("local-and-provider", prepared.Source);
+        Assert.True(prepared.Complete);
+        Assert.Equal(Download(15).Candles, prepared.Candles);
+        Assert.Equal(localHash, Assert.Single(Library.Scan().Datasets).DatasetHash);
+
+        LibraryReplayHistoryResult first = await Service.LoadPreparedAsync(prepared, default);
+        LibraryReplayHistoryResult second = await Service.LoadPreparedAsync(prepared, default);
+
+        Assert.Equal("local-and-provider-saved-library", first.Source);
+        Assert.Equal(prepared.Candles, first.Candles);
+        Assert.Equal(first.Candles, second.Candles);
+        Assert.Equal(first.Datasets.Select(item => item.DatasetHash), second.Datasets.Select(item => item.DatasetHash));
+        Assert.Equal(prefix, Library.Read(localHash).Candles);
+        Assert.Single(_provider.Requests);
+
+        ReplayHistoryAvailability retained = await Service.CheckAsync(Query with
+        {
+            RevisionPolicy = HistoricalRevisionPolicy.CompatibleCoverage,
+        }, false, default);
+
+        Assert.True(retained.IsLocal);
+        Assert.True(retained.Complete);
+        Assert.Equal(prepared.Candles, retained.Candles);
+        Assert.Single(_provider.Requests);
+        Assert.Equal(retained.Candles, (await Service.LoadPreparedAsync(retained, default)).Candles);
+    }
+
+    [Fact]
+    public async Task FineLocalPrefix_AndMinuteBrokerTail_AggregateWithoutChangingNativeFiles()
+    {
+        HistoricalCandle[] prefix = Download(15).Candles.Take(4).Select((candle, index) => candle with
+        {
+            Open = 100m + index, High = 105m + index, Low = 90m - index, Close = 101m + index,
+            Volume = index == 1 ? null : 1000m,
+        }).ToArray();
+        string localHash = Assert.Single(Library.Save(Download(15) with { Candles = prefix })).DatasetHash;
+        _provider.Downloads[60] = Download(60);
+
+        ReplayHistoryAvailability prepared = await Service.CheckAsync(Query, false, default);
+
+        Assert.True(prepared.Complete);
+        Assert.Equal(60, prepared.SourceIntervalSeconds);
+        Assert.Equal(new[] { 15, 60 }, prepared.NativeSourceIntervals);
+        Assert.Equal(new[] { 15, 30, 60 }, _provider.Requests.Select(item => item.SourceIntervalSeconds));
+        Assert.All(_provider.Requests, request =>
+        {
+            Assert.Equal(Start.AddMinutes(1), request.FromUtc);
+            Assert.Equal(Start.AddMinutes(2), request.ThroughUtc);
+        });
+        Assert.Equal(new HistoricalCandle(Start, Start.AddMinutes(1), Start.AddMinutes(1),
+            100m, 108m, 87m, 104m, null), prepared.Candles[0]);
+        Assert.Equal(Download(60).Candles[1], prepared.Candles[1]);
+        Assert.Contains(prepared.Diagnostics, item => item.Code == "composed_replay_history");
+        Assert.Equal(localHash, Assert.Single(Library.Scan().Datasets).DatasetHash);
+
+        LibraryReplayHistoryResult loaded = await Service.LoadPreparedAsync(prepared, default);
+
+        Assert.Equal(prepared.Candles, loaded.Candles);
+        Assert.Equal(2, loaded.Datasets.Count);
+        Assert.Contains(loaded.Datasets, item => item.DatasetHash == localHash && item.SourceIntervalSeconds == 15);
+        HistoricalDatasetInfo brokerFile = Assert.Single(loaded.Datasets, item => item.SourceIntervalSeconds == 60);
+        Assert.Equal(new[] { Download(60).Candles[1] }, Library.Read(brokerFile.DatasetHash).Candles);
+        Assert.Equal(prefix, Library.Read(localHash).Candles);
+        Assert.Equal(3, _provider.Requests.Count);
+    }
+
+    [Fact]
+    public async Task CoarseBrokerCandle_ReplacesWholeOverlappingBucket_WithoutSlicingOrLookahead()
+    {
+        HistoricalCandle[] fine = Download(15).Candles.Where((_, index) => index != 5).ToArray();
+        string localHash = Assert.Single(Library.Save(Download(15) with { Candles = fine })).DatasetHash;
+        HistoricalCandle coarse = Download(60).Candles[1] with
+        {
+            Open = 200m, High = 220m, Low = 190m, Close = 210m, Volume = 999m,
+        };
+        _provider.Downloads[60] = Download(60) with { Candles = [coarse] };
+
+        ReplayHistoryAvailability prepared = await Service.CheckAsync(Query, false, default);
+
+        Assert.True(prepared.Complete);
+        Assert.Equal(60, prepared.SourceIntervalSeconds);
+        Assert.Equal(new[] { Start.AddSeconds(75), Start.AddSeconds(60), Start.AddMinutes(1) },
+            _provider.Requests.Select(item => item.FromUtc));
+        Assert.Equal(new[] { Start.AddSeconds(90), Start.AddSeconds(90), Start.AddMinutes(2) },
+            _provider.Requests.Select(item => item.ThroughUtc));
+        Assert.Equal(2, prepared.Candles.Count);
+        Assert.Equal(coarse, prepared.Candles[1]);
+        Assert.All(prepared.Candles, candle =>
+        {
+            Assert.Equal(TimeSpan.FromMinutes(1), candle.EndsAtUtc - candle.StartsAtUtc);
+            Assert.Equal(candle.EndsAtUtc, candle.AvailableAtUtc);
+        });
+
+        LibraryReplayHistoryResult loaded = await Service.LoadPreparedAsync(prepared, default);
+        Assert.Equal(prepared.Candles, loaded.Candles);
+        Assert.Equal(fine, Library.Read(localHash).Candles);
+        Assert.Equal(3, _provider.Requests.Count);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MixedPreparedStart_CancellationOrMissingLocalFile_FailsBeforeSavingBrokerData(bool removeFile)
+    {
+        Library.Save(Download(15) with { Candles = Download(15).Candles.Take(4).ToArray() });
+        _provider.Downloads[60] = Download(60);
+        ReplayHistoryAvailability prepared = await Service.CheckAsync(Query, false, default);
+        HistoricalDatasetInfo local = Assert.Single(prepared.Datasets);
+        using var cancellation = new CancellationTokenSource();
+        if (removeFile)
+        {
+            File.Delete(Path.Combine(_root, local.RelativePath));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => Service.LoadPreparedAsync(prepared, default));
+        }
+        else
+        {
+            cancellation.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Service.LoadPreparedAsync(prepared, cancellation.Token));
+        }
+
+        Assert.DoesNotContain(Library.Scan().Datasets, item => item.SourceIntervalSeconds == 60);
+        Assert.Equal(removeFile ? 0 : 1, Library.Scan().Datasets.Count);
+        Assert.Equal(3, _provider.Requests.Count);
+    }
+
     private static HistoricalDownload Download(int interval) => new("Robinhood", "test-msft", "MSFT", interval,
         "split", "robinhood-split-unversioned", "regular", Start.AddDays(1), Start, Start.AddMinutes(2),
         Enumerable.Range(0, 120 / interval).Select(index =>
@@ -330,8 +468,19 @@ public sealed class ReplayHistoryAvailabilityServiceTests : IDisposable
         {
             Requests.Add(request);
             if (Error is not null) throw Error;
-            return Task.FromResult(Downloads.GetValueOrDefault(request.SourceIntervalSeconds) ??
-                Download(request.SourceIntervalSeconds) with { Candles = [] });
+            HistoricalDownload download = Downloads.GetValueOrDefault(request.SourceIntervalSeconds) ??
+                Download(request.SourceIntervalSeconds) with { Candles = [] };
+            // Ordinary fixtures represent the original dashboard range. Narrow them
+            // for gap requests, while preserving intentionally invalid provenance.
+            if (download.RequestedFromUtc == Start && download.RequestedThroughUtc == Start.AddMinutes(2) &&
+                request.FromUtc >= Start && request.ThroughUtc <= Start.AddMinutes(2) &&
+                (request.FromUtc != Start || request.ThroughUtc != Start.AddMinutes(2)))
+                download = download with
+                {
+                    RequestedFromUtc = request.FromUtc, RequestedThroughUtc = request.ThroughUtc,
+                    Candles = download.Candles.Where(item => item.StartsAtUtc >= request.FromUtc && item.EndsAtUtc <= request.ThroughUtc).ToArray(),
+                };
+            return Task.FromResult(download);
         }
     }
 

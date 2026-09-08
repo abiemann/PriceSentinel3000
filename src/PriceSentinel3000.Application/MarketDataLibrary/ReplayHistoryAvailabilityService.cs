@@ -9,11 +9,14 @@ public sealed record ReplayHistoryAvailability(
     IReadOnlyList<HistoricalCandle> Candles,
     HistoricalCoverage Coverage,
     IReadOnlyList<MarketDataLibraryDiagnostic> Diagnostics,
-    HistoricalDownload? PendingDownload = null)
+    HistoricalDownload? PendingDownload = null,
+    IReadOnlyList<ReplayHistorySource>? Sources = null)
 {
     public bool HasData => Candles.Count > 0;
     public bool Complete => HasData && Coverage.Complete;
     public bool IsLocal => Source is "local-library" or "pinned-library";
+    public IReadOnlyList<int> NativeSourceIntervals => Sources?.Select(item => item.SourceIntervalSeconds).Distinct().Order().ToArray()
+        ?? [SourceIntervalSeconds];
 }
 
 /// <summary>
@@ -40,37 +43,50 @@ public sealed class ReplayHistoryAvailabilityService(IMarketDataLibrary library,
                 ReadQuery(query with { SourceIntervalSeconds = intervals[0] })), []);
         }
 
-        ReplayHistoryAvailability? partial = null;
-        ReplayHistoryAvailability? empty = null;
+        var sources = new List<ReplayHistorySource>();
         var diagnostics = new List<MarketDataLibraryDiagnostic>();
+        // Read every supported local resolution before contacting the broker.
         foreach (int interval in new[] { 15, 30, 60, 120 })
         {
             cancellationToken.ThrowIfCancellationRequested();
             HistoricalDataQuery current = query with { SourceIntervalSeconds = interval };
             HistoricalDataQueryResult local = ReadQuery(current);
             diagnostics.AddRange(local.Diagnostics);
-            ReplayHistoryAvailability choice = Local(query, offlineOnly, interval, "local-library", local);
-            if (choice.Complete) return WithDiagnostics(choice, diagnostics);
-            partial = PreferPartial(partial, choice);
-            empty = choice;
-            if (offlineOnly || interval == 120) continue;
+            if (local.Candles.Count > 0)
+                sources.Add(new(interval, local.Datasets.ToArray(), local.Candles.ToArray()));
+            ReplayHistoryComposition localComposition = ReplayHistoryComposer.Compose(query, sources);
+            if (localComposition.Coverage.Complete)
+                return Composed(query, offlineOnly, localComposition, diagnostics);
+        }
 
+        ReplayHistoryComposition composition = ReplayHistoryComposer.Compose(query, sources);
+        if (offlineOnly) return Composed(query, true, composition, diagnostics);
+        // Robinhood has no native two-minute endpoint. Genuine local two-minute
+        // files are supported above; broker requests use only supported intervals.
+        foreach (int interval in new[] { 15, 30, 60 })
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            HistoricalGap first = composition.Coverage.Gaps[0], last = composition.Coverage.Gaps[^1];
+            long ticks = TimeSpan.FromSeconds(interval).Ticks;
+            // One bounded request spans the gaps, avoiding a request per missing bar.
+            // Boundary expansion obtains whole coarse candles; composition never slices them.
+            DateTimeOffset from = new(first.FromUtc.Ticks - first.FromUtc.Ticks % ticks, TimeSpan.Zero);
+            DateTimeOffset through = new(checked((last.ThroughUtc.Ticks + ticks - 1) / ticks * ticks), TimeSpan.Zero);
+            HistoricalDataQuery current = query with { FromUtc = from, ThroughUtc = through, SourceIntervalSeconds = interval };
             HistoricalDownload download = await provider.DownloadHistoryAsync(new(query.Symbol,
-                query.FromUtc, query.ThroughUtc, interval, query.SessionBounds ?? "regular",
+                from, through, interval, query.SessionBounds ?? "regular",
                 query.AdjustmentPolicy ?? "split"), cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             // Snapshot provider collections before validating/preparing so a later
             // provider request cannot change the candles promised by this check.
             ArgumentNullException.ThrowIfNull(download.Candles);
             download = download with { Candles = download.Candles.ToArray() };
-            HistoricalCoverage coverage = ValidateDownload(current, download);
-            choice = new(query, offlineOnly, "provider", interval, [], download.Candles,
-                coverage, [], download);
-            if (choice.Complete) return WithDiagnostics(choice, diagnostics);
-            partial = PreferPartial(partial, choice);
-            empty = choice;
+            ValidateDownload(current, download);
+            if (download.Candles.Count > 0) sources.Add(new(interval, [], download.Candles, download));
+            composition = ReplayHistoryComposer.Compose(query, sources);
+            if (composition.Coverage.Complete) break;
         }
-        return WithDiagnostics(partial ?? empty!, diagnostics);
+        return Composed(query, false, composition, diagnostics);
     }
 
     /// <summary>Consumes exactly the checked source without another broker request or a silent revision change.</summary>
@@ -82,6 +98,9 @@ public sealed class ReplayHistoryAvailabilityService(IMarketDataLibrary library,
         if (!availability.HasData)
             return Task.FromResult(new LibraryReplayHistoryResult(availability.Source,
                 availability.SourceIntervalSeconds, [], [], availability.Coverage, availability.Diagnostics));
+
+        if (availability.Sources is { } sources)
+            return Task.FromResult(LoadComposition(availability, sources, cancellationToken));
 
         HistoricalDataQuery query = availability.Query with { SourceIntervalSeconds = availability.SourceIntervalSeconds };
         IReadOnlyList<HistoricalDatasetInfo> datasets = availability.Datasets;
@@ -121,15 +140,84 @@ public sealed class ReplayHistoryAvailabilityService(IMarketDataLibrary library,
         string source, HistoricalDataQueryResult result) =>
         new(query, offlineOnly, source, interval, result.Datasets, result.Candles, result.Coverage, result.Diagnostics);
 
-    private static ReplayHistoryAvailability? PreferPartial(ReplayHistoryAvailability? previous, ReplayHistoryAvailability next) =>
-        next.HasData && (previous is null || next.SourceIntervalSeconds < previous.SourceIntervalSeconds ||
-            (next.SourceIntervalSeconds == previous.SourceIntervalSeconds && next.Candles.Count > previous.Candles.Count))
-            ? next : previous;
+    private static ReplayHistoryAvailability Composed(HistoricalDataQuery query, bool offlineOnly,
+        ReplayHistoryComposition composition, IEnumerable<MarketDataLibraryDiagnostic> diagnostics)
+    {
+        bool broker = composition.Sources.Any(item => item.PendingDownload is not null);
+        bool local = composition.Sources.Any(item => item.Datasets.Count > 0);
+        string source = broker ? local ? "local-and-provider" : "provider" : "local-library";
+        return WithDiagnostics(new(query, offlineOnly, source, composition.SourceIntervalSeconds,
+            composition.Sources.SelectMany(item => item.Datasets).DistinctBy(item => item.DatasetHash).ToArray(),
+            composition.Candles, composition.Coverage, [],
+            composition.Sources.Select(item => item.PendingDownload).FirstOrDefault(item => item is not null),
+            composition.Sources), diagnostics);
+    }
+
+    private LibraryReplayHistoryResult LoadComposition(ReplayHistoryAvailability availability,
+        IReadOnlyList<ReplayHistorySource> sources, CancellationToken token)
+    {
+        var loaded = new List<ReplayHistorySource>();
+        // Validate retained files before archiving any new source. Changed or missing
+        // files fail the prepared selection rather than substituting another revision.
+        foreach (ReplayHistorySource source in sources.Where(item => item.PendingDownload is null))
+            _ = Reload(source, availability.Query.FromUtc, availability.Query.ThroughUtc);
+        foreach (ReplayHistorySource source in sources)
+        {
+            token.ThrowIfCancellationRequested();
+            ReplayHistorySource retained = source;
+            DateTimeOffset from = availability.Query.FromUtc, through = availability.Query.ThroughUtc;
+            if (source.PendingDownload is { } download)
+            {
+                from = download.RequestedFromUtc;
+                through = download.RequestedThroughUtc;
+                ValidateDownload(availability.Query with
+                    { FromUtc = from, ThroughUtc = through, SourceIntervalSeconds = source.SourceIntervalSeconds }, download);
+                retained = source with { Datasets = library.Save(download), PendingDownload = null };
+            }
+            loaded.Add(retained with { Candles = Reload(retained, from, through) });
+        }
+        ReplayHistoryComposition result = ReplayHistoryComposer.Compose(availability.Query, loaded);
+        token.ThrowIfCancellationRequested();
+        if (result.SourceIntervalSeconds != availability.SourceIntervalSeconds || !result.Candles.SequenceEqual(availability.Candles))
+            throw new InvalidOperationException("The checked Replay data changed. Check the date again before starting.");
+        string origin = availability.Source switch
+        {
+            "provider" => "provider-saved-library",
+            "local-and-provider" => "local-and-provider-saved-library",
+            _ => availability.Source,
+        };
+        return new(origin, result.SourceIntervalSeconds,
+            result.Sources.SelectMany(item => item.Datasets).DistinctBy(item => item.DatasetHash).ToArray(),
+            result.Candles, result.Coverage, availability.Diagnostics);
+
+        IReadOnlyList<HistoricalCandle> Reload(ReplayHistorySource source, DateTimeOffset from, DateTimeOffset through)
+        {
+            token.ThrowIfCancellationRequested();
+            HistoricalCandle[] candles;
+            try
+            {
+                candles = source.Datasets.SelectMany(info => library.Read(info.DatasetHash).Candles)
+                    .Where(item => item.StartsAtUtc >= from && item.EndsAtUtc <= through)
+                    .Distinct().OrderBy(item => item.StartsAtUtc).ToArray();
+            }
+            catch (InvalidDataException exception)
+            {
+                throw new InvalidOperationException("The checked Replay file is missing or changed. Check the date again before starting.", exception);
+            }
+            if (!candles.SequenceEqual(source.Candles))
+                throw new InvalidOperationException("The checked Replay data changed. Check the date again before starting.");
+            return candles;
+        }
+    }
 
     private static ReplayHistoryAvailability WithDiagnostics(ReplayHistoryAvailability result,
         IEnumerable<MarketDataLibraryDiagnostic> previous)
     {
         var diagnostics = previous.Concat(result.Diagnostics).Distinct().ToList();
+        if (result.NativeSourceIntervals.Count > 1)
+            diagnostics.Add(new("", "composed_replay_history",
+                $"Replay combines {string.Join(", ", result.NativeSourceIntervals)}-second source data into {result.SourceIntervalSeconds}-second candles. " +
+                "Only complete bars are aggregated. Native source files are preserved; no finer candles are invented."));
         if (result.HasData && !result.Complete)
             diagnostics.Add(new("", "partial_replay_history",
                 $"Only {result.Candles.Count} of {result.Coverage.ExpectedCandleCount} expected {result.SourceIntervalSeconds}-second candles are available. " +

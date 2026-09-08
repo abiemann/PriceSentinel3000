@@ -35,11 +35,14 @@ Run several symbols in one portfolio, with one shared account and operating mode
 See the [user guide](docs/market-data-library.md) and [design](DESIGN.md#local-market-data-library).
 
 - [x] App-styled Tools entry, saved-state clock, modeless list/schedule/library UI, editable lists, individual equity inclusion, and read-only Robinhood snapshot import/refresh.
-- [x] User-selected daily time and saved time zone, holiday/early-close/DST handling, app-open collection, durable deduplicated jobs, bounded retries, restart/disconnection recovery, and manual date-range downloads.
+- [x] User-selected daily time and saved time zone, holiday/early-close/DST handling, app-open collection, durable deduplicated jobs, bounded retries, and restart/disconnection recovery.
+- [x] One date-free Download now action: reuse saved coverage, collect today's completed candles, discover older 15-second sessions per equity until three consecutive empty broker checks, and retry known failures or imported partial days beyond that boundary.
+- [x] Continue ready download batches without a fixed pause; keep collection running after closing its window, with live progress inside the header button and current status on reopening.
 - [x] Portable symbol-only list transfer and year / numbered English month / ticker / daily JSON history with exact candles, source-close timing, provenance, gaps, nullable volume and immutable revisions.
 - [x] Local-first and offline Replay, explicit revision selection and dataset pins, actual-resolution enforcement, and read-only paginated MCP library discovery/candle access without an active session.
 - [x] Per-equity continuity from saved coverage, genuine 15-second-only collection, partial-day repair, and persistent reporting of older unresolved gaps.
 - [x] Replay preflight on Enter/CHECK/date selection, a colored availability calendar, exact-range coverage checks, and reuse of checked data at START without another broker download.
+- [x] Dashboard local-only Replay option; default disk-first reuse of agreeing saved pieces and broker gap fills at genuine supported intervals, with uniform Replay aggregation and native-source provenance.
 - [x] Automated storage, scheduler, import, Replay, MCP and UI integration checks; authenticated read-only list/candle provider smoke checks.
 - [ ] Compare fixed scripts empirically across retained source resolutions using the same period and strategy interval. Preserving finer data does not guarantee higher P&L.
 - [ ] Consider a separately installed background worker if users need collection while the app is closed. Current scheduling explicitly requires an open, connected app.

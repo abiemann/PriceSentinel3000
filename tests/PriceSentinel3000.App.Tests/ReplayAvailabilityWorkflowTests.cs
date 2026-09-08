@@ -62,6 +62,33 @@ public sealed partial class SessionWorkflowTests
     });
 
     [Theory]
+    [InlineData(30)]
+    [InlineData(60)]
+    [InlineData(120)]
+    public Task ReplayAvailability_CompleteCoarseDiskCoverageAvoidsFineBrokerRequests(int interval) => host.RunAsync(async () =>
+    {
+        using var files = new AvailabilityFiles();
+        await using var workspace = new TestWorkspace();
+        DateTimeOffset start = AvailabilityStart(workspace);
+        HistoricalDownload fine = LibraryDownload(start, 15);
+        files.Library.Save(fine with { Candles = [fine.Candles[0]] });
+        files.Library.Save(LibraryDownload(start, interval));
+        files.Provider.Error = new InvalidOperationException("Complete local coverage must not request broker history.");
+        MainViewModel vm = workspace.ViewModel;
+        vm.DataRetention = files.CreateRetention();
+        await ConfigureLibraryReplay(vm, start, 60, "builtin");
+
+        await vm.CheckReplayAvailabilityAsync();
+
+        Assert.Equal(interval <= 60 ? "Coarse60" : "Coarse120", vm.ReplayAvailabilityStatus);
+        Assert.Contains($"{interval}-second replay data on disk", vm.ReplayAvailabilityText);
+        Assert.Contains("Ready for START", vm.ReplayAvailabilityText);
+        Assert.Equal(0, files.Provider.Calls);
+        Assert.Equal(0, files.Connections);
+        Assert.Equal(0, workspace.Broker.Connections);
+    });
+
+    [Theory]
     [InlineData(30, false, "Coarse60")]
     [InlineData(60, false, "Coarse60")]
     [InlineData(120, false, "Coarse120")]
@@ -365,6 +392,7 @@ public sealed partial class SessionWorkflowTests
         public JsonMarketDataLibrary Library => new(Root);
         public AvailabilityProvider Provider { get; } = new();
         public int Connections { get; private set; }
+        public bool AllowConnections { get; set; }
 
         public DataRetentionViewModel CreateRetention()
         {
@@ -372,7 +400,9 @@ public sealed partial class SessionWorkflowTests
             return new(collector, Provider, Provider, Provider, path => new JsonMarketDataLibrary(path), _ =>
             {
                 Connections++;
-                throw new InvalidOperationException("Checking or starting prepared Replay must not request login.");
+                if (!AllowConnections)
+                    throw new InvalidOperationException("Checking or starting prepared Replay must not request login.");
+                return Task.CompletedTask;
             }, () => false);
         }
 
@@ -389,6 +419,7 @@ public sealed partial class SessionWorkflowTests
     private sealed class AvailabilityProvider : IMarketHistoryProvider, IPersonalWatchlistSource, IEquityCatalogSource
     {
         public int Calls { get; private set; }
+        public List<HistoricalDataRequest> Requests { get; } = [];
         public int CompleteInterval { get; set; }
         public Exception? Error { get; set; }
         public bool HoldResponse { get; set; }
@@ -398,6 +429,7 @@ public sealed partial class SessionWorkflowTests
         public async Task<HistoricalDownload> DownloadHistoryAsync(HistoricalDataRequest request, CancellationToken token)
         {
             Calls++;
+            Requests.Add(request);
             Entered.TrySetResult();
             if (HoldResponse) await Release.Task; // Deliberately ignores cancellation to test stale-result rejection.
             if (Error is not null) throw Error;
@@ -405,6 +437,14 @@ public sealed partial class SessionWorkflowTests
             {
                 Symbol = request.Symbol, SessionBounds = request.SessionBounds, AdjustmentPolicy = request.AdjustmentPolicy,
                 RequestedThroughUtc = request.ThroughUtc,
+                Candles = Enumerable.Range(0, (int)((request.ThroughUtc - request.FromUtc).TotalSeconds / request.SourceIntervalSeconds))
+                    .Select(index =>
+                    {
+                        DateTimeOffset at = request.FromUtc.AddSeconds(index * request.SourceIntervalSeconds);
+                        decimal price = 10m + index;
+                        return new HistoricalCandle(at, at.AddSeconds(request.SourceIntervalSeconds), at.AddSeconds(request.SourceIntervalSeconds),
+                            price, price + 0.1234567890123456789m, price - 1m, price, null);
+                    }).ToArray(),
             };
             return request.SourceIntervalSeconds == CompleteInterval ? download : download with { Candles = [] };
         }

@@ -72,7 +72,7 @@ public sealed record MarketDataLibraryScan(
     IReadOnlyList<HistoricalDatasetInfo> Datasets,
     IReadOnlyList<MarketDataLibraryDiagnostic> Diagnostics);
 
-public enum HistoricalRevisionPolicy { RejectConflicts, LatestFetched }
+public enum HistoricalRevisionPolicy { RejectConflicts, LatestFetched, CompatibleCoverage }
 
 public sealed record HistoricalDataQuery(
     string Symbol,

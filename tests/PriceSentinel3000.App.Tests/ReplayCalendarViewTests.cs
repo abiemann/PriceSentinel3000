@@ -43,7 +43,7 @@ public sealed partial class SessionWorkflowTests
             await WaitForCalendarUi(() => vm.ReplayAvailabilityStatus == "Disk15");
 
             Assert.Equal(typedDate, vm.ReplayDate);
-            Assert.Contains("15-second data on disk", vm.ReplayAvailabilityText);
+            Assert.Contains("15-second replay data on disk", vm.ReplayAvailabilityText);
             Assert.False(vm.IsSessionRunning);
             Assert.Equal(0, files.Provider.Calls);
             Assert.Equal(0, workspace.Broker.Connections);

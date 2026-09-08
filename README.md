@@ -21,9 +21,13 @@ pause/step boundaries and fast playback.
 
 ## Retain high-resolution history
 
-Open **Tools > Retain Hi-Res Data** to create download lists, import individual equities from Robinhood lists, and choose a daily collection time and time zone. The app stores portable daily candles under year / numbered English month / ticker folders, then reuses them for Replay and read-only MCP analysis. Automatic collection requires the app to stay open and connected; copied history can be replayed offline. See the [market-data library guide](docs/market-data-library.md).
+Open **Tools > Retain Hi-Res Data** to create download lists, import individual equities from Robinhood lists, and choose a daily collection time and time zone. **Download now** automatically finds missing 15-second history without date fields, including today's completed candles, searches older sessions per equity, and retries known gaps. Compatible candles are merged with saved history, including partial files copied into the library. The app stores portable daily candles under year / numbered English month / ticker folders, then reuses them for Replay and read-only MCP analysis. Automatic collection requires the app to stay open and connected; copied history can be replayed offline. See the [market-data library guide](docs/market-data-library.md).
+
+Replay checks disk first and fills missing coverage from supported broker history. Complete finer candles can be aggregated alongside coarser gap fills to one Replay interval, with the native resolutions shown and preserved in the files. Choose **Replay from local files only** in the dashboard before START to prevent broker requests.
 
 In Replay, press **Enter** after entering a date or time, click **CHECK**, or choose a calendar date to check coverage before starting. Dark green means complete local 15-second data, light green means verified broker 15-second data, orange means 30–60-second data, and red means two-minute data. Neutral dates have details explaining unchecked, partial, or unavailable coverage.
+
+Downloads continue when you close the retention window. The **Retain Hi-Res Data** button shows a compact progress bar and reopens the current download status. Ready batches continue without a fixed pause; keep PriceSentinel open for background collection.
 
 ## Reviewer tour
 

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Windows.Data;
 using System.Windows.Threading;
 using PriceSentinel3000.Application.MarketDataLibrary;
 
@@ -48,8 +49,6 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
     private string _dailyTime;
     private string _timeZone;
     private string _bounds;
-    private string _from;
-    private string _through;
     private string _replayPins = "";
     private bool _replayOffline;
     private bool _replayLatest;
@@ -70,13 +69,19 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
         _isConnected = isConnected;
         _dispatcher = dispatcher ?? Dispatcher.CurrentDispatcher;
         _clock = clock ?? TimeProvider.System;
+        VisibleJobs = new ListCollectionView(Jobs)
+        {
+            Filter = item => item is DownloadJobViewModel row &&
+                (row.Status != CollectionJobStatus.Unavailable || !row.IsAvailabilityProbe),
+            IsLiveFiltering = true,
+            LiveFilteringProperties = { nameof(DownloadJobViewModel.Status), nameof(DownloadJobViewModel.IsAvailabilityProbe) },
+        };
         CollectionSettings settings = collector.State.Settings;
         _libraryRoot = settings.LibraryRootPath;
         _automatic = settings.AutomaticDownloadsEnabled;
         _dailyTime = settings.DailyDownloadTime.ToString("HH:mm", CultureInfo.InvariantCulture);
         _timeZone = settings.TimeZoneId;
         _bounds = settings.SessionBounds;
-        _from = _through = CollectionSchedule.LatestFinalizedSession(DateTimeOffset.UtcNow, _bounds, 15).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         foreach (DownloadList list in settings.Lists) Lists.Add(list);
         if (Lists.Count > 0) SelectedList = Lists[0];
         NewListCommand = new RelayCommand(NewList, () => !IsBusy);
@@ -96,12 +101,7 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
         ImportWatchlistCommand = Command(() => PreviewWatchlistAsync(false));
         RefreshWatchlistCommand = Command(() => PreviewWatchlistAsync(true));
         SaveScheduleCommand = Command(SaveScheduleAsync);
-        SetThroughDateToNowCommand = new RelayCommand(() => ThroughDate =
-            TimeZoneInfo.ConvertTime(_clock.GetUtcNow(), TimeZoneInfo.FindSystemTimeZoneById(TimeZoneId))
-                .ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
         DownloadNowCommand = Command(DownloadNowAsync, () => !_downloadsPaused);
-        RetryMissingCommand = Command(async () => { await Collector.RetryMissingAsync(cancellationToken: _lifetime.Token); await RunDownloadsAsync(); },
-            () => !_downloadsPaused);
         ScanLibraryCommand = Command(ScanLibraryAsync);
         PinDatasetCommand = new RelayCommand(() => { if (SelectedDataset is { } d) ReplayPinnedHashes = d.DatasetHash; });
         ClearPinsCommand = new RelayCommand(() => ReplayPinnedHashes = "");
@@ -127,6 +127,7 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
     public ObservableCollection<DownloadMemberViewModel> Members { get; } = [];
     public ObservableCollection<PersonalWatchlist> RobinhoodLists { get; } = [];
     public ObservableCollection<DownloadJobViewModel> Jobs { get; } = [];
+    public ListCollectionView VisibleJobs { get; }
     public ObservableCollection<HistoricalDatasetInfo> Datasets { get; } = [];
     public IReadOnlyList<TimeZoneInfo> TimeZones { get; } = TimeZoneInfo.GetSystemTimeZones();
     public IReadOnlyList<string> SessionChoices { get; } = ["regular", "extended"];
@@ -144,8 +145,6 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
     public string DailyTime { get => _dailyTime; set { _dailyTime = value; Changed(); ScheduleDraftChanged(); } }
     public string TimeZoneId { get => _timeZone; set { _timeZone = value; Changed(); ScheduleDraftChanged(); } }
     public string SessionBounds { get => _bounds; set { _bounds = value; Changed(); ScheduleDraftChanged(); } }
-    public string FromDate { get => _from; set { _from = value; Changed(); } }
-    public string ThroughDate { get => _through; set { _through = value; Changed(); } }
     public bool ReplayOfflineOnly { get => _replayOffline; set { _replayOffline = value; Changed(); } }
     public bool ReplayUseLatestRevision { get => _replayLatest; set { _replayLatest = value; Changed(); } }
     public string ReplayPinnedHashes { get => _replayPins; set { _replayPins = value; Changed(); } }
@@ -154,7 +153,7 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
     public string SavedSchedule => SavedAutomaticDownloadsEnabled
         ? $"Automatic downloads enabled: {Collector.State.Settings.DailyDownloadTime:HH:mm} · {Collector.State.Settings.TimeZoneId}. Keep this app open and connected."
         : "Automatic downloads are off. Manual downloads remain available.";
-    public string JobSummary => $"Retained queue: {DownloadProcessed}/{DownloadTotal} checked · {Jobs.Count(j => j.Status == CollectionJobStatus.Complete)} complete · {Jobs.Count(j => j.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading)} remaining · {Jobs.Count(j => j.Status is CollectionJobStatus.Partial or CollectionJobStatus.Unavailable or CollectionJobStatus.Failed)} need attention";
+    public string JobSummary => $"Retained queue: {DownloadProcessed}/{DownloadTotal} checked · {Jobs.Count(j => j.Status == CollectionJobStatus.Complete && j.RequestedThroughUtc is null)} complete · {Jobs.Count(j => j.Status == CollectionJobStatus.Complete && j.RequestedThroughUtc is not null)} saved so far · {Jobs.Count(j => j.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading)} remaining · {Jobs.Count(j => j.NeedsAttention)} need attention";
     public string ContinuityWarnings
     {
         get
@@ -163,8 +162,8 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
             CollectionContinuityGap[] gaps = state.ContinuityGaps.Where(g =>
                 string.Equals(g.LibraryRootPath, state.Settings.LibraryRootPath, StringComparison.OrdinalIgnoreCase) &&
                 g.SessionBounds == state.Settings.SessionBounds).ToArray();
-            if (gaps.Length == 0) return "Only genuine 15-second candles are downloaded. Missing coverage is checked per equity on each scheduled run.";
-            return "Unresolved gaps outside the automatic retry window (provider availability is not guaranteed). Use Download now with these dates to retry:\n" +
+            if (gaps.Length == 0) return "Only genuine 15-second candles are downloaded. Download now finds available history missing from the saved equity lists.";
+            return "Older unresolved gaps remain recorded below. Download now checks how far back 15-second history is still available; expired data cannot be recreated:\n" +
                 string.Join("\n", gaps.Select(g => FormattableString.Invariant($"{g.Symbol}: {g.FromSessionDate:yyyy-MM-dd} through {g.ThroughSessionDate:yyyy-MM-dd}")));
         }
     }
@@ -177,9 +176,7 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
     public AsyncRelayCommand ImportWatchlistCommand { get; }
     public AsyncRelayCommand RefreshWatchlistCommand { get; }
     public AsyncRelayCommand SaveScheduleCommand { get; }
-    public RelayCommand SetThroughDateToNowCommand { get; }
     public AsyncRelayCommand DownloadNowCommand { get; }
-    public AsyncRelayCommand RetryMissingCommand { get; }
     public AsyncRelayCommand ScanLibraryCommand { get; }
     public AsyncRelayCommand OpenFolderCommand { get; }
     public RelayCommand PinDatasetCommand { get; }
@@ -303,12 +300,7 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
 
     public async Task DownloadNowAsync()
     {
-        if (!DateOnly.TryParseExact(FromDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly from) ||
-            !DateOnly.TryParseExact(ThroughDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly through))
-            throw new ArgumentException("Enter dates as yyyy-MM-dd.");
-        string[] symbols = Collector.State.Settings.Lists.Where(l => l.IsEnabled).SelectMany(l => l.Members)
-            .Where(m => m.IsIncluded).Select(m => m.Symbol).Distinct().ToArray();
-        await Collector.QueueManualAsync(symbols, from, through, cancellationToken: _lifetime.Token);
+        await Collector.QueueAvailableAsync(cancellationToken: _lifetime.Token);
         await RunDownloadsAsync();
     }
 
@@ -318,7 +310,7 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
         await PollAsync(connect: true);
         Status = DownloadProcessed == DownloadTotal
             ? "Queue checked. See the download status for complete files and any dates that need attention."
-            : "Batch checked. The download status shows when queued work will continue.";
+            : "Queued work is kept. The download status shows any connection or retry wait.";
     }
 
     public async Task ScanLibraryAsync()
@@ -357,6 +349,8 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         _downloadCancellation = cancellation;
         _collectionError = null;
+        _timer.Stop();
+        CollectionBatchResult result = CollectionBatchResult.Idle;
         try
         {
             if (connect)
@@ -366,14 +360,25 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
                 try { await PrepareConnectionAsync(cancellation.Token); }
                 finally { _connecting = false; RefreshState(); }
             }
-            await Collector.TickAsync(_isConnected(), cancellation.Token);
+            while ((result = await Collector.TickAsync(_isConnected(), cancellation.Token)) == CollectionBatchResult.Ready)
+            {
+                cancellation.Token.ThrowIfCancellationRequested();
+                if (_downloadsPaused || !_isConnected()) break;
+                RefreshState();
+                await Dispatcher.Yield(DispatcherPriority.Background);
+            }
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             _collectionError = exception.Message;
             throw;
         }
-        finally { _downloadCancellation = null; ScheduleNextDownloadCheck(); RefreshState(); }
+        finally
+        {
+            _downloadCancellation = null;
+            ScheduleNextDownloadCheck(result == CollectionBatchResult.WaitingForRetry);
+            RefreshState();
+        }
     }
 
     private void OnCollectorChanged(object? sender, EventArgs e)
@@ -401,7 +406,7 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
 
     private AsyncRelayCommand[] Commands() => [SaveListCommand, DeleteListCommand, AddTickersCommand,
         LoadWatchlistsCommand, ReconnectCommand, ImportWatchlistCommand, RefreshWatchlistCommand, SaveScheduleCommand,
-        DownloadNowCommand, RetryMissingCommand, ScanLibraryCommand, OpenFolderCommand, PauseDownloadsCommand];
+        DownloadNowCommand, ScanLibraryCommand, OpenFolderCommand, PauseDownloadsCommand];
     private AsyncRelayCommand Command(Func<Task> action, Func<bool>? canExecute = null) =>
         new(() => ExecuteAsync(action), () => !IsBusy && !_disposed && (canExecute?.Invoke() ?? true));
     public async Task ExecuteAsync(Func<Task> action)
@@ -425,7 +430,8 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
         _progressTimer.Stop();
         Collector.StateChanged -= OnCollectorChanged;
         await _lifetime.CancelAsync();
-        Task[] active = Commands().Select(c => c.ExecutionTask).Append(_pollTask).OfType<Task>().ToArray();
+        Task[] active = Commands().Select(c => c.ExecutionTask).Append(PauseDownloadsCommand.ExecutionTask)
+            .Append(_pollTask).OfType<Task>().ToArray();
         try { await Task.WhenAll(active); } catch (OperationCanceledException) { }
         _lifetime.Dispose();
     }

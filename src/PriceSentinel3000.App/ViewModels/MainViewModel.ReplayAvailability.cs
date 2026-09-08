@@ -155,15 +155,18 @@ public sealed partial class MainViewModel
         var settings = retention.Collector.State.Settings;
         var query = new HistoricalDataQuery(symbol, from.ToUniversalTime(), through.ToUniversalTime(), AdjustmentPolicy: "split",
             SessionBounds: settings.SessionBounds, PinnedHashes: pins,
-            RevisionPolicy: retention.ReplayUseLatestRevision ? HistoricalRevisionPolicy.LatestFetched : HistoricalRevisionPolicy.RejectConflicts);
+            RevisionPolicy: retention.ReplayUseLatestRevision ? HistoricalRevisionPolicy.LatestFetched : HistoricalRevisionPolicy.CompatibleCoverage);
         return new(settings.LibraryRootPath, query, retention.ReplayOfflineOnly, retention);
     }
 
     private static ReplayCalendarDay DescribeReplayAvailability(ReplayHistoryAvailability result)
     {
         if (!result.HasData) return new("Unavailable", "No history was returned at the supported resolutions for this window.");
-        string source = result.IsLocal ? "on disk" : "verified with Robinhood";
-        string text = $"{result.SourceIntervalSeconds}-second data {source}: {result.Coverage.ActualCandleCount}/{result.Coverage.ExpectedCandleCount} candles.";
+        string source = result.IsLocal ? "on disk" : result.Source == "local-and-provider"
+            ? "from disk and Robinhood gap fills" : "verified with Robinhood";
+        string text = $"{result.SourceIntervalSeconds}-second replay data {source}: {result.Coverage.ActualCandleCount}/{result.Coverage.ExpectedCandleCount} candles.";
+        if (result.NativeSourceIntervals.Count > 1)
+            text += $" Combined from genuine {string.Join(", ", result.NativeSourceIntervals)}-second sources; no finer candles are invented.";
         if (!result.Complete) return new("Partial", text + " Incomplete coverage; missing candles remain gaps. START can replay the available candles.");
         string status = result.SourceIntervalSeconds == 15 ? result.IsLocal ? "Disk15" : "Broker15"
             : result.SourceIntervalSeconds <= 60 ? "Coarse60" : "Coarse120";
@@ -192,6 +195,9 @@ public sealed partial class MainViewModel
             if ((query.RevisionPolicy == HistoricalRevisionPolicy.RejectConflicts || pins is { Count: > 0 }) &&
                 candidates.GroupBy(d => d.TradingDate).Any(g => g.Count() > 1))
                 return new("Unknown", "Multiple daily revisions match. Choose one dataset hash per day or an applicable revision policy.");
+            if (query.RevisionPolicy == HistoricalRevisionPolicy.CompatibleCoverage &&
+                candidates.GroupBy(d => d.TradingDate).Any(g => g.Count() > 1))
+                return new("Unknown", "Multiple saved pieces may cover this day. Select the date to verify their candles and combined coverage.");
             candidates = candidates.GroupBy(d => d.TradingDate).Select(g => g.OrderByDescending(d => d.FetchedAtUtc)
                 .ThenBy(d => d.DatasetHash, StringComparer.Ordinal).First()).OrderBy(d => d.TradingDate).ToArray();
             partial |= candidates.Any(d => d.Coverage.ActualCandleCount > 0);

@@ -17,7 +17,7 @@ public sealed partial class SessionWorkflowTests
         fixture.Provider.HoldDownloads = true;
         DataRetentionViewModel vm = fixture.ViewModel;
 
-        Task downloading = vm.DownloadNowCommand.ExecuteAsync();
+        Task downloading = StartQueuedRetentionDownloadsAsync(vm);
         await fixture.Provider.DownloadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         Assert.Equal("Working", vm.DownloadState);
@@ -44,7 +44,7 @@ public sealed partial class SessionWorkflowTests
         await fixture.SaveSingleSymbol();
         fixture.HoldConnection = true;
         DataRetentionViewModel vm = fixture.ViewModel;
-        Task downloading = vm.DownloadNowCommand.ExecuteAsync();
+        Task downloading = StartQueuedRetentionDownloadsAsync(vm);
         await fixture.ConnectionStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
 
@@ -65,7 +65,7 @@ public sealed partial class SessionWorkflowTests
         await fixture.SaveSingleSymbol();
         fixture.Provider.HoldDownloads = true;
         DataRetentionViewModel vm = fixture.ViewModel;
-        Task downloading = vm.DownloadNowCommand.ExecuteAsync();
+        Task downloading = StartQueuedRetentionDownloadsAsync(vm);
         await fixture.Provider.DownloadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         Guid id = Assert.Single(vm.Jobs).Id;
@@ -105,9 +105,9 @@ public sealed partial class SessionWorkflowTests
         vm.TickerInput = "NFLX SOXL MSFT";
         await vm.AddTickersAsync();
         await vm.SaveListAsync();
-        vm.FromDate = vm.ThroughDate = "2026-09-04";
+        await fixture.Collector.QueueManualAsync(["NFLX", "SOXL", "MSFT"], new(2026, 9, 4), new(2026, 9, 4));
         fixture.Provider.HoldDownloads = true;
-        Task downloading = vm.DownloadNowCommand.ExecuteAsync();
+        Task downloading = StartQueuedRetentionDownloadsAsync(vm);
         await fixture.Provider.DownloadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await vm.PauseDownloadsCommand.ExecuteAsync();
         await downloading.WaitAsync(TimeSpan.FromSeconds(5));
@@ -132,7 +132,7 @@ public sealed partial class SessionWorkflowTests
         await fixture.SaveSingleSymbol();
         fixture.Provider.HoldDownloads = true;
         DataRetentionViewModel vm = fixture.ViewModel;
-        Task downloading = vm.DownloadNowCommand.ExecuteAsync();
+        Task downloading = StartQueuedRetentionDownloadsAsync(vm);
         await fixture.Provider.DownloadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await vm.PauseDownloadsCommand.ExecuteAsync();
         await downloading.WaitAsync(TimeSpan.FromSeconds(5));
@@ -160,12 +160,13 @@ public sealed partial class SessionWorkflowTests
     public Task DownloadProgress_UpdatesExistingRowsWithoutResettingTheGridCollection() => host.RunAsync(async () =>
     {
         await using var fixture = new RetentionFixture();
-        await fixture.SaveSingleSymbol();
+        await fixture.SaveSingleSymbol(queueDate: false);
         fixture.Provider.HoldDownloads = true;
         DataRetentionViewModel vm = fixture.ViewModel;
         var changes = new List<NotifyCollectionChangedAction>();
         vm.Jobs.CollectionChanged += (_, e) => changes.Add(e.Action);
-        Task downloading = vm.DownloadNowCommand.ExecuteAsync();
+        await fixture.Collector.QueueManualAsync(["NFLX"], new(2026, 9, 4), new(2026, 9, 4));
+        Task downloading = StartQueuedRetentionDownloadsAsync(vm);
         await fixture.Provider.DownloadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         DownloadJobViewModel row = Assert.Single(vm.Jobs);
@@ -202,7 +203,7 @@ public sealed partial class SessionWorkflowTests
         Assert.False(vm.SavedAutomaticDownloadsEnabled);
         Assert.Contains("save", vm.ScheduleChangesText.ToLowerInvariant());
         fixture.Provider.HoldDownloads = true;
-        Task downloading = vm.DownloadNowCommand.ExecuteAsync();
+        Task downloading = StartQueuedRetentionDownloadsAsync(vm);
         await fixture.Provider.DownloadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         Assert.True(vm.HasScheduleChanges);
@@ -268,21 +269,29 @@ public sealed partial class SessionWorkflowTests
     });
 
     [Fact]
-    public Task DownloadProgress_BetweenBatchesShowsWaitingAndPreservesProcessedProgress() => host.RunAsync(async () =>
+    public Task DownloadProgress_ContinuesAcrossBatchesAndReportsIntermediateProgress() => host.RunAsync(async () =>
     {
         await using var fixture = new ProgressFixture(
             new CollectionRunOptions { MaximumRequestsPerTick = 1, MinimumRequestInterval = TimeSpan.Zero },
             [new() { Symbol = "NFLX" }, new() { Symbol = "SOXL" }]);
         fixture.Connected = true;
         DataRetentionViewModel vm = fixture.ViewModel;
+        var progress = new List<double>();
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(DataRetentionViewModel.DownloadProgressPercent))
+                progress.Add(vm.DownloadProgressPercent);
+        };
         await vm.CheckDownloadsAsync();
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
-        Assert.Equal(1, fixture.Provider.DownloadCalls);
+        Assert.Equal(2, fixture.Provider.DownloadCalls);
         Assert.Equal(2, vm.DownloadTotal);
-        Assert.Equal(1, vm.DownloadProcessed);
-        Assert.Equal(50d, vm.DownloadProgressPercent);
-        Assert.Equal("Waiting", vm.DownloadState);
+        Assert.Equal(2, vm.DownloadProcessed);
+        Assert.Contains(50d, progress);
+        Assert.Equal(100d, vm.DownloadProgressPercent);
+        Assert.Equal("Complete", vm.DownloadState);
         Assert.False(vm.IsDownloadActive);
+        Assert.False(vm.HasDownloadWork);
         Assert.False(string.IsNullOrWhiteSpace(vm.DownloadTiming));
 
         await vm.CheckDownloadsAsync();
@@ -310,6 +319,52 @@ public sealed partial class SessionWorkflowTests
     });
 
     [Fact]
+    public Task DownloadProgress_EmptyAvailabilityProbeCompletesTheCheckWithoutAnAttentionWarning() => host.RunAsync(async () =>
+    {
+        await using var fixture = new ProgressFixture(new CollectionJob
+        {
+            Symbol = "NFLX", Status = CollectionJobStatus.Unavailable, IsAvailabilityProbe = true,
+        });
+        DataRetentionViewModel vm = fixture.ViewModel;
+        Assert.Equal("Complete", vm.DownloadState);
+        Assert.Equal("Available-history check complete", vm.DownloadHeading);
+        Assert.Contains("three consecutive", vm.DownloadDetail);
+        Assert.Contains("0 need attention", vm.JobSummary);
+        Assert.Equal("No data", Assert.Single(vm.Jobs).StateText);
+    });
+
+    [Fact]
+    public Task DownloadProgress_CurrentDaySnapshotIsSavedSoFarRatherThanACompleteDay() => host.RunAsync(async () =>
+    {
+        DateTimeOffset cutoff = new(2026, 9, 4, 17, 0, 0, TimeSpan.Zero);
+        await using var fixture = new ProgressFixture(new CollectionJob
+        {
+            Symbol = "NFLX", Status = CollectionJobStatus.Complete, IsAvailabilityProbe = true,
+            RequestedThroughUtc = cutoff, ActualSourceIntervalSeconds = 15,
+        });
+        DataRetentionViewModel vm = fixture.ViewModel;
+        DownloadJobViewModel row = Assert.Single(vm.Jobs);
+        Assert.Equal("Saved so far", row.StateText);
+        Assert.Contains(cutoff.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"), row.DetailsText);
+        Assert.Contains("0 complete", vm.JobSummary);
+        Assert.Contains("1 saved so far", vm.JobSummary);
+        Assert.Contains("0 need attention", vm.JobSummary);
+    });
+
+    [Theory]
+    [InlineData(CollectionJobStatus.Partial)]
+    [InlineData(CollectionJobStatus.Failed)]
+    public Task DownloadProgress_AvailabilityProbeGapsAndErrorsStillNeedAttention(CollectionJobStatus status) => host.RunAsync(async () =>
+    {
+        await using var fixture = new ProgressFixture(new CollectionJob
+        {
+            Symbol = "NFLX", Status = status, IsAvailabilityProbe = true,
+        });
+        Assert.Equal("Attention", fixture.ViewModel.DownloadState);
+        Assert.Contains("1 need attention", fixture.ViewModel.JobSummary);
+    });
+
+    [Fact]
     public Task DownloadProgress_DisconnectedQueueWaitsWithoutInteractiveLoginOrPretendingToDownload() => host.RunAsync(async () =>
     {
         await using var fixture = new ProgressFixture(new CollectionJob { Symbol = "NFLX" });
@@ -334,9 +389,9 @@ public sealed partial class SessionWorkflowTests
         vm.TickerInput = "NFLX";
         await vm.AddTickersAsync();
         await vm.SaveListAsync();
-        vm.FromDate = vm.ThroughDate = "2026-09-04";
+        await vm.Collector.QueueManualAsync(["NFLX"], new(2026, 9, 4), new(2026, 9, 4));
         fixture.ConnectionError = "Robinhood authorization could not be restored.";
-        await vm.DownloadNowCommand.ExecuteAsync();
+        await StartQueuedRetentionDownloadsAsync(vm);
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
 
         Assert.Equal("Attention", vm.DownloadState);

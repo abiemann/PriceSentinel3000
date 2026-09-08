@@ -33,7 +33,7 @@ public sealed partial class SessionWorkflowTests
 
         Assert.Equal("LOCAL LIBRARY", vm.MarketDataStatus);
         Assert.Equal("30 SEC CANDLES", vm.DataResolutionLabel);
-        Assert.Contains("local data library", vm.DataResolutionDescription);
+        Assert.Contains("the local library", vm.DataResolutionDescription);
         Assert.Contains(hash, vm.DataResolutionDescription);
         Assert.Contains("4/4 candles (complete)", vm.DataResolutionDescription);
         JsonElement status = (await Automate(vm, "status")).Result!.Value;

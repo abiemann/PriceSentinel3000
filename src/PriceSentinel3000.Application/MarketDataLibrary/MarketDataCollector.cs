@@ -3,7 +3,7 @@ using PriceSentinel3000.Core.MarketData;
 namespace PriceSentinel3000.Application.MarketDataLibrary;
 
 /// <summary>Durable, serial collection work. The host owns polling, connection state and cancellation.</summary>
-public sealed class MarketDataCollector
+public sealed partial class MarketDataCollector
 {
     private readonly ICollectionStateStore _store;
     private readonly IMarketHistoryProvider _provider;
@@ -104,15 +104,16 @@ public sealed class MarketDataCollector
                 : j).ToArray(),
         }), cancellationToken);
 
-    public Task TickAsync(bool isConnected, CancellationToken cancellationToken = default) => Task.Run(async () =>
+    /// <returns>Whether the host can continue immediately, wait for a retry, or await a connection.</returns>
+    public Task<CollectionBatchResult> TickAsync(bool isConnected, CancellationToken cancellationToken = default) => Task.Run(async () =>
     {
-        if (!await _gate.WaitAsync(0, cancellationToken).ConfigureAwait(false)) return;
+        if (!await _gate.WaitAsync(0, cancellationToken).ConfigureAwait(false)) return CollectionBatchResult.Busy;
         Interlocked.Exchange(ref _isBusy, 1);
         try
         {
             SetActivity("CheckingSchedule");
             QueueScheduled();
-            if (!isConnected) return;
+            if (!isConnected) return CollectionBatchResult.Disconnected;
             int remaining = _options.MaximumRequestsPerTick;
             foreach (CollectionJob job in _state.Jobs.Where(j => j.Status == CollectionJobStatus.Pending &&
                 (!j.IsAutomatic || _state.Settings.AutomaticDownloadsEnabled) &&
@@ -120,10 +121,17 @@ public sealed class MarketDataCollector
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (remaining == 0) break;
-                var result = await CollectAsync(job, remaining, cancellationToken).ConfigureAwait(false);
+                CollectionJob current = _state.Jobs.First(j => j.Id == job.Id);
+                if (current.Status != CollectionJobStatus.Pending) continue;
+                var result = await CollectAsync(current, remaining, cancellationToken).ConfigureAwait(false);
                 remaining -= result.Requests;
-                if (result.ConnectionLost) break;
+                if (result.ConnectionLost) return CollectionBatchResult.Disconnected;
             }
+            CollectionJob[] pending = _state.Jobs.Where(j => j.Status == CollectionJobStatus.Pending &&
+                (!j.IsAutomatic || _state.Settings.AutomaticDownloadsEnabled)).ToArray();
+            return pending.Any(j => j.RetryAfterUtc is null || j.RetryAfterUtc <= _clock.GetUtcNow())
+                ? CollectionBatchResult.Ready : pending.Length > 0
+                    ? CollectionBatchResult.WaitingForRetry : CollectionBatchResult.Idle;
         }
         finally
         {
@@ -159,6 +167,7 @@ public sealed class MarketDataCollector
         foreach (DownloadListMember member in members)
         {
             DateOnly? trackedFrom = jobs.Where(j => j.Symbol == member.Symbol &&
+                (!j.IsAvailabilityProbe || j.DatasetHashes.Count > 0 || j.Status == CollectionJobStatus.Failed) &&
                 j.SessionBounds == _state.Settings.SessionBounds && SamePath(j.LibraryRootPath, _state.Settings.LibraryRootPath))
                 .Select(j => (DateOnly?)j.SessionDate)
                 .Concat(_state.ContinuityGaps.Where(g => g.Symbol == member.Symbol &&
@@ -195,7 +204,10 @@ public sealed class MarketDataCollector
             else if (!automatic ||
                 (automatic && jobs[existing].Status is not (CollectionJobStatus.Pending or CollectionJobStatus.Downloading)))
                 jobs[existing] = jobs[existing] with { IsAutomatic = automatic && jobs[existing].IsAutomatic, Status = CollectionJobStatus.Pending,
-                    Attempts = 0, NextSourceIntervalSeconds = 15, RetryAfterUtc = null, Error = null };
+                    Attempts = 0, NextSourceIntervalSeconds = 15, RetryAfterUtc = null, Error = null,
+                    RequestedThroughUtc = null,
+                    DiscoveryEmptySessions = automatic ? jobs[existing].DiscoveryEmptySessions : null,
+                    IsAvailabilityProbe = automatic && jobs[existing].IsAvailabilityProbe };
         }
     }
 
@@ -203,6 +215,12 @@ public sealed class MarketDataCollector
     {
         int requests = 0;
         CollectionSessionWindow window = CollectionSchedule.GetSessionWindow(job.SessionDate, job.SessionBounds);
+        if (job.RequestedThroughUtc is { } cap)
+        {
+            if (cap <= window.FromUtc || cap > window.ThroughUtc || cap.UtcTicks % (15 * TimeSpan.TicksPerSecond) != 0)
+                throw new InvalidDataException("The requested collection cutoff is outside the market session.");
+            window = window with { ThroughUtc = cap };
+        }
         CollectionJob active = job;
         try
         {
@@ -218,7 +236,7 @@ public sealed class MarketDataCollector
             if (saved.Succeeded && saved.Coverage.Complete && (job.ProviderInstrumentId is null ||
                 saved.Datasets.All(d => d.InstrumentId == job.ProviderInstrumentId)))
             {
-                Update(job with { Status = CollectionJobStatus.Complete, ActualSourceIntervalSeconds = 15,
+                FinishCollection(job with { Status = CollectionJobStatus.Complete, ActualSourceIntervalSeconds = 15,
                     DatasetHashes = saved.Datasets.Select(d => d.DatasetHash).ToArray(), Error = null });
                 return (0, false);
             }
@@ -256,10 +274,11 @@ public sealed class MarketDataCollector
                 throw new InvalidDataException("The provider returned mismatched 15-second history provenance.");
             if (downloaded.Candles.Count == 0)
             {
-                Update(active with { Status = saved.Candles.Count > 0 ? CollectionJobStatus.Partial : CollectionJobStatus.Unavailable,
+                FinishCollection(active with { Status = saved.Candles.Count > 0 ? CollectionJobStatus.Partial : CollectionJobStatus.Unavailable,
                     ActualSourceIntervalSeconds = saved.Candles.Count > 0 ? 15 : null,
                     DatasetHashes = saved.Datasets.Select(d => d.DatasetHash).ToArray(),
-                    Error = "No 15-second candles were returned for the missing range. Provider retention may have expired; the gap remains unresolved. Coarser data is not substituted." });
+                    Error = "No 15-second candles were returned for the missing range. Provider retention may have expired; the gap remains unresolved. Coarser data is not substituted." },
+                    emptySession: saved.Candles.Count == 0);
                 return (requests, false);
             }
             if (saved.Datasets.Any(d => d.Provider != downloaded.Provider || d.InstrumentId != downloaded.InstrumentId ||
@@ -282,14 +301,14 @@ public sealed class MarketDataCollector
             bool complete = datasets.Count > 0 &&
                 datasets.All(d => d.Coverage.Complete) && datasets.Min(d => d.Coverage.RequestedFromUtc) <= window.FromUtc &&
                 datasets.Max(d => d.Coverage.RequestedThroughUtc) >= window.ThroughUtc;
-            Update(active with
+            FinishCollection(active with
             {
                 Status = complete ? CollectionJobStatus.Complete : CollectionJobStatus.Partial,
                 ActualSourceIntervalSeconds = downloaded.SourceIntervalSeconds,
                 AdjustmentBasis = downloaded.AdjustmentBasis,
                 DatasetHashes = datasets.Select(d => d.DatasetHash).ToArray(),
                 Error = complete ? null : "Saved genuine 15-second history; coverage has gaps. Recent gaps are checked again on the next scheduled run.",
-            });
+            }, receivedCandles: true);
         }
         catch (MarketDataConnectionUnavailableException exception)
         {
@@ -370,6 +389,8 @@ public sealed class MarketDataCollector
         OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
     private static bool SameWork(CollectionJob left, CollectionJob right) =>
+        (left.ProviderInstrumentId is null || right.ProviderInstrumentId is null ||
+            left.ProviderInstrumentId == right.ProviderInstrumentId) &&
         (left.Symbol == right.Symbol || (left.ProviderInstrumentId is not null && left.ProviderInstrumentId == right.ProviderInstrumentId)) &&
         left.SessionDate == right.SessionDate && left.SourceIntervalSeconds == right.SourceIntervalSeconds &&
         left.SessionBounds == right.SessionBounds && left.AdjustmentPolicy == right.AdjustmentPolicy &&

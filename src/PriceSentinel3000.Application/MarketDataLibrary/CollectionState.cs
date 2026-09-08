@@ -1,6 +1,7 @@
 namespace PriceSentinel3000.Application.MarketDataLibrary;
 
 public enum CollectionJobStatus { Pending, Downloading, Complete, Partial, Unavailable, Failed }
+public enum CollectionBatchResult { Idle, Ready, WaitingForRetry, Disconnected, Busy }
 
 public sealed record CollectionContinuityGap(string Symbol, DateOnly FromSessionDate, DateOnly ThroughSessionDate,
     string SessionBounds, string LibraryRootPath);
@@ -26,6 +27,9 @@ public sealed record CollectionJob
     public string? Error { get; init; }
     public IReadOnlyList<string> DatasetHashes { get; init; } = [];
     public bool IsAutomatic { get; init; }
+    public bool IsAvailabilityProbe { get; init; }
+    public DateTimeOffset? RequestedThroughUtc { get; init; }
+    public int? DiscoveryEmptySessions { get; init; }
 }
 
 public sealed record CollectionState

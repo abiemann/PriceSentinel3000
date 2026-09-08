@@ -1,4 +1,5 @@
 using System.IO;
+using System.Windows.Threading;
 using PriceSentinel3000.App.ViewModels;
 using PriceSentinel3000.Application.MarketDataLibrary;
 using PriceSentinel3000.Infrastructure.MarketDataLibrary;
@@ -107,7 +108,7 @@ public sealed partial class SessionWorkflowTests
     });
 
     [Fact]
-    public Task ManualDownload_UsesSavedIncludedUnionAndWritesRescannableLibraryWithoutDuplicates() => host.RunAsync(async () =>
+    public Task DownloadNow_DiscoversSavedIncludedUnionAndWritesRescannableLibraryWithoutDuplicates() => host.RunAsync(async () =>
     {
         await using var fixture = new RetentionFixture();
         DataRetentionViewModel vm = fixture.ViewModel;
@@ -123,20 +124,69 @@ public sealed partial class SessionWorkflowTests
         // Unsaved edits must not change the queued dataset's membership.
         vm.TickerInput = "NVDA";
         await vm.AddTickersAsync();
-        vm.FromDate = vm.ThroughDate = "2026-09-04";
         await vm.DownloadNowAsync();
-        CollectionJob job = Assert.Single(fixture.Collector.State.Jobs);
+        CollectionJob job = Assert.Single(fixture.Collector.State.Jobs, job => job.Status == CollectionJobStatus.Complete);
         Assert.Equal("NFLX", job.Symbol);
+        Assert.All(fixture.Collector.State.Jobs, item => Assert.Equal("NFLX", item.Symbol));
         Assert.Equal(CollectionJobStatus.Complete, job.Status);
-        Assert.Equal(1, fixture.Provider.DownloadCalls);
+        Assert.Equal(1, fixture.Provider.Requests.Count(request => request.FromUtc.Date == new DateTime(2026, 9, 4)));
         await vm.ScanLibraryAsync();
         HistoricalDatasetInfo dataset = Assert.Single(vm.Datasets);
         Assert.True(dataset.Coverage.Complete);
         Assert.Equal(1560, dataset.Coverage.ActualCandleCount);
         Assert.Equal(15, dataset.SourceIntervalSeconds);
         await vm.DownloadNowAsync();
-        Assert.Equal(1, fixture.Provider.DownloadCalls);
+        Assert.Equal(1, fixture.Provider.Requests.Count(request => request.FromUtc.Date == new DateTime(2026, 9, 4)));
         Assert.Single(new JsonMarketDataLibrary(fixture.LibraryRoot).Scan().Datasets);
+    });
+
+    [Fact]
+    public Task DownloadNow_CurrentDayStopsAtTheLastCompletedCandleAndLaterCollectsOnlyNewCoverage() => host.RunAsync(async () =>
+    {
+        await using var fixture = new RetentionFixture();
+        fixture.Clock.Now = new(2026, 9, 8, 17, 0, 10, TimeSpan.Zero);
+        await fixture.SaveSingleSymbol(queueDate: false);
+        await fixture.ViewModel.DownloadNowCommand.ExecuteAsync();
+        DateTimeOffset firstCutoff = new(2026, 9, 8, 17, 0, 0, TimeSpan.Zero);
+        HistoricalDataRequest first = Assert.Single(fixture.Provider.Requests,
+            request => request.FromUtc.Date == new DateTime(2026, 9, 8));
+        Assert.Equal(firstCutoff, first.ThroughUtc);
+        Assert.All(fixture.Provider.Requests, request => Assert.Equal(15, request.SourceIntervalSeconds));
+        CollectionJob snapshot = Assert.Single(fixture.Collector.State.Jobs,
+            job => job.SessionDate == new DateOnly(2026, 9, 8));
+        Assert.Equal(CollectionJobStatus.Complete, snapshot.Status);
+        Assert.Equal(firstCutoff, snapshot.RequestedThroughUtc);
+
+        fixture.Clock.Now = fixture.Clock.Now.AddMinutes(1);
+        await fixture.ViewModel.DownloadNowCommand.ExecuteAsync();
+        HistoricalDataRequest[] today = fixture.Provider.Requests
+            .Where(request => request.FromUtc.Date == new DateTime(2026, 9, 8)).ToArray();
+        Assert.Equal(2, today.Length);
+        Assert.Equal(firstCutoff, today[1].FromUtc);
+        Assert.Equal(firstCutoff.AddMinutes(1), today[1].ThroughUtc);
+    });
+
+    [Fact]
+    public Task DownloadNow_RetriesAnOlderUnavailableJobWithoutASeparateRetryAction() => host.RunAsync(async () =>
+    {
+        await using var fixture = new RetentionFixture();
+        await fixture.SaveSingleSymbol(queueDate: false);
+        DateOnly olderDay = new(2026, 8, 10);
+        await fixture.Collector.QueueManualAsync(["NFLX"], olderDay, olderDay);
+        fixture.Connected = true;
+        await fixture.ViewModel.CheckDownloadsAsync();
+        CollectionJob missing = Assert.Single(fixture.Collector.State.Jobs);
+        Assert.Equal(CollectionJobStatus.Unavailable, missing.Status);
+        Assert.False(missing.IsAvailabilityProbe);
+
+        fixture.Provider.AvailableFrom = olderDay;
+        await fixture.ViewModel.DownloadNowCommand.ExecuteAsync();
+
+        CollectionJob recovered = Assert.Single(fixture.Collector.State.Jobs, job => job.Id == missing.Id);
+        Assert.Equal(olderDay, recovered.SessionDate);
+        Assert.Equal(CollectionJobStatus.Complete, recovered.Status);
+        Assert.Equal(2, fixture.Provider.Requests.Count(request =>
+            DateOnly.FromDateTime(request.FromUtc.UtcDateTime) == olderDay));
     });
 
     [Fact]
@@ -146,7 +196,7 @@ public sealed partial class SessionWorkflowTests
         await fixture.SaveSingleSymbol();
         fixture.Provider.HoldDownloads = true;
         DataRetentionViewModel vm = fixture.ViewModel;
-        Task downloading = vm.DownloadNowCommand.ExecuteAsync();
+        Task downloading = StartQueuedRetentionDownloadsAsync(vm);
         await fixture.Provider.DownloadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.True(vm.IsBusy);
         Assert.False(vm.SaveListCommand.CanExecute(null));
@@ -169,7 +219,7 @@ public sealed partial class SessionWorkflowTests
         await using var fixture = new RetentionFixture();
         await fixture.SaveSingleSymbol();
         fixture.HoldConnection = true;
-        Task downloading = fixture.ViewModel.DownloadNowCommand.ExecuteAsync();
+        Task downloading = StartQueuedRetentionDownloadsAsync(fixture.ViewModel);
         await fixture.ConnectionStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
         fixture.ViewModel.CancelDownloadsCommand.Execute(null);
         await downloading.WaitAsync(TimeSpan.FromSeconds(5));
@@ -213,15 +263,25 @@ public sealed partial class SessionWorkflowTests
     {
         await using var fixture = new RetentionFixture(new(2026, 8, 24), new(2026, 8, 26));
         Assert.Contains("NFLX: 2026-08-24 through 2026-08-26", fixture.ViewModel.ContinuityWarnings);
-        await fixture.SaveSingleSymbol();
-        fixture.ViewModel.FromDate = fixture.ViewModel.ThroughDate = "2026-08-25";
-        await fixture.ViewModel.DownloadNowAsync();
+        await fixture.SaveSingleSymbol(queueDate: false);
+        fixture.Provider.AvailableFrom = new(2026, 8, 25);
+        await fixture.Collector.QueueManualAsync(["NFLX"], new(2026, 8, 25), new(2026, 8, 25));
+        await StartQueuedRetentionDownloadsAsync(fixture.ViewModel);
         Assert.Equal(CollectionJobStatus.Complete, Assert.Single(fixture.Collector.State.Jobs).Status);
         Assert.Contains("NFLX: 2026-08-24 through 2026-08-24", fixture.ViewModel.ContinuityWarnings);
         Assert.Contains("NFLX: 2026-08-26 through 2026-08-26", fixture.ViewModel.ContinuityWarnings);
         Assert.DoesNotContain("2026-08-25", fixture.ViewModel.ContinuityWarnings);
         Assert.Equal(2, new JsonCollectionStateStore(fixture.StatePath).Load().ContinuityGaps.Count);
     });
+
+    // Keep progress and cancellation fixtures focused on their prequeued jobs. The production
+    // Download now discovery path is covered separately; Resume already runs retained work.
+    private static async Task StartQueuedRetentionDownloadsAsync(DataRetentionViewModel viewModel)
+    {
+        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+        await viewModel.PauseDownloadsCommand.ExecuteAsync();
+        await viewModel.PauseDownloadsCommand.ExecuteAsync();
+    }
 
     private sealed class RetentionFixture : IAsyncDisposable
     {
@@ -231,6 +291,7 @@ public sealed partial class SessionWorkflowTests
         public bool Connected { get; set; }
         public bool HoldConnection { get; set; }
         public int ConnectionCalls { get; private set; }
+        public TestClock Clock { get; } = new() { Now = new(2026, 9, 7, 20, 0, 0, TimeSpan.Zero) };
         public TaskCompletionSource ConnectionStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public RetentionProvider Provider { get; }
         public MarketDataCollector Collector { get; }
@@ -243,8 +304,7 @@ public sealed partial class SessionWorkflowTests
                 { LibraryRootPath = LibraryRoot, TimeZoneId = timeZoneId ?? TimeZoneInfo.Local.Id },
                 ContinuityGaps = gapFrom is { } from && gapThrough is { } through
                     ? [new("NFLX", from, through, "regular", LibraryRoot)] : [] });
-            Collector = new(store, Provider, root => new JsonMarketDataLibrary(root),
-                new TestClock { Now = new(2026, 9, 7, 20, 0, 0, TimeSpan.Zero) },
+            Collector = new(store, Provider, root => new JsonMarketDataLibrary(root), Clock,
                 new CollectionRunOptions { MinimumRequestInterval = TimeSpan.Zero });
             ViewModel = new(Collector, Provider, Provider, Provider, root => new JsonMarketDataLibrary(root), async token =>
             {
@@ -252,14 +312,14 @@ public sealed partial class SessionWorkflowTests
                 ConnectionStarted.TrySetResult();
                 if (HoldConnection) await Task.Delay(Timeout.Infinite, token);
                 Connected = true;
-            }, () => Connected);
+            }, () => Connected, clock: Clock);
         }
-        public async Task SaveSingleSymbol()
+        public async Task SaveSingleSymbol(bool queueDate = true)
         {
             ViewModel.TickerInput = "NFLX";
             await ViewModel.AddTickersAsync();
             await ViewModel.SaveListAsync();
-            ViewModel.FromDate = ViewModel.ThroughDate = "2026-09-04";
+            if (queueDate) await Collector.QueueManualAsync(["NFLX"], new(2026, 9, 4), new(2026, 9, 4));
         }
         public async ValueTask DisposeAsync()
         {
@@ -272,6 +332,8 @@ public sealed partial class SessionWorkflowTests
     {
         public int Calls { get; private set; }
         public int DownloadCalls { get; private set; }
+        public List<HistoricalDataRequest> Requests { get; } = [];
+        public DateOnly AvailableFrom { get; set; } = new(2026, 9, 4);
         public bool HoldDownloads { get; set; }
         public IReadOnlyList<PersonalWatchlistMember> Members { get; set; } = [];
         public TaskCompletionSource DownloadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -284,9 +346,11 @@ public sealed partial class SessionWorkflowTests
         {
             CheckConnected();
             DownloadCalls++;
+            Requests.Add(request);
             DownloadStarted.TrySetResult();
             if (HoldDownloads) await Task.Delay(Timeout.Infinite, cancellationToken);
-            int count = (int)((request.ThroughUtc - request.FromUtc).TotalSeconds / request.SourceIntervalSeconds);
+            int count = DateOnly.FromDateTime(request.FromUtc.UtcDateTime) < AvailableFrom ? 0
+                : (int)((request.ThroughUtc - request.FromUtc).TotalSeconds / request.SourceIntervalSeconds);
             return new("Robinhood", "id-" + request.Symbol, request.Symbol, request.SourceIntervalSeconds,
                 request.AdjustmentPolicy, "robinhood-split-unversioned", request.SessionBounds, request.ThroughUtc.AddDays(1),
                 request.FromUtc, request.ThroughUtc, Enumerable.Range(0, count).Select(index =>

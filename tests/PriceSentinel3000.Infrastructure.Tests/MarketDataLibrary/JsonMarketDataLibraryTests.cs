@@ -105,6 +105,7 @@ public sealed class JsonMarketDataLibraryTests : IDisposable
         Assert.Equal(2, Library.Scan().Datasets.Count);
         Assert.Contains(Library.Scan().Diagnostics, item => item.Code == "conflicting_revisions");
         Assert.False(Library.Query(Query()).Succeeded);
+        Assert.False(Library.Query(Query() with { RevisionPolicy = HistoricalRevisionPolicy.CompatibleCoverage }).Succeeded);
         HistoricalDataQueryResult newest = Library.Query(Query() with { RevisionPolicy = HistoricalRevisionPolicy.LatestFetched });
         Assert.True(newest.Succeeded);
         Assert.Equal(corrected.DatasetHash, Assert.Single(newest.Datasets).DatasetHash);
