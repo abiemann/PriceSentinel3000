@@ -18,6 +18,7 @@ public sealed record DownloadList(
 
 public sealed record CollectionSettings
 {
+    public const string AllAvailableSessionBounds = "24_5";
     public string LibraryRootPath { get; init; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PriceSentinel3000", "MarketData");
     public IReadOnlyList<DownloadList> Lists { get; init; } = [];
@@ -36,8 +37,8 @@ public sealed record CollectionSettings
         _ = TimeZoneInfo.FindSystemTimeZoneById(TimeZoneId);
         if (DailyDownloadTime.Ticks % TimeSpan.TicksPerMinute != 0)
             throw new ArgumentException("The daily download time must use hours and minutes.");
-        if (SessionBounds is not ("regular" or "extended"))
-            throw new ArgumentException("Choose regular or extended session coverage.");
+        if (SessionBounds is not ("regular" or "extended" or "24_5"))
+            throw new ArgumentException("Unknown session coverage.");
         if (ProviderFinalizationDelayMinutes is < 0 or > 1440 || CatchUpCalendarDays is < 1 or > 30)
             throw new ArgumentException("Finalization delay must be 0–1440 minutes and catch-up 1–30 calendar days.");
         if (Lists is null || Lists.Count > 100 || Lists.Select(l => l.Id).Distinct().Count() != Lists.Count)

@@ -51,6 +51,7 @@ public sealed partial class SessionWorkflowTests
             tooltip.IsOpen = true;
             await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
             Assert.Contains(FindRetentionVisuals<TextBlock>(tooltip), text => text.Text == vm.DownloadHeading);
+            Assert.Contains(FindRetentionVisuals<TextBlock>(tooltip), text => text.Text == vm.DownloadDetail);
 
             await vm.PauseDownloadsCommand.ExecuteAsync();
             await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
@@ -59,6 +60,7 @@ public sealed partial class SessionWorkflowTests
             Assert.Equal(100d, progress.Value);
             Assert.Equal(buttonWidth, button.ActualWidth);
             Assert.Contains(FindRetentionVisuals<TextBlock>(tooltip), text => text.Text == vm.DownloadHeading);
+            Assert.Contains(FindRetentionVisuals<TextBlock>(tooltip), text => text.Text == vm.DownloadDetail);
             Assert.Contains(FindRetentionVisuals<TextBlock>(tooltip), text => text.Text == vm.JobSummary);
         }
         finally

@@ -8,19 +8,26 @@ public sealed partial class MarketDataCollector
     private const int EmptySessionsToStopDiscovery = 3;
 
     /// <summary>Collects missing genuine 15-second candles, discovering each equity's older availability.</summary>
-    public Task QueueAvailableAsync(CancellationToken cancellationToken = default) => MutateAsync(() =>
+    public Task QueueAvailableAsync(CancellationToken cancellationToken = default) =>
+        MutateAsync(() => QueueAvailable(automatic: false), cancellationToken);
+
+    private void QueueAvailable(bool automatic)
     {
         DownloadListMember[] members = _state.Settings.Lists.Where(l => l.IsEnabled).SelectMany(l => l.Members)
             .Where(m => m.IsIncluded).GroupBy(m => m.Symbol, StringComparer.Ordinal)
             .Select(g => g.FirstOrDefault(m => m.ProviderInstrumentId is not null) ?? g.First()).ToArray();
-        if (members.Length == 0) throw new ArgumentException("Save a list with at least one included equity before downloading.");
+        if (members.Length == 0)
+        {
+            if (automatic) return;
+            throw new ArgumentException("Save a list with at least one included equity before downloading.");
+        }
         DateTimeOffset now = _clock.GetUtcNow();
-        string bounds = _state.Settings.SessionBounds;
+        string bounds = CollectionSettings.AllAvailableSessionBounds;
         DateOnly today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, CollectionEastern).DateTime);
         DateOnly latest = CollectionSchedule.LatestFinalizedSession(now, bounds,
             _state.Settings.ProviderFinalizationDelayMinutes);
         DateTimeOffset? partialThrough = null;
-        if (UsEquityTradingCalendar.IsTradingDay(today))
+        if (CollectionSchedule.IsCollectionDate(today, bounds))
         {
             CollectionSessionWindow window = CollectionSchedule.GetSessionWindow(today, bounds);
             DateTimeOffset completed = new(now.UtcTicks - now.UtcTicks % (15 * TimeSpan.TicksPerSecond), TimeSpan.Zero);
@@ -34,14 +41,14 @@ public sealed partial class MarketDataCollector
         // The retry horizon controls the first batch only, never the provider's retention boundary.
         DateOnly first = today.AddDays(-_state.Settings.CatchUpCalendarDays + 1);
         if (first > latest) first = latest;
-        while (!UsEquityTradingCalendar.IsTradingDay(first)) first = first.AddDays(1);
+        while (!CollectionSchedule.IsCollectionDate(first, bounds)) first = first.AddDays(1);
         var jobs = _state.Jobs.Select(j => members.Any(m => m.Symbol == j.Symbol) &&
             j.SessionBounds == bounds && SamePath(j.LibraryRootPath, _state.Settings.LibraryRootPath)
             ? j with { DiscoveryEmptySessions = null } : j).ToList();
         for (DateOnly day = latest; day >= first; day = day.AddDays(-1))
         {
-            if (!UsEquityTradingCalendar.IsTradingDay(day)) continue;
-            AddJobs(jobs, members, day, bounds, automatic: false);
+            if (!CollectionSchedule.IsCollectionDate(day, bounds)) continue;
+            AddJobs(jobs, members, day, bounds, automatic);
             foreach (DownloadListMember member in members)
             {
                 int index = FindAvailabilityJob(jobs, member, day, bounds, _state.Settings.LibraryRootPath);
@@ -53,12 +60,12 @@ public sealed partial class MarketDataCollector
                 };
             }
         }
-        QueueKnownMissing(jobs, members, first, latest, bounds, now);
+        QueueKnownMissing(jobs, members, first, latest, bounds, now, automatic);
         Commit(_state with { Jobs = jobs.ToArray() });
-    }, cancellationToken);
+    }
 
     private void QueueKnownMissing(List<CollectionJob> jobs, DownloadListMember[] members,
-        DateOnly firstDiscoveryDate, DateOnly latest, string bounds, DateTimeOffset now)
+        DateOnly firstDiscoveryDate, DateOnly latest, string bounds, DateTimeOffset now, bool automatic)
     {
         MarketDataLibraryScan scan = _libraryFactory(_state.Settings.LibraryRootPath).Scan();
         if (scan.Diagnostics.Any(d => d.Code is "scan_limit" or "scan_failed"))
@@ -68,7 +75,7 @@ public sealed partial class MarketDataCollector
             // Known failures and saved partial days still deserve a retry even when an
             // empty broker window stops ordinary discovery before reaching their dates.
             DateOnly[] retryDates = jobs.Where(j => j.Symbol == member.Symbol &&
-                j.SessionDate < firstDiscoveryDate && j.SessionBounds == bounds &&
+                j.SessionDate < firstDiscoveryDate && j.SessionBounds is "regular" or "extended" or "24_5" &&
                 (member.ProviderInstrumentId is null || j.ProviderInstrumentId is null ||
                     j.ProviderInstrumentId == member.ProviderInstrumentId) &&
                 SamePath(j.LibraryRootPath, _state.Settings.LibraryRootPath) &&
@@ -80,14 +87,14 @@ public sealed partial class MarketDataCollector
             CollectionBackfillPlan plan = CollectionBackfillPlanner.Plan(member, scan.Datasets, latest,
                 bounds, now, _state.Settings.CatchUpCalendarDays);
             DateOnly[] partialDates = scan.Datasets.Where(d => d.Symbol == member.Symbol &&
-                d.SourceIntervalSeconds == 15 && d.SessionBounds == bounds && d.TradingDate < firstDiscoveryDate &&
+                d.SourceIntervalSeconds == 15 && d.SessionBounds is "regular" or "extended" or "24_5" && d.TradingDate < firstDiscoveryDate &&
                 d.AdjustmentPolicy == "split" && d.AdjustmentBasis == "robinhood-split-unversioned" &&
                 (member.ProviderInstrumentId is null || d.InstrumentId == member.ProviderInstrumentId) &&
                 (plan.MissingSessions.Contains(d.TradingDate) ||
                     plan.ExpiredGaps.Any(g => d.TradingDate >= g.FromSessionDate && d.TradingDate <= g.ThroughSessionDate)))
                 .Select(d => d.TradingDate).ToArray();
-            foreach (DateOnly day in retryDates.Concat(partialDates).Distinct().OrderDescending())
-                AddJobs(jobs, [member], day, bounds, automatic: false);
+            foreach (DateOnly day in retryDates.Concat(partialDates).Where(day => CollectionSchedule.IsCollectionDate(day, bounds)).Distinct().OrderDescending())
+                AddJobs(jobs, [member], day, bounds, automatic);
         }
     }
 
@@ -97,7 +104,7 @@ public sealed partial class MarketDataCollector
     {
         if (emptySession && job.IsAvailabilityProbe)
             job = job with { Error = job.DiscoveryEmptySessions is >= EmptySessionsToStopDiscovery - 1
-                ? "No genuine 15-second candles are available. Earlier discovery stopped after three consecutive empty broker checks."
+                ? "No genuine 15-second candles are available. Earlier discovery stopped after three consecutive collection dates with no broker data."
                 : "No genuine 15-second candles are available for this date." };
         var jobs = _state.Jobs.Select(j => j.Id == job.Id ? job with { DiscoveryEmptySessions = null } : j).ToList();
         if (job.DiscoveryEmptySessions is { } precedingEmpty)
@@ -106,19 +113,27 @@ public sealed partial class MarketDataCollector
             if (empty < EmptySessionsToStopDiscovery && job.SessionDate > DateOnly.MinValue)
             {
                 DateOnly previous = job.SessionDate.AddDays(-1);
-                while (previous > DateOnly.MinValue && !UsEquityTradingCalendar.IsTradingDay(previous))
+                while (previous > DateOnly.MinValue && !CollectionSchedule.IsCollectionDate(previous, job.SessionBounds))
                     previous = previous.AddDays(-1);
-                if (UsEquityTradingCalendar.IsTradingDay(previous))
+                if (CollectionSchedule.IsCollectionDate(previous, job.SessionBounds))
                 {
                     var next = job with
                     {
                         Id = Guid.NewGuid(), SessionDate = previous, RequestedThroughUtc = null,
                         DiscoveryEmptySessions = empty, Status = CollectionJobStatus.Pending,
                         ActualSourceIntervalSeconds = null, DatasetHashes = [], Attempts = 0,
+                        NextGapFromUtc = null, ReceivedCandlesThisRun = false,
                         QueuedAtUtc = _clock.GetUtcNow(), LastAttemptAtUtc = null, RetryAfterUtc = null, Error = null,
                     };
                     int existing = jobs.FindIndex(j => SameWork(j, next));
-                    if (existing >= 0) next = next with { Id = jobs[existing].Id };
+                    if (existing >= 0)
+                    {
+                        CollectionJob previousWork = jobs[existing];
+                        next = previousWork.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading
+                            ? previousWork with { DiscoveryEmptySessions = empty, IsAvailabilityProbe = true,
+                                RequestedThroughUtc = null }
+                            : next with { Id = previousWork.Id };
+                    }
                     if (existing >= 0) jobs[existing] = next;
                     else jobs.Add(next);
                 }

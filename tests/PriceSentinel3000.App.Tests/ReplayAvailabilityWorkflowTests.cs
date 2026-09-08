@@ -118,7 +118,6 @@ public sealed partial class SessionWorkflowTests
     [InlineData("start")]
     [InlineData("end")]
     [InlineData("root")]
-    [InlineData("bounds")]
     [InlineData("pins")]
     [InlineData("offline")]
     [InlineData("revision")]
@@ -146,7 +145,6 @@ public sealed partial class SessionWorkflowTests
                 Assert.Equal("Disk15", vm.ReplayAvailabilityStatus); // Unsaved draft is not the active library.
                 await retention.SaveScheduleAsync();
                 break;
-            case "bounds": retention.SessionBounds = "extended"; await retention.SaveScheduleAsync(); break;
             case "pins": retention.ReplayPinnedHashes = new string('a', 64); break;
             case "offline": retention.ReplayOfflineOnly = true; break;
             case "revision": retention.ReplayUseLatestRevision = true; break;

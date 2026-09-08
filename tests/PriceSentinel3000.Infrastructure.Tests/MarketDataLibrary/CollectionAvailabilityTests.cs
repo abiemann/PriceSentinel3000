@@ -16,7 +16,7 @@ public sealed class CollectionAvailabilityTests
         await fixture.Drain();
 
         Assert.Contains(fixture.Library.Scan().Datasets, d => d.TradingDate == new DateOnly(2026, 8, 24));
-        Assert.Equal(new DateOnly(2026, 8, 19), fixture.Provider.Requests.Min(Date));
+        Assert.Equal(new DateOnly(2026, 8, 20), fixture.Provider.Requests.Min(Date));
         Assert.All(fixture.Provider.Requests, r => Assert.Equal(15, r.SourceIntervalSeconds));
         Assert.All(fixture.Collector.State.Jobs, j => Assert.True(j.IsAvailabilityProbe));
         Assert.DoesNotContain(fixture.Collector.State.Jobs, j => j.DiscoveryEmptySessions is not null);
@@ -34,9 +34,9 @@ public sealed class CollectionAvailabilityTests
         fixture.Provider.Oldest["NVDA"] = new(2026, 8, 24);
         await fixture.Collector.QueueAvailableAsync();
         await fixture.Drain();
-        Assert.Equal(new DateOnly(2026, 8, 26), fixture.Provider.Requests.Where(r => r.Symbol == "SOFI").Min(Date));
-        Assert.Equal(new DateOnly(2026, 8, 19), fixture.Provider.Requests.Where(r => r.Symbol == "NVDA").Min(Date));
-        Assert.Equal(fixture.Provider.Requests.Count, fixture.Provider.Requests.Select(r => (r.Symbol, Date(r))).Distinct().Count());
+        Assert.Equal(new DateOnly(2026, 8, 27), fixture.Provider.Requests.Where(r => r.Symbol == "SOFI").Min(Date));
+        Assert.Equal(new DateOnly(2026, 8, 20), fixture.Provider.Requests.Where(r => r.Symbol == "NVDA").Min(Date));
+        Assert.Equal(fixture.Provider.Requests.Count, fixture.Provider.Requests.Select(r => (r.Symbol, r.FromUtc, r.ThroughUtc)).Distinct().Count());
         Assert.DoesNotContain(fixture.Provider.Requests, r => r.Symbol is "EXCLUDED" or "DISABLED");
     }
 
@@ -66,7 +66,7 @@ public sealed class CollectionAvailabilityTests
         await fixture.Collector.QueueAvailableAsync();
         await fixture.Drain();
         DateOnly day = new(2026, 9, 4);
-        HistoricalDatasetInfo saved = Assert.Single(fixture.Library.Scan().Datasets, d => d.TradingDate == day);
+        HistoricalDatasetInfo saved = fixture.Library.Scan().Datasets.First(d => d.TradingDate == day);
         int initial = fixture.Provider.Requests.Count(r => Date(r) == day);
         await fixture.Collector.QueueAvailableAsync();
         await fixture.Drain();
@@ -90,7 +90,7 @@ public sealed class CollectionAvailabilityTests
         Assert.Equal(CollectionJobStatus.Complete, first.Status);
         Assert.Equal(DateTimeOffset.Parse("2026-09-08T14:00:00Z"), first.RequestedThroughUtc);
         Assert.Contains(day, CollectionBackfillPlanner.Plan(new("SOFI"), fixture.Library.Scan().Datasets, day,
-            "regular", fixture.Clock.Now).MissingSessions);
+            "24_5", fixture.Clock.Now).MissingSessions);
 
         fixture.Clock.Now = DateTimeOffset.Parse("2026-09-08T14:05:22Z");
         await fixture.Collector.QueueAvailableAsync();
@@ -99,14 +99,14 @@ public sealed class CollectionAvailabilityTests
         Assert.Equal(first.RequestedThroughUtc, extended.FromUtc);
         Assert.Equal(DateTimeOffset.Parse("2026-09-08T14:05:15Z"), extended.ThroughUtc);
 
-        fixture.Clock.Now = DateTimeOffset.Parse("2026-09-08T20:16:00Z");
+        fixture.Clock.Now = DateTimeOffset.Parse("2026-09-09T04:16:00Z");
         await fixture.Collector.QueueAvailableAsync();
         await fixture.Drain();
         CollectionJob finalized = Assert.Single(fixture.Collector.State.Jobs, j => j.SessionDate == day);
         Assert.Null(finalized.RequestedThroughUtc);
         Assert.Equal(CollectionJobStatus.Complete, finalized.Status);
         Assert.DoesNotContain(day, CollectionBackfillPlanner.Plan(new("SOFI"), fixture.Library.Scan().Datasets, day,
-            "regular", fixture.Clock.Now).MissingSessions);
+            "24_5", fixture.Clock.Now).MissingSessions);
     }
 
     [Fact]
@@ -119,7 +119,7 @@ public sealed class CollectionAvailabilityTests
         Assert.Contains(fixture.Collector.State.Jobs, j => j.Status == CollectionJobStatus.Pending && j.DiscoveryEmptySessions is not null);
         fixture.Restart();
         await fixture.Drain();
-        Assert.Equal(fixture.Provider.Requests.Count, fixture.Provider.Requests.Select(r => (r.Symbol, Date(r))).Distinct().Count());
+        Assert.Equal(fixture.Provider.Requests.Count, fixture.Provider.Requests.Select(r => (r.Symbol, r.FromUtc, r.ThroughUtc)).Distinct().Count());
         Assert.Contains(fixture.Library.Scan().Datasets, d => d.TradingDate == new DateOnly(2026, 8, 24));
     }
 
@@ -182,20 +182,22 @@ public sealed class CollectionAvailabilityTests
         await fixture.Drain();
         Assert.All(oldJobs, old => Assert.Equal(CollectionJobStatus.Complete,
             Assert.Single(fixture.Collector.State.Jobs, j => j.Id == old.Id).Status));
-        Assert.All(oldJobs, old => Assert.Single(fixture.Provider.Requests, r => Date(r) == old.SessionDate));
-        HistoricalDataRequest repair = Assert.Single(fixture.Provider.Requests, r => Date(r) == partialDay);
-        CollectionSessionWindow window = CollectionSchedule.GetSessionWindow(partialDay);
+        Assert.All(oldJobs, old => Assert.Contains(fixture.Provider.Requests, r => Date(r) == old.SessionDate));
+        HistoricalDataRequest repair = fixture.Provider.Requests.First(r => Date(r) == partialDay);
+        CollectionSessionWindow window = CollectionSchedule.GetSessionWindow(partialDay, "24_5");
         Assert.Equal(window.FromUtc.AddSeconds(75), repair.FromUtc);
         HistoricalDataQueryResult recovered = fixture.Library.Query(new("SOFI", window.FromUtc, window.ThroughUtc,
-            RevisionPolicy: HistoricalRevisionPolicy.LatestFetched));
+            SessionBounds: "24_5", RevisionPolicy: HistoricalRevisionPolicy.CompatibleCoverage));
         Assert.True(recovered.Coverage.Complete);
-        Assert.Equal(1560, recovered.Candles.Count);
+        Assert.Equal(5760, recovered.Candles.Count);
         Assert.Equal(fixture.Library.Read(prefix.DatasetHash).Candles, recovered.Candles.Take(5));
 
+        int oldDayRequests = fixture.Provider.Requests.Count(r => oldJobs.Any(j => j.SessionDate == Date(r)));
         fixture.Clock.Now = fixture.Clock.Now.AddMinutes(1);
         await fixture.Collector.QueueAvailableAsync();
         await fixture.Drain();
-        Assert.All(oldJobs, old => Assert.Single(fixture.Provider.Requests, r => Date(r) == old.SessionDate));
+        Assert.All(oldJobs, old => Assert.Contains(fixture.Provider.Requests, r => Date(r) == old.SessionDate));
+        Assert.Equal(oldDayRequests, fixture.Provider.Requests.Count(r => oldJobs.Any(j => j.SessionDate == Date(r))));
         Assert.All(fixture.Provider.Requests, r => Assert.Equal(15, r.SourceIntervalSeconds));
     }
 
@@ -209,7 +211,7 @@ public sealed class CollectionAvailabilityTests
             fixture.OldJob(day, CollectionJobStatus.Failed) with { Symbol = "EXCLUDED" },
             fixture.OldJob(day, CollectionJobStatus.Failed) with { Symbol = "DISABLED" },
             fixture.OldJob(day, CollectionJobStatus.Failed) with { LibraryRootPath = fixture.Library.RootPath + "-other" },
-            fixture.OldJob(day, CollectionJobStatus.Failed) with { SessionBounds = "extended" },
+            fixture.OldJob(day, CollectionJobStatus.Failed) with { SessionBounds = "unsupported" },
             fixture.OldJob(day, CollectionJobStatus.Failed) with { ProviderInstrumentId = "different-SOFI-id" },
         ];
         CollectionState saved = fixture.Store.Load();
@@ -250,8 +252,8 @@ public sealed class CollectionAvailabilityTests
         await fixture.Drain();
         CollectionJob repaired = Assert.Single(fixture.Collector.State.Jobs, j => j.SessionDate == day);
         Assert.Equal(CollectionJobStatus.Complete, repaired.Status);
-        HistoricalDataRequest request = Assert.Single(fixture.Provider.Requests, r => Date(r) == day);
-        Assert.Equal(CollectionSchedule.GetSessionWindow(day).FromUtc.AddSeconds(60), request.FromUtc);
+        HistoricalDataRequest request = fixture.Provider.Requests.First(r => Date(r) == day);
+        Assert.Equal(CollectionSchedule.GetSessionWindow(day, "24_5").FromUtc.AddSeconds(60), request.FromUtc);
     }
 
     [Fact]
@@ -290,12 +292,12 @@ public sealed class CollectionAvailabilityTests
             j => j.SessionDate == day && j.ProviderInstrumentId == "SOFI-id");
         Assert.NotEqual(differentInstrument.Id, repaired.Id);
         Assert.Equal(CollectionJobStatus.Complete, repaired.Status);
-        HistoricalDataRequest request = Assert.Single(fixture.Provider.Requests, r => Date(r) == day);
+        HistoricalDataRequest request = fixture.Provider.Requests.First(r => Date(r) == day);
         Assert.Equal("SOFI-id", request.InstrumentId);
-        Assert.Equal(CollectionSchedule.GetSessionWindow(day).FromUtc.AddSeconds(60), request.FromUtc);
+        Assert.Equal(CollectionSchedule.GetSessionWindow(day, "24_5").FromUtc.AddSeconds(60), request.FromUtc);
     }
 
-    private static DateOnly Date(HistoricalDataRequest request) => DateOnly.FromDateTime(request.FromUtc.UtcDateTime);
+    private static DateOnly Date(HistoricalDataRequest request) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(request.FromUtc, TimeZoneInfo.FindSystemTimeZoneById("America/New_York")).DateTime);
 
     private sealed class Fixture : IDisposable
     {
@@ -321,15 +323,15 @@ public sealed class CollectionAvailabilityTests
         public MarketDataCollector Collector { get; private set; } = null!;
         public CollectionJob OldJob(DateOnly day, CollectionJobStatus status) => new()
         {
-            Symbol = "SOFI", SessionDate = day, Status = status, LibraryRootPath = Library.RootPath,
+            Symbol = "SOFI", SessionDate = day, Status = status, LibraryRootPath = Library.RootPath, SessionBounds = "24_5",
             QueuedAtUtc = Clock.Now.AddDays(-1), LastAttemptAtUtc = Clock.Now.AddDays(-1),
             Error = "Previous download needs attention.",
         };
         public HistoricalDatasetInfo SavePrefix(DateOnly day, int candleCount)
         {
-            CollectionSessionWindow window = CollectionSchedule.GetSessionWindow(day);
+            CollectionSessionWindow window = CollectionSchedule.GetSessionWindow(day, "24_5");
             return Assert.Single(Library.Save(new("test", "SOFI-id", "SOFI", 15, "split", "robinhood-split-unversioned",
-                "regular", Clock.Now.AddDays(-1), window.FromUtc, window.ThroughUtc,
+                "24_5", Clock.Now.AddDays(-1), window.FromUtc, window.ThroughUtc,
                 Enumerable.Range(0, candleCount).Select(index =>
                 {
                     DateTimeOffset at = window.FromUtc.AddSeconds(index * 15);
@@ -342,7 +344,7 @@ public sealed class CollectionAvailabilityTests
         });
         public async Task Drain()
         {
-            for (int i = 0; i < 100 && Collector.State.Jobs.Any(j => j.Status == CollectionJobStatus.Pending); i++)
+            for (int i = 0; i < 300 && Collector.State.Jobs.Any(j => j.Status == CollectionJobStatus.Pending); i++)
                 await Collector.TickAsync(true);
             Assert.DoesNotContain(Collector.State.Jobs, j => j.Status == CollectionJobStatus.Pending);
         }

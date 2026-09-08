@@ -154,8 +154,9 @@ public sealed partial class MainViewModel
             StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
         var settings = retention.Collector.State.Settings;
         var query = new HistoricalDataQuery(symbol, from.ToUniversalTime(), through.ToUniversalTime(), AdjustmentPolicy: "split",
-            SessionBounds: settings.SessionBounds, PinnedHashes: pins,
-            RevisionPolicy: retention.ReplayUseLatestRevision ? HistoricalRevisionPolicy.LatestFetched : HistoricalRevisionPolicy.CompatibleCoverage);
+            SessionBounds: "24_5", PinnedHashes: pins,
+            RevisionPolicy: retention.ReplayUseLatestRevision ? HistoricalRevisionPolicy.LatestFetched : HistoricalRevisionPolicy.CompatibleCoverage,
+            IncludeCompatibleSessions: true);
         return new(settings.LibraryRootPath, query, retention.ReplayOfflineOnly, retention);
     }
 
@@ -179,7 +180,7 @@ public sealed partial class MainViewModel
             return new("Unknown", "The local library could not be fully scanned. Select this date to check.");
         var pins = query.PinnedHashes;
         HistoricalDatasetInfo[] available = scan.Datasets.Where(d => d.Symbol == query.Symbol &&
-            d.AdjustmentPolicy == query.AdjustmentPolicy && d.SessionBounds == query.SessionBounds &&
+            d.AdjustmentPolicy == query.AdjustmentPolicy && query.MatchesSessionBounds(d.SessionBounds) &&
             d.Coverage.RequestedFromUtc < query.ThroughUtc && d.Coverage.RequestedThroughUtc > query.FromUtc &&
             (pins is not { Count: > 0 } || pins.Contains(d.DatasetHash))).ToArray();
         bool partial = false;
@@ -198,6 +199,9 @@ public sealed partial class MainViewModel
             if (query.RevisionPolicy == HistoricalRevisionPolicy.CompatibleCoverage &&
                 candidates.GroupBy(d => d.TradingDate).Any(g => g.Count() > 1))
                 return new("Unknown", "Multiple saved pieces may cover this day. Select the date to verify their candles and combined coverage.");
+            if (query.IncludeCompatibleSessions && candidates.GroupBy(d => d.TradingDate)
+                .Any(g => g.Select(d => d.SessionBounds).Distinct().Count() > 1))
+                return new("Unknown", "Multiple market sessions may cover this day. Select the date to verify their candles and combined coverage.");
             candidates = candidates.GroupBy(d => d.TradingDate).Select(g => g.OrderByDescending(d => d.FetchedAtUtc)
                 .ThenBy(d => d.DatasetHash, StringComparer.Ordinal).First()).OrderBy(d => d.TradingDate).ToArray();
             partial |= candidates.Any(d => d.Coverage.ActualCandleCount > 0);

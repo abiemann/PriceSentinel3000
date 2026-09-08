@@ -84,6 +84,10 @@ public sealed partial class SessionWorkflowTests
             Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting((TextBlock)dialog.FindName("DownloadActivityHeading")));
             Assert.DoesNotContain(FindRetentionVisuals<TextBox>(dialog), field =>
                 AutomationProperties.GetName(field) is "Download from date" or "Download through date");
+            Assert.DoesNotContain(FindRetentionVisuals<ComboBox>(dialog), field =>
+                AutomationProperties.GetName(field) == "Download session coverage");
+            Assert.Contains("overnight", ((TextBlock)dialog.FindName("DownloadCoverageGuidance")).Text);
+            Assert.Equal(vm.ScheduleHelp, ((TextBlock)dialog.FindName("ScheduleHelpText")).Text);
             Assert.DoesNotContain(FindRetentionVisuals<Button>(dialog), button => Equals(button.Content, "NOW"));
             Button downloadAvailable = Assert.Single(FindRetentionVisuals<Button>(dialog),
                 button => Equals(button.Content, "DOWNLOAD NOW"));

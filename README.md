@@ -21,13 +21,13 @@ pause/step boundaries and fast playback.
 
 ## Retain high-resolution history
 
-Open **Tools > Retain Hi-Res Data** to create download lists, import individual equities from Robinhood lists, and choose a daily collection time and time zone. **Download now** automatically finds missing 15-second history without date fields, including today's completed candles, searches older sessions per equity, and retries known gaps. Compatible candles are merged with saved history, including partial files copied into the library. The app stores portable daily candles under year / numbered English month / ticker folders, then reuses them for Replay and read-only MCP analysis. Automatic collection requires the app to stay open and connected; copied history can be replayed offline. See the [market-data library guide](docs/market-data-library.md).
+Open **Tools > Retain Hi-Res Data** to create download lists, import individual equities from Robinhood lists, and choose a daily collection time and time zone. Scheduled runs and **Download now** automatically find missing 15-second history across all available regular, premarket, after-hours and overnight trading, including today's completed candles. They search older sessions per equity and retry known gaps without date or market-session fields. Compatible candles are merged with saved history, including existing regular/extended files and partial files copied into the library. Expected coverage excludes closed-market periods. The app stores portable daily candles under year / numbered English month / ticker folders, then reuses them for Replay and read-only MCP analysis. Automatic collection requires the app to stay open and connected; copied history can be replayed offline. See the [market-data library guide](docs/market-data-library.md).
 
 Replay checks disk first and fills missing coverage from supported broker history. Complete finer candles can be aggregated alongside coarser gap fills to one Replay interval, with the native resolutions shown and preserved in the files. Choose **Replay from local files only** in the dashboard before START to prevent broker requests.
 
 In Replay, press **Enter** after entering a date or time, click **CHECK**, or choose a calendar date to check coverage before starting. Dark green means complete local 15-second data, light green means verified broker 15-second data, orange means 30–60-second data, and red means two-minute data. Neutral dates have details explaining unchecked, partial, or unavailable coverage.
 
-Downloads continue when you close the retention window. The **Retain Hi-Res Data** button shows a compact progress bar and reopens the current download status. Ready batches continue without a fixed pause; keep PriceSentinel open for background collection.
+Downloads continue when you close the retention window. The **Retain Hi-Res Data** button shows a compact progress bar and reopens the current download status. Nearby gaps are grouped into bounded requests to reduce broker calls. The status shows the current request range and progress checking that stock/date, separately from saved-data coverage. Ready batches continue without a fixed pause; keep PriceSentinel open for background collection.
 
 ## Reviewer tour
 
@@ -321,7 +321,7 @@ them later; they are not a promise that the labeled regions can be captured live
    speed. Press **Enter**, click **CHECK**, or select a calendar date to inspect
    availability, then click **Start Replay**.
 2. The check considers saved history and the broker for precisely that range and
-   the library's selected session bounds. Complete 15-second coverage takes
+   all available trading hours. Complete 15-second coverage takes
    priority over complete 30-second, one-minute, or imported two-minute coverage.
    Partial results are explicitly marked. START reuses the checked snapshot;
    starting without a check uses the existing local-first lookup. Offline mode

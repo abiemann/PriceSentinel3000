@@ -48,7 +48,6 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
     private bool _automatic;
     private string _dailyTime;
     private string _timeZone;
-    private string _bounds;
     private string _replayPins = "";
     private bool _replayOffline;
     private bool _replayLatest;
@@ -81,7 +80,6 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
         _automatic = settings.AutomaticDownloadsEnabled;
         _dailyTime = settings.DailyDownloadTime.ToString("HH:mm", CultureInfo.InvariantCulture);
         _timeZone = settings.TimeZoneId;
-        _bounds = settings.SessionBounds;
         foreach (DownloadList list in settings.Lists) Lists.Add(list);
         if (Lists.Count > 0) SelectedList = Lists[0];
         NewListCommand = new RelayCommand(NewList, () => !IsBusy);
@@ -130,7 +128,6 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
     public ListCollectionView VisibleJobs { get; }
     public ObservableCollection<HistoricalDatasetInfo> Datasets { get; } = [];
     public IReadOnlyList<TimeZoneInfo> TimeZones { get; } = TimeZoneInfo.GetSystemTimeZones();
-    public IReadOnlyList<string> SessionChoices { get; } = ["regular", "extended"];
     public PersonalWatchlist? SelectedRobinhoodList { get; set; }
     public HistoricalDatasetInfo? SelectedDataset { get; set; }
     public DownloadList? SelectedList { get => _selectedList; set { _selectedList = value; if (value is not null) LoadEditor(value); Changed(); Changed(nameof(ListSummary)); } }
@@ -144,15 +141,17 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
     public bool SavedAutomaticDownloadsEnabled => Collector.State.Settings.AutomaticDownloadsEnabled;
     public string DailyTime { get => _dailyTime; set { _dailyTime = value; Changed(); ScheduleDraftChanged(); } }
     public string TimeZoneId { get => _timeZone; set { _timeZone = value; Changed(); ScheduleDraftChanged(); } }
-    public string SessionBounds { get => _bounds; set { _bounds = value; Changed(); ScheduleDraftChanged(); } }
     public bool ReplayOfflineOnly { get => _replayOffline; set { _replayOffline = value; Changed(); } }
     public bool ReplayUseLatestRevision { get => _replayLatest; set { _replayLatest = value; Changed(); } }
     public string ReplayPinnedHashes { get => _replayPins; set { _replayPins = value; Changed(); } }
     public bool IsBusy => _busy || Collector.IsBusy || _downloadCancellation is not null || _pollTask is { IsCompleted: false };
     public string Status { get => _status; private set { _status = value; Changed(); } }
     public string SavedSchedule => SavedAutomaticDownloadsEnabled
-        ? $"Automatic downloads enabled: {Collector.State.Settings.DailyDownloadTime:HH:mm} · {Collector.State.Settings.TimeZoneId}. Keep this app open and connected."
+        ? $"Daily at {Collector.State.Settings.DailyDownloadTime:HH:mm} · {Collector.State.Settings.TimeZoneId}: today's completed candles and earlier missing history. Keep this app open and connected."
         : "Automatic downloads are off. Manual downloads remain available.";
+    public string ScheduleHelp => SavedAutomaticDownloadsEnabled
+        ? "Runs at your saved daily time while PriceSentinel is open and connected. Each run saves today's completed candles and checks earlier missing history for every included equity. Saved files are reused; older unresolved gaps remain visible."
+        : "Automatic downloads are off. Download now saves today's completed candles and checks earlier missing history. To run daily while PriceSentinel is open and connected, enable automatic downloads and save the schedule.";
     public string JobSummary => $"Retained queue: {DownloadProcessed}/{DownloadTotal} checked · {Jobs.Count(j => j.Status == CollectionJobStatus.Complete && j.RequestedThroughUtc is null)} complete · {Jobs.Count(j => j.Status == CollectionJobStatus.Complete && j.RequestedThroughUtc is not null)} saved so far · {Jobs.Count(j => j.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading)} remaining · {Jobs.Count(j => j.NeedsAttention)} need attention";
     public string ContinuityWarnings
     {
@@ -161,8 +160,8 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
             CollectionState state = Collector.State;
             CollectionContinuityGap[] gaps = state.ContinuityGaps.Where(g =>
                 string.Equals(g.LibraryRootPath, state.Settings.LibraryRootPath, StringComparison.OrdinalIgnoreCase) &&
-                g.SessionBounds == state.Settings.SessionBounds).ToArray();
-            if (gaps.Length == 0) return "Only genuine 15-second candles are downloaded. Download now finds available history missing from the saved equity lists.";
+                g.SessionBounds is "regular" or "extended" or "24_5").ToArray();
+            if (gaps.Length == 0) return "Only genuine, completed 15-second candles are downloaded, across all available trading hours. Saved candles are reused when filling missing history.";
             return "Older unresolved gaps remain recorded below. Download now checks how far back 15-second history is still available; expired data cannot be recreated:\n" +
                 string.Join("\n", gaps.Select(g => FormattableString.Invariant($"{g.Symbol}: {g.FromSessionDate:yyyy-MM-dd} through {g.ThroughSessionDate:yyyy-MM-dd}")));
         }
@@ -292,9 +291,11 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
         await Collector.SaveSettingsAsync(Collector.State.Settings with
         {
             LibraryRootPath = LibraryRootPath, AutomaticDownloadsEnabled = AutomaticDownloadsEnabled,
-            DailyDownloadTime = time, TimeZoneId = TimeZoneId, SessionBounds = SessionBounds,
+            DailyDownloadTime = time, TimeZoneId = TimeZoneId, SessionBounds = CollectionSettings.AllAvailableSessionBounds,
         }, _lifetime.Token);
-        Status = "Schedule and library folder saved. Collection uses the latest finalized session at your chosen time.";
+        Status = "Schedule and library folder saved. " + (SavedAutomaticDownloadsEnabled
+            ? "Automatic downloads collect today's completed candles and earlier missing history at the saved daily time."
+            : "Automatic downloads are off. Download now remains available.");
         RefreshState();
     }
 
@@ -394,7 +395,7 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
     private void RefreshState()
     {
         RefreshJobRows();
-        Changed(nameof(SavedAutomaticDownloadsEnabled)); Changed(nameof(SavedSchedule)); Changed(nameof(JobSummary)); Changed(nameof(ContinuityWarnings)); Changed(nameof(IsBusy));
+        Changed(nameof(SavedAutomaticDownloadsEnabled)); Changed(nameof(SavedSchedule)); Changed(nameof(ScheduleHelp)); Changed(nameof(JobSummary)); Changed(nameof(ContinuityWarnings)); Changed(nameof(IsBusy));
         ScheduleDraftChanged();
         RefreshDownloadPresentation();
         Changed(nameof(CanEditPlan));

@@ -25,7 +25,7 @@ internal static partial class RobinhoodLibraryParser
         if (!IsEquitySymbol(NormalizeSymbol(request.Symbol))) throw new ArgumentException("A valid equity ticker is required.", nameof(request));
         _ = IntervalName(request.SourceIntervalSeconds);
         if (request.FromUtc >= request.ThroughUtc) throw new ArgumentException("History end must be after its start.", nameof(request));
-        if (request.SessionBounds is not ("regular" or "extended")) throw new ArgumentException("Choose regular or extended session bounds.", nameof(request));
+        if (request.SessionBounds is not ("regular" or "extended" or "24_5")) throw new ArgumentException("Choose regular, extended, or 24_5 session bounds.", nameof(request));
         if (request.AdjustmentPolicy != "split") throw new ArgumentException("The library provider requires split adjustment.", nameof(request));
     }
 

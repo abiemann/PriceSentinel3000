@@ -30,6 +30,8 @@ public sealed record CollectionJob
     public bool IsAvailabilityProbe { get; init; }
     public DateTimeOffset? RequestedThroughUtc { get; init; }
     public int? DiscoveryEmptySessions { get; init; }
+    public DateTimeOffset? NextGapFromUtc { get; init; }
+    public bool ReceivedCandlesThisRun { get; init; }
 }
 
 public sealed record CollectionState

@@ -70,6 +70,49 @@ public sealed class DatasetSessionCoverageConverterTests
         Assert.Contains("3,840 of 3,840", Details(dataset));
     }
 
+    [Theory]
+    [InlineData("2026-09-08", "5,760")]
+    [InlineData("2026-09-11", "4,800")]
+    [InlineData("2026-09-13", "960")]
+    [InlineData("2026-09-07", "960")]
+    [InlineData("2026-11-27", "4,080")]
+    public void TwentyFourFiveCountsOnlyActiveHoursForTheEasternDate(string day, string expected)
+    {
+        HistoricalDatasetInfo dataset = Dataset(DateOnly.Parse(day), "24_5");
+        Assert.Equal("100%", Percent(dataset));
+        Assert.Contains($"{expected} of {expected}", Details(dataset));
+    }
+
+    [Fact]
+    public void ClosedHoursAfterEarlyCloseDoNotReduceTwentyFourFiveCoverage()
+    {
+        CollectionSessionWindow session = CollectionSchedule.GetSessionWindow(EarlyCloseDay, "24_5");
+        HistoricalDatasetInfo dataset = Dataset(EarlyCloseDay, "24_5", through: session.ThroughUtc.AddHours(7));
+        dataset = dataset with { Coverage = dataset.Coverage with
+        {
+            ActualCandleCount = 4080, Complete = false, CoveredThroughUtc = session.ThroughUtc,
+            Gaps = [new(session.ThroughUtc, session.ThroughUtc.AddHours(7))],
+        } };
+
+        Assert.Equal("100%", Percent(dataset));
+        Assert.Contains("4,080 of 4,080", Details(dataset));
+    }
+
+    [Fact]
+    public void SundayOvernightGapReducesOnlyTheFourHourSession()
+    {
+        HistoricalDatasetInfo dataset = Dataset(new(2026, 9, 13), "24_5");
+        DateTimeOffset from = dataset.Coverage.RequestedFromUtc;
+        dataset = dataset with { Coverage = dataset.Coverage with
+        {
+            ActualCandleCount = 720, Complete = false,
+            Gaps = [new(from.AddHours(1), from.AddHours(2))],
+        } };
+
+        Assert.Equal("75%", Percent(dataset));
+        Assert.Contains("720 of 960", Details(dataset));
+    }
+
     [Fact]
     public void ImportedOutOfSessionCandlesDoNotInflateSessionCoverage()
     {
@@ -116,6 +159,7 @@ public sealed class DatasetSessionCoverageConverterTests
     [InlineData("overnight", 15, 8)]
     [InlineData("regular", 15, 5)]
     [InlineData("regular", 5, 8)]
+    [InlineData("24_5", 15, 5)]
     public void UnsupportedSessionDateOrIntervalHasNoInventedPercentage(string bounds, int seconds, int day)
     {
         HistoricalDatasetInfo dataset = Dataset(RegularDay) with

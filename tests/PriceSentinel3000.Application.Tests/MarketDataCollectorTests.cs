@@ -19,12 +19,42 @@ public sealed class MarketDataCollectorTests
         Assert.Empty(provider.Requests);
         await collector.SaveSettingsAsync(collector.State.Settings with { Lists = [] });
         var restarted = new MarketDataCollector(store, provider, _ => library, clock, Options());
+        for (int i = 0; i < 100; i++)
+        {
+            if (await restarted.TickAsync(true) == CollectionBatchResult.Idle) break;
+            Assert.True(i < 99, "Queued collection did not settle after 100 ticks.");
+        }
+        Assert.Equal(new[] { "SOFI", "NVDA" }, provider.Requests.Select(r => r.Symbol).Distinct());
+        Assert.Empty(provider.Requests.GroupBy(r => r).Where(g => g.Count() > 1).Select(g => g.Key));
+        Assert.Equal(restarted.State.Jobs.Count, restarted.State.Jobs.Select(j => (j.Symbol, j.SessionDate, j.SessionBounds)).Distinct().Count());
+        Assert.All(collector.State.Jobs, queued => Assert.Contains(restarted.State.Jobs, j => j.Id == queued.Id));
+        CollectionJob[] boundaryJobs = restarted.State.Jobs.Where(j => j.SessionDate == new DateOnly(2026, 8, 31)).ToArray();
+        Assert.Equal(new[] { "SOFI", "NVDA" }, boundaryJobs.Select(j => j.Symbol));
+        Assert.All(boundaryJobs, job =>
+        {
+            Assert.Equal(CollectionJobStatus.Partial, job.Status);
+            HistoricalDataQueryResult saved = library.Query(new(job.Symbol,
+                DateTimeOffset.Parse("2026-08-31T04:00:00Z"), DateTimeOffset.Parse("2026-09-01T04:00:00Z"),
+                SessionBounds: "24_5", RevisionPolicy: HistoricalRevisionPolicy.CompatibleCoverage));
+            Assert.Equal(1440, saved.Candles.Count);
+            Assert.Equal(DateTimeOffset.Parse("2026-08-31T22:00:00Z"), saved.Candles[0].StartsAtUtc);
+            Assert.Equal(DateTimeOffset.Parse("2026-09-01T04:00:00Z"), saved.Candles[^1].EndsAtUtc);
+            Assert.False(saved.Coverage.Complete);
+            Assert.Equal(new HistoricalGap(DateTimeOffset.Parse("2026-08-31T04:00:00Z"),
+                DateTimeOffset.Parse("2026-08-31T22:00:00Z")), Assert.Single(saved.Coverage.Gaps));
+        });
+        Assert.All(restarted.State.Jobs.Where(j => j.SessionDate != new DateOnly(2026, 8, 31)),
+            j => Assert.True(j.Status is CollectionJobStatus.Complete or CollectionJobStatus.Unavailable));
+        Assert.All(provider.Requests, r =>
+        {
+            Assert.Equal("24_5", r.SessionBounds);
+            Assert.Equal(15, r.SourceIntervalSeconds);
+            Assert.InRange(r.ThroughUtc - r.FromUtc, TimeSpan.FromSeconds(15), TimeSpan.FromHours(6));
+        });
+        int requests = provider.Requests.Count;
+        Assert.True(requests > collector.State.Jobs.Count);
         await restarted.TickAsync(true);
-        await restarted.TickAsync(true);
-        Assert.Equal(collector.State.Jobs.Count, provider.Requests.Count);
-        Assert.All(restarted.State.Jobs, j => Assert.Equal(CollectionJobStatus.Complete, j.Status));
-        await restarted.TickAsync(true);
-        Assert.Equal(collector.State.Jobs.Count, provider.Requests.Count);
+        Assert.Equal(requests, provider.Requests.Count);
     }
 
     [Fact]
@@ -221,8 +251,15 @@ public sealed class MarketDataCollectorTests
             cancellationToken.ThrowIfCancellationRequested();
             if (Disconnected) throw new MarketDataConnectionUnavailableException("Connection unavailable");
             if (request.Symbol == FailingSymbol) throw new HttpRequestException("Temporary transport failure");
-            HistoricalCandle[] bars = EmptyIntervals.Contains(request.SourceIntervalSeconds) ? [] :
-                [new(request.FromUtc, request.FromUtc.AddSeconds(request.SourceIntervalSeconds), request.FromUtc.AddSeconds(request.SourceIntervalSeconds), 10, 11, 9, 10, null)];
+            HistoricalCandle[] bars = EmptyIntervals.Contains(request.SourceIntervalSeconds) ||
+                request.ThroughUtc <= DateTimeOffset.Parse("2026-09-01T00:00:00Z") ? [] :
+                Enumerable.Range(0, (int)((request.ThroughUtc - request.FromUtc).TotalSeconds / request.SourceIntervalSeconds))
+                    .Select(i =>
+                    {
+                        DateTimeOffset start = request.FromUtc.AddSeconds(i * request.SourceIntervalSeconds);
+                        return new HistoricalCandle(start, start.AddSeconds(request.SourceIntervalSeconds),
+                            start.AddSeconds(request.SourceIntervalSeconds), 10, 11, 9, 10, null);
+                    }).ToArray();
             return Task.FromResult(new HistoricalDownload("test", "instrument", request.Symbol, request.SourceIntervalSeconds,
                 request.AdjustmentPolicy, "robinhood-split-unversioned", request.SessionBounds, request.ThroughUtc,
                 request.FromUtc, request.ThroughUtc, bars));
@@ -233,15 +270,62 @@ public sealed class MarketDataCollectorTests
         public string RootPath => Path.GetFullPath("test-library");
         public bool HasCompleteData { get; set; }
         public bool SaveHasGaps { get; set; }
-        public HistoricalDataQueryResult Query(HistoricalDataQuery query) => new(true, [], [],
-            new(query.FromUtc, query.ThroughUtc, query.FromUtc, query.ThroughUtc, 1, HasCompleteData ? 1 : 0,
-                HasCompleteData, false, []), []);
-        public IReadOnlyList<HistoricalDatasetInfo> Save(HistoricalDownload download) =>
-            [new("hash", "day.json", download.Provider, download.InstrumentId, download.Symbol, Day, download.SourceIntervalSeconds,
-                download.AdjustmentPolicy, download.AdjustmentBasis, download.SessionBounds, download.FetchedAtUtc,
-                new(download.RequestedFromUtc, download.RequestedThroughUtc, download.RequestedFromUtc, download.RequestedThroughUtc,
-                    1, 1, !SaveHasGaps, false, []))];
-        public MarketDataLibraryScan Scan() => new([], []);
-        public HistoricalDataset Read(string datasetHash) => throw new NotSupportedException();
+        private readonly List<HistoricalDataset> _files = [];
+
+        public HistoricalDataQueryResult Query(HistoricalDataQuery query)
+        {
+            if (HasCompleteData && !_files.Any(d => d.Symbol == query.Symbol))
+            {
+                HistoricalCandle[] seeded = Enumerable.Range(0, (int)((query.ThroughUtc - query.FromUtc).TotalSeconds / query.SourceIntervalSeconds))
+                    .Select(i =>
+                    {
+                        DateTimeOffset start = query.FromUtc.AddSeconds(i * query.SourceIntervalSeconds);
+                        return new HistoricalCandle(start, start.AddSeconds(query.SourceIntervalSeconds),
+                            start.AddSeconds(query.SourceIntervalSeconds), 10, 11, 9, 10, null);
+                    }).ToArray();
+                Save(new("test", "instrument", query.Symbol, query.SourceIntervalSeconds, "split", "robinhood-split-unversioned",
+                    query.SessionBounds ?? "regular", query.ThroughUtc, query.FromUtc, query.ThroughUtc, seeded));
+            }
+            HistoricalDataset[] datasets = _files.Where(d => d.Symbol == query.Symbol && d.SourceIntervalSeconds == query.SourceIntervalSeconds &&
+                query.MatchesSessionBounds(d.SessionBounds) && d.Coverage.RequestedFromUtc < query.ThroughUtc &&
+                d.Coverage.RequestedThroughUtc > query.FromUtc).ToArray();
+            HistoricalCandle[] candles = datasets.SelectMany(d => d.Candles)
+                .Where(c => c.StartsAtUtc >= query.FromUtc && c.EndsAtUtc <= query.ThroughUtc)
+                .Distinct().OrderBy(c => c.StartsAtUtc).ToArray();
+            return new(true, datasets.Select(Describe).ToArray(), candles,
+                Coverage(query.FromUtc, query.ThroughUtc, query.SourceIntervalSeconds, candles), []);
+        }
+        public IReadOnlyList<HistoricalDatasetInfo> Save(HistoricalDownload download)
+        {
+            HistoricalCandle[] candles = (SaveHasGaps ? download.Candles.SkipLast(1) : download.Candles).ToArray();
+            DateOnly day = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(download.RequestedFromUtc,
+                TimeZoneInfo.FindSystemTimeZoneById("America/New_York")).DateTime);
+            var dataset = new HistoricalDataset(1, "America/New_York", Guid.NewGuid().ToString("N"), download.Provider,
+                download.InstrumentId, download.Symbol, day, download.SourceIntervalSeconds, download.AdjustmentPolicy,
+                download.AdjustmentBasis, download.SessionBounds, download.FetchedAtUtc,
+                Coverage(download.RequestedFromUtc, download.RequestedThroughUtc, download.SourceIntervalSeconds, candles), candles);
+            _files.Add(dataset);
+            return [Describe(dataset)];
+        }
+        public MarketDataLibraryScan Scan() => new(_files.Select(Describe).ToArray(), []);
+        public HistoricalDataset Read(string datasetHash) => _files.Single(d => d.DatasetHash == datasetHash);
+        private static HistoricalDatasetInfo Describe(HistoricalDataset d) => new(d.DatasetHash, d.DatasetHash + ".json",
+            d.Provider, d.InstrumentId, d.Symbol, d.TradingDate, d.SourceIntervalSeconds, d.AdjustmentPolicy,
+            d.AdjustmentBasis, d.SessionBounds, d.FetchedAtUtc, d.Coverage);
+        private static HistoricalCoverage Coverage(DateTimeOffset from, DateTimeOffset through, int interval,
+            IReadOnlyList<HistoricalCandle> candles)
+        {
+            var gaps = new List<HistoricalGap>();
+            DateTimeOffset cursor = from;
+            foreach (HistoricalCandle candle in candles)
+            {
+                if (candle.StartsAtUtc > cursor) gaps.Add(new(cursor, candle.StartsAtUtc));
+                if (candle.EndsAtUtc > cursor) cursor = candle.EndsAtUtc;
+            }
+            if (cursor < through) gaps.Add(new(cursor, through));
+            return new(from, through, candles.Count > 0 ? candles[0].StartsAtUtc : null,
+                candles.Count > 0 ? candles[^1].EndsAtUtc : null, (int)((through - from).TotalSeconds / interval),
+                candles.Count, gaps.Count == 0, false, gaps);
+        }
     }
 }

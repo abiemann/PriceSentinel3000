@@ -53,6 +53,7 @@
                             </ToolTip.Template>
                             <StackPanel MaxWidth="340">
                                 <TextBlock FontWeight="SemiBold" Text="{Binding DataRetention.DownloadHeading}" />
+                                <TextBlock Margin="0,4,0,0" TextWrapping="Wrap" Text="{Binding DataRetention.DownloadDetail}" />
                                 <TextBlock Margin="0,4,0,0" TextWrapping="Wrap" Text="{Binding DataRetention.JobSummary}" />
                                 <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" Text="{Binding DataRetention.SavedSchedule}" />
                             </StackPanel>

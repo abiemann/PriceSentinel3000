@@ -49,8 +49,15 @@ public static class ReplayHistoryComposer
             }
         }
         foreach (List<Part> at in parts.Values)
+        {
+            if (query.IncludeCompatibleSessions && at.GroupBy(part => part.IntervalSeconds).Any(group =>
+                group.Select(part => part.Candle).Distinct().Skip(1).Any() &&
+                group.SelectMany(part => Identities(sources[part.SourceIndex]))
+                    .Select(item => item.Identity.SessionBounds).Distinct().Skip(1).Any()))
+                throw new InvalidDataException("Replay market sessions disagree on overlapping candle prices or volume. Select one saved revision.");
             at.Sort((left, right) => left.IntervalSeconds != right.IntervalSeconds
                 ? left.IntervalSeconds.CompareTo(right.IntervalSeconds) : left.SourceIndex.CompareTo(right.SourceIndex));
+        }
 
         ReplayHistoryComposition best = new(15, [], BuildCoverage(query, 15, []), []);
         long bestCoveredTicks = 0;
@@ -140,10 +147,10 @@ public static class ReplayHistoryComposer
                     (query.Provider is not null && identity.Provider != query.Provider) ||
                     (query.AdjustmentPolicy is not null && identity.AdjustmentPolicy != query.AdjustmentPolicy) ||
                     (query.AdjustmentBasis is not null && identity.AdjustmentBasis != query.AdjustmentBasis) ||
-                    (query.SessionBounds is not null && identity.SessionBounds != query.SessionBounds) ||
-                    (expected is not null && identity != expected))
+                    !query.MatchesSessionBounds(identity.SessionBounds) ||
+                    (expected is not null && identity with { SessionBounds = query.SessionIdentity(identity.SessionBounds) } != expected))
                     throw new InvalidDataException("Replay cannot combine different providers, instruments, symbols, adjustments, or market sessions.");
-                expected ??= identity;
+                expected ??= identity with { SessionBounds = query.SessionIdentity(identity.SessionBounds) };
             }
         }
     }

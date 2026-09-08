@@ -224,7 +224,6 @@ public sealed partial class SessionWorkflowTests
     [InlineData("time", "UTC")]
     [InlineData("zone", "UTC")]
     [InlineData("zone", "Pacific Standard Time")]
-    [InlineData("bounds", "UTC")]
     [InlineData("folder", "UTC")]
     public Task DownloadProgress_EachScheduleDraftFieldRequiresSave(string field, string savedTimeZone) => host.RunAsync(async () =>
     {
@@ -237,7 +236,6 @@ public sealed partial class SessionWorkflowTests
             case "automatic": vm.AutomaticDownloadsEnabled = !vm.AutomaticDownloadsEnabled; break;
             case "time": vm.DailyTime = "12:34"; break;
             case "zone": vm.TimeZoneId = savedTimeZone == "UTC" ? "Pacific Standard Time" : "UTC"; break;
-            case "bounds": vm.SessionBounds = "extended"; break;
             case "folder": vm.LibraryRootPath = Path.Combine(fixture.Root, "other-library"); break;
         }
         Assert.True(vm.HasScheduleChanges);

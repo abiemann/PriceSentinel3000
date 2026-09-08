@@ -34,10 +34,11 @@ public sealed partial class MainViewModel
             StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
         bool offline = retention.ReplayOfflineOnly;
         var query = new HistoricalDataQuery(instrument.Symbol, from.ToUniversalTime(), through.ToUniversalTime(),
-            AdjustmentPolicy: "split", SessionBounds: retention.Collector.State.Settings.SessionBounds,
+            AdjustmentPolicy: "split", SessionBounds: "24_5",
             PinnedHashes: pins,
             RevisionPolicy: retention.ReplayUseLatestRevision
-                ? HistoricalRevisionPolicy.LatestFetched : HistoricalRevisionPolicy.CompatibleCoverage);
+                ? HistoricalRevisionPolicy.LatestFetched : HistoricalRevisionPolicy.CompatibleCoverage,
+            IncludeCompatibleSessions: true);
         Dispatcher dispatcher = Dispatcher.CurrentDispatcher;
         var resolver = new LibraryReplayHistoryResolver(library, retention.Provider, cancellation =>
             dispatcher.InvokeAsync(() =>

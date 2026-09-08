@@ -83,13 +83,13 @@ public sealed partial class MarketDataCollector
             DateOnly latest = CollectionSchedule.LatestFinalizedSession(_clock.GetUtcNow(), bounds,
                 _state.Settings.ProviderFinalizationDelayMinutes);
             for (DateOnly day = latest.AddDays(1); day <= through; day = day.AddDays(1))
-                if (UsEquityTradingCalendar.IsTradingDay(day))
+                if (CollectionSchedule.IsCollectionDate(day, bounds))
                     throw new ArgumentException("The selected range includes a session that has not finalized yet.");
             var members = normalized.Select(symbol => _state.Settings.Lists.SelectMany(l => l.Members)
                 .FirstOrDefault(m => m.Symbol == symbol && m.ProviderInstrumentId is not null) ?? new DownloadListMember(symbol)).ToArray();
             var jobs = _state.Jobs.ToList();
             for (DateOnly day = from; day <= through; day = day.AddDays(1))
-                if (UsEquityTradingCalendar.IsTradingDay(day)) AddJobs(jobs, members, day, bounds, automatic: false);
+                if (CollectionSchedule.IsCollectionDate(day, bounds)) AddJobs(jobs, members, day, bounds, automatic: false);
             Commit(_state with { Jobs = jobs.ToArray() });
         }, cancellationToken);
     }
@@ -100,7 +100,7 @@ public sealed partial class MarketDataCollector
             Jobs = _state.Jobs.Select(j => (jobIds is null || jobIds.Contains(j.Id)) &&
                 j.Status is CollectionJobStatus.Partial or CollectionJobStatus.Unavailable or CollectionJobStatus.Failed
                 ? j with { Status = CollectionJobStatus.Pending, Attempts = 0, NextSourceIntervalSeconds = 15,
-                    IsAutomatic = false, RetryAfterUtc = null, Error = null }
+                    IsAutomatic = false, RetryAfterUtc = null, Error = null, NextGapFromUtc = null, ReceivedCandlesThisRun = false }
                 : j).ToArray(),
         }), cancellationToken);
 
@@ -144,15 +144,9 @@ public sealed partial class MarketDataCollector
 
     private void QueueScheduled()
     {
-        DateTimeOffset oldest = _clock.GetUtcNow().AddDays(-_state.Settings.CatchUpCalendarDays);
-        if (_state.Jobs.Any(j => j.IsAutomatic && j.Status == CollectionJobStatus.Pending &&
-            CollectionSchedule.GetSessionWindow(j.SessionDate, j.SessionBounds).ThroughUtc < oldest))
-            Commit(_state with { Jobs = _state.Jobs.Select(j => j.IsAutomatic && j.Status == CollectionJobStatus.Pending &&
-                CollectionSchedule.GetSessionWindow(j.SessionDate, j.SessionBounds).ThroughUtc < oldest
-                ? j with { Status = CollectionJobStatus.Unavailable, Error = "Outside the automatic retry window. Missing 15-second history is unresolved; retry manually to check provider availability." }
-                : j).ToArray() });
+        const string bounds = CollectionSettings.AllAvailableSessionBounds;
         IReadOnlyList<DueCollectionSession> due = CollectionSchedule.GetDueSessions(
-            _state.Settings, _state.LastScheduledOccurrenceUtc, _clock.GetUtcNow());
+            _state.Settings with { SessionBounds = bounds }, _state.LastScheduledOccurrenceUtc, _clock.GetUtcNow());
         if (due.Count == 0) return;
         DownloadListMember[] members = _state.Settings.Lists.Where(l => l.IsEnabled).SelectMany(l => l.Members)
             .Where(m => m.IsIncluded).GroupBy(m => m.Symbol, StringComparer.Ordinal)
@@ -163,24 +157,26 @@ public sealed partial class MarketDataCollector
             throw new InvalidDataException("The library must scan completely before checking download continuity.");
         var jobs = _state.Jobs.ToList();
         var gaps = _state.ContinuityGaps.Where(g => !SamePath(g.LibraryRootPath, _state.Settings.LibraryRootPath) ||
-            g.SessionBounds != _state.Settings.SessionBounds || !members.Any(m => m.Symbol == g.Symbol)).ToList();
+            g.SessionBounds != bounds || !members.Any(m => m.Symbol == g.Symbol)).ToList();
         foreach (DownloadListMember member in members)
         {
             DateOnly? trackedFrom = jobs.Where(j => j.Symbol == member.Symbol &&
                 (!j.IsAvailabilityProbe || j.DatasetHashes.Count > 0 || j.Status == CollectionJobStatus.Failed) &&
-                j.SessionBounds == _state.Settings.SessionBounds && SamePath(j.LibraryRootPath, _state.Settings.LibraryRootPath))
+                j.SessionBounds == bounds && SamePath(j.LibraryRootPath, _state.Settings.LibraryRootPath))
                 .Select(j => (DateOnly?)j.SessionDate)
                 .Concat(_state.ContinuityGaps.Where(g => g.Symbol == member.Symbol &&
-                    g.SessionBounds == _state.Settings.SessionBounds && SamePath(g.LibraryRootPath, _state.Settings.LibraryRootPath))
+                    g.SessionBounds == bounds && SamePath(g.LibraryRootPath, _state.Settings.LibraryRootPath))
                     .Select(g => (DateOnly?)g.FromSessionDate)).Min();
             CollectionBackfillPlan plan = CollectionBackfillPlanner.Plan(member, scan.Datasets, due[^1].SessionDate,
-                _state.Settings.SessionBounds, _clock.GetUtcNow(), _state.Settings.CatchUpCalendarDays, trackedFrom);
+                bounds, _clock.GetUtcNow(), _state.Settings.CatchUpCalendarDays, trackedFrom);
             foreach (DateOnly day in plan.MissingSessions)
-                AddJobs(jobs, [member], day, _state.Settings.SessionBounds, automatic: true);
+                AddJobs(jobs, [member], day, bounds, automatic: true);
             gaps.AddRange(plan.ExpiredGaps.Select(g => new CollectionContinuityGap(member.Symbol,
-                g.FromSessionDate, g.ThroughSessionDate, _state.Settings.SessionBounds, _state.Settings.LibraryRootPath)));
+                g.FromSessionDate, g.ThroughSessionDate, bounds, _state.Settings.LibraryRootPath)));
         }
-        Commit(_state with { Jobs = jobs.ToArray(), ContinuityGaps = gaps.ToArray(), LastScheduledOccurrenceUtc = due[^1].OccurrenceUtc });
+        Commit(_state with { Jobs = jobs.ToArray(), ContinuityGaps = gaps.ToArray() });
+        QueueAvailable(automatic: true);
+        Commit(_state with { LastScheduledOccurrenceUtc = due[^1].OccurrenceUtc });
     }
 
     private void AddJobs(List<CollectionJob> jobs, IReadOnlyList<DownloadListMember> members, DateOnly day,
@@ -205,7 +201,7 @@ public sealed partial class MarketDataCollector
                 (automatic && jobs[existing].Status is not (CollectionJobStatus.Pending or CollectionJobStatus.Downloading)))
                 jobs[existing] = jobs[existing] with { IsAutomatic = automatic && jobs[existing].IsAutomatic, Status = CollectionJobStatus.Pending,
                     Attempts = 0, NextSourceIntervalSeconds = 15, RetryAfterUtc = null, Error = null,
-                    RequestedThroughUtc = null,
+                    RequestedThroughUtc = null, NextGapFromUtc = null, ReceivedCandlesThisRun = false,
                     DiscoveryEmptySessions = automatic ? jobs[existing].DiscoveryEmptySessions : null,
                     IsAvailabilityProbe = automatic && jobs[existing].IsAvailabilityProbe };
         }
@@ -213,6 +209,8 @@ public sealed partial class MarketDataCollector
 
     private async Task<(int Requests, bool ConnectionLost)> CollectAsync(CollectionJob job, int requestBudget, CancellationToken cancellationToken)
     {
+        if (job.SessionBounds == CollectionSettings.AllAvailableSessionBounds)
+            return await CollectAllHoursAsync(job, requestBudget, cancellationToken).ConfigureAwait(false);
         int requests = 0;
         CollectionSessionWindow window = CollectionSchedule.GetSessionWindow(job.SessionDate, job.SessionBounds);
         if (job.RequestedThroughUtc is { } cap)
@@ -342,9 +340,10 @@ public sealed partial class MarketDataCollector
         finally { _gate.Release(); }
     }, cancellationToken);
 
-    private void SetActivity(string stage, CollectionJob? job = null)
+    private void SetActivity(string stage, CollectionJob? job = null,
+        DateTimeOffset? fromUtc = null, DateTimeOffset? throughUtc = null)
     {
-        Volatile.Write(ref _activity, new(stage, job?.Symbol, job?.SessionDate, _clock.GetUtcNow()));
+        Volatile.Write(ref _activity, new(stage, job?.Symbol, job?.SessionDate, _clock.GetUtcNow(), fromUtc, throughUtc));
         StateChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -357,15 +356,15 @@ public sealed partial class MarketDataCollector
 
     private static IEnumerable<CollectionContinuityGap> RemoveRepairedSession(CollectionContinuityGap gap, CollectionJob job)
     {
-        if (gap.Symbol != job.Symbol || gap.SessionBounds != job.SessionBounds || !SamePath(gap.LibraryRootPath, job.LibraryRootPath) ||
+        if (gap.Symbol != job.Symbol || (gap.SessionBounds != job.SessionBounds && !(job.SessionBounds == "24_5" && gap.SessionBounds is "regular" or "extended")) || !SamePath(gap.LibraryRootPath, job.LibraryRootPath) ||
             job.SessionDate < gap.FromSessionDate || job.SessionDate > gap.ThroughSessionDate)
         {
             yield return gap;
             yield break;
         }
         DateOnly before = job.SessionDate.AddDays(-1), after = job.SessionDate.AddDays(1);
-        while (before >= gap.FromSessionDate && !UsEquityTradingCalendar.IsTradingDay(before)) before = before.AddDays(-1);
-        while (after <= gap.ThroughSessionDate && !UsEquityTradingCalendar.IsTradingDay(after)) after = after.AddDays(1);
+        while (before >= gap.FromSessionDate && !CollectionSchedule.IsCollectionDate(before, gap.SessionBounds)) before = before.AddDays(-1);
+        while (after <= gap.ThroughSessionDate && !CollectionSchedule.IsCollectionDate(after, gap.SessionBounds)) after = after.AddDays(1);
         if (before >= gap.FromSessionDate) yield return gap with { ThroughSessionDate = before };
         if (after <= gap.ThroughSessionDate) yield return gap with { FromSessionDate = after };
     }

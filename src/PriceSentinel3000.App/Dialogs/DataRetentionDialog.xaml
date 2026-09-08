@@ -82,20 +82,20 @@
      <Button Margin="0,12,0,0" HorizontalAlignment="Left" Style="{StaticResource SecondaryButtonStyle}" Content="RECONNECT ROBINHOOD" Command="{Binding ReconnectCommand}" ToolTip="Renew authorization while trading and downloads are idle" />
      <TextBlock Margin="0,16,0,6" Text="Time of day (24-hour HH:mm)" /><TextBox Style="{StaticResource InputTextBoxStyle}" Text="{Binding DailyTime, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Daily download time" />
      <TextBlock Margin="0,12,0,6" Text="Time zone" /><ComboBox Style="{StaticResource InputComboBoxStyle}" ItemsSource="{Binding TimeZones}" SelectedValuePath="Id" DisplayMemberPath="DisplayName" SelectedValue="{Binding TimeZoneId}" AutomationProperties.Name="Daily download time zone" />
-     <TextBlock Margin="0,12,0,6" Text="Market session" /><ComboBox Style="{StaticResource InputComboBoxStyle}" ItemsSource="{Binding SessionChoices}" SelectedItem="{Binding SessionBounds}" AutomationProperties.Name="Download session coverage" />
+     <TextBlock x:Name="DownloadCoverageGuidance" Margin="0,12,0,6" FontSize="12" Text="All available trading hours, including overnight. Only completed 15-second candles are saved." />
      <TextBlock Margin="0,12,0,6" Text="Library folder" />
      <Grid><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
       <TextBox Style="{StaticResource InputTextBoxStyle}" Text="{Binding LibraryRootPath, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Market data library folder" />
       <Button Grid.Column="1" Width="36" Height="36" Margin="8,0,0,0" Padding="0" Style="{StaticResource SecondaryButtonStyle}" Content="..." Click="BrowseLibraryFolder_Click" ToolTip="Browse for a market data library folder" AutomationProperties.Name="Browse for market data library folder" />
      </Grid>
      <Button Margin="0,12,0,8" Style="{StaticResource PrimaryButtonStyle}" Content="SAVE SCHEDULE &amp; FOLDER" Command="{Binding SaveScheduleCommand}" />
-     <TextBlock FontSize="12" Text="Runs while PriceSentinel is open and connected. Each run checks saved 15-second coverage per equity and retries recent missing sessions. Older gaps remain visible. Collection uses the latest session that closed at least 15 minutes ago; an early scheduled time collects the prior session." />
-     <TextBlock Margin="0,16,0,0" FontSize="12" Text="Regular coverage: 9:30–16:00 Eastern (13:00 early close). Extended coverage: 4:00–20:00 Eastern (17:00 early close). Market holidays are skipped." />
+     <TextBlock x:Name="ScheduleHelpText" FontSize="12" Text="{Binding ScheduleHelp}" />
+     <TextBlock Margin="0,16,0,0" FontSize="12" Text="Includes regular, premarket, after-hours and overnight trading when available. Market closures are excluded from expected coverage." />
      <TextBlock Margin="0,16,0,0" FontSize="12" Foreground="{StaticResource AccentBrush}" Text="{Binding ContinuityWarnings}" />
     </StackPanel></ScrollViewer>
     <Grid Grid.Column="2"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
      <StackPanel><TextBlock Style="{StaticResource SectionLabelStyle}" Text="DOWNLOAD SAVED, INCLUDED EQUITIES" />
-      <TextBlock x:Name="DownloadAvailableGuidance" Margin="0,8,0,10" FontSize="12" Text="Collect available 15-second history missing from your library, including today's completed candles. Saved coverage is skipped. The queue grows as earlier available dates are discovered." />
+      <TextBlock x:Name="DownloadAvailableGuidance" Margin="0,8,0,10" FontSize="12" Text="Collect missing 15-second history across all available trading hours, including today's completed candles and overnight trading. Saved files are reused and extended. The queue grows as earlier available dates are discovered." />
      </StackPanel>
      <Button x:Name="DownloadAvailableButton" Grid.Row="1" Height="32" HorizontalAlignment="Left" Style="{StaticResource PrimaryButtonStyle}" Content="DOWNLOAD NOW" Command="{Binding DownloadNowCommand}" Margin="0,0,0,8" />
      <DataGrid x:Name="DownloadJobsGrid" Grid.Row="2" Style="{StaticResource LibraryGrid}" ItemsSource="{Binding VisibleJobs}" EnableRowVirtualization="True" EnableColumnVirtualization="True" AutomationProperties.Name="Download queue">

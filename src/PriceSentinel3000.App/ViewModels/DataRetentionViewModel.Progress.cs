@@ -18,6 +18,26 @@ public sealed class DownloadJobViewModel(CollectionJob job) : INotifyPropertyCha
     public bool IsAutomatic => _job.IsAutomatic;
     public bool IsAvailabilityProbe => _job.IsAvailabilityProbe;
     public DateTimeOffset? RequestedThroughUtc => _job.RequestedThroughUtc;
+    public DateTimeOffset? NextGapFromUtc => _job.NextGapFromUtc;
+    public double CheckedProgressPercent
+    {
+        get
+        {
+            if (_job.SessionBounds is not ("regular" or "extended" or "24_5")) return 0;
+            long totalTicks = 0, checkedTicks = 0;
+            foreach (CollectionSessionWindow window in CollectionSchedule.GetSessionWindows(SessionDate, _job.SessionBounds))
+            {
+                DateTimeOffset through = RequestedThroughUtc is { } cutoff && cutoff < window.ThroughUtc ? cutoff : window.ThroughUtc;
+                if (through <= window.FromUtc) continue;
+                totalTicks += (through - window.FromUtc).Ticks;
+                DateTimeOffset cursor = NextGapFromUtc ?? (Status == CollectionJobStatus.Complete ? through : window.FromUtc);
+                DateTimeOffset checkedThrough = cursor < through ? cursor : through;
+                if (checkedThrough > window.FromUtc) checkedTicks += (checkedThrough - window.FromUtc).Ticks;
+            }
+            return totalTicks == 0 ? 0 : 100d * checkedTicks / totalTicks;
+        }
+    }
+    public string CheckedProgressText => $"{CheckedProgressPercent:0.#}% of requested trading time checked.";
     public bool NeedsAttention => Status is CollectionJobStatus.Partial or CollectionJobStatus.Failed ||
         Status == CollectionJobStatus.Unavailable && !IsAvailabilityProbe;
     public DateTimeOffset? RetryAfterUtc => _job.RetryAfterUtc;
@@ -34,8 +54,10 @@ public sealed class DownloadJobViewModel(CollectionJob job) : INotifyPropertyCha
         ? $"Completed 15-second candles saved through {through.ToLocalTime():yyyy-MM-dd HH:mm:ss}. Download again to collect newer candles."
         : !string.IsNullOrEmpty(Error) ? Error : Status switch
     {
-        CollectionJobStatus.Pending => "Waiting for its turn in the download queue.",
-        CollectionJobStatus.Downloading => "Checking or downloading genuine 15-second history.",
+        CollectionJobStatus.Pending => NextGapFromUtc is null ? "Waiting for its turn in the download queue."
+            : $"{CheckedProgressText} Waiting for the next missing section.",
+        CollectionJobStatus.Downloading => NextGapFromUtc is null ? "Checking or downloading genuine 15-second history."
+            : $"{CheckedProgressText} Checking or downloading genuine 15-second history.",
         CollectionJobStatus.Unavailable when IsAvailabilityProbe => "The broker returned no 15-second history for this date.",
         CollectionJobStatus.Complete => ActualSourceIntervalSeconds is { } interval
             ? $"Complete {interval}-second coverage saved on disk." : "Complete coverage saved on disk.",
@@ -44,11 +66,13 @@ public sealed class DownloadJobViewModel(CollectionJob job) : INotifyPropertyCha
     public event PropertyChangedEventHandler? PropertyChanged;
     internal bool Update(CollectionJob next)
     {
-        bool progress = (Status != next.Status || _job.LastAttemptAtUtc != next.LastAttemptAtUtc) &&
+        bool progress = next.NextGapFromUtc is { } cursor && (NextGapFromUtc is null || cursor > NextGapFromUtc) ||
+            (Status != next.Status || _job.LastAttemptAtUtc != next.LastAttemptAtUtc) &&
             next.Status is CollectionJobStatus.Complete or CollectionJobStatus.Partial or CollectionJobStatus.Unavailable or CollectionJobStatus.Failed;
         bool changed = Status != next.Status || ActualSourceIntervalSeconds != next.ActualSourceIntervalSeconds ||
             Error != next.Error || IsAutomatic != next.IsAutomatic || RetryAfterUtc != next.RetryAfterUtc ||
-            IsAvailabilityProbe != next.IsAvailabilityProbe || RequestedThroughUtc != next.RequestedThroughUtc;
+            IsAvailabilityProbe != next.IsAvailabilityProbe || RequestedThroughUtc != next.RequestedThroughUtc ||
+            NextGapFromUtc != next.NextGapFromUtc;
         _job = next;
         if (changed) PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
         return progress;
@@ -57,6 +81,7 @@ public sealed class DownloadJobViewModel(CollectionJob job) : INotifyPropertyCha
 
 public sealed partial class DataRetentionViewModel
 {
+    private static readonly TimeZoneInfo DownloadEastern = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
     private readonly TimeProvider _clock;
     private readonly DispatcherTimer _progressTimer;
     private readonly Dictionary<Guid, DownloadJobViewModel> _jobRows = [];
@@ -96,12 +121,12 @@ public sealed partial class DataRetentionViewModel
             CollectionSettings saved = Collector.State.Settings;
             return AutomaticDownloadsEnabled != saved.AutomaticDownloadsEnabled ||
                 !TimeOnly.TryParseExact(DailyTime, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out TimeOnly time) ||
-                time != saved.DailyDownloadTime || TimeZoneId != saved.TimeZoneId || SessionBounds != saved.SessionBounds ||
+                time != saved.DailyDownloadTime || TimeZoneId != saved.TimeZoneId ||
                 !string.Equals(LibraryRootPath, saved.LibraryRootPath, StringComparison.OrdinalIgnoreCase);
         }
     }
     public string ScheduleChangesText => HasScheduleChanges
-        ? "UNSAVED CHANGES. Downloads still use the saved schedule, session, and folder. Select Save schedule & folder to apply this draft."
+        ? "UNSAVED CHANGES. Downloads still use the saved schedule and folder. Select Save schedule & folder to apply this draft."
         : "These settings are saved. Manual downloads work even when the automatic schedule is off.";
 
     private void ScheduleDraftChanged()
@@ -223,13 +248,22 @@ public sealed partial class DataRetentionViewModel
             string target = activity.Symbol is null ? "" : $"{activity.Symbol} · {activity.SessionDate:yyyy-MM-dd}";
             (heading, detail) = activity.Stage switch
             {
-                "CheckingSchedule" => ("Checking saved coverage…", "Finding missing sessions for the saved equity lists."),
+                "CheckingSchedule" => ("Checking saved coverage…", "Finding today's completed candles and earlier missing history for the saved equity lists."),
                 "CheckingLocalHistory" => (activity.Symbol is null ? "Checking local library…" : $"Checking {target}",
                     "Reading saved candles before requesting missing 15-second data."),
                 "WaitingForRateLimit" => ($"Waiting briefly · {target}", "Spacing requests to the broker. Downloads will continue automatically."),
                 "Saving" => ($"Saving {target}", "Validating and writing the returned candles to the local library."),
                 _ => ($"Downloading {target}", "Waiting for Robinhood to return 15-second candles. This request is still active."),
             };
+            if (activity.FromUtc is { } from && activity.ThroughUtc is { } through)
+            {
+                DateTimeOffset localFrom = TimeZoneInfo.ConvertTime(from, DownloadEastern);
+                DateTimeOffset localThrough = TimeZoneInfo.ConvertTime(through, DownloadEastern);
+                string end = localFrom.Date == localThrough.Date ? $"{localThrough:HH:mm:ss}" : $"{localThrough:MM-dd HH:mm:ss}";
+                DownloadJobViewModel? row = Jobs.FirstOrDefault(job => job.Symbol == activity.Symbol &&
+                    job.SessionDate == activity.SessionDate && job.Status == CollectionJobStatus.Downloading);
+                detail = $"Request {localFrom:HH:mm:ss}–{end} Eastern. " + (row?.CheckedProgressText ?? detail);
+            }
         }
         else if (_collectionError is not null)
         {
@@ -268,7 +302,7 @@ public sealed partial class DataRetentionViewModel
             bool availabilityChecked = state.Jobs.Any(j => j.IsAvailabilityProbe);
             heading = availabilityChecked ? "Available-history check complete" : "All queued downloads complete";
             detail = availabilityChecked
-                ? "The availability check finished. Earlier dates are checked until three consecutive broker checks return no 15-second data. Download again to collect newer completed candles."
+                ? "The availability check finished. Earlier dates are checked until three consecutive collection dates return no 15-second data. Download again to collect newer completed candles."
                 : "Completed history is saved in the local library. You can replay it or close this window.";
         }
         else
@@ -277,9 +311,11 @@ public sealed partial class DataRetentionViewModel
             detail = "Save your equity list, then select Download now. The app finds missing 15-second history and skips coverage already saved.";
         }
         string timing = _lastDownloadProgressAt is { } last
-            ? $"Last job finished {Elapsed(now - last)} ago ({last.ToLocalTime():HH:mm:ss})."
-            : "No job has finished since this window's data was loaded.";
-        if (activity is not null) timing = $"Current step: {Elapsed(now - activity.SinceUtc)}. " + timing;
+            ? (now - last < TimeSpan.FromSeconds(1) ? $"Last progress just now ({last.ToLocalTime():HH:mm:ss})."
+                : $"Last progress {Elapsed(now - last)} ago ({last.ToLocalTime():HH:mm:ss}).")
+            : "No collection progress since this window's data was loaded.";
+        if (activity is not null) timing = (now - activity.SinceUtc < TimeSpan.FromSeconds(1)
+            ? "Current step just started. " : $"Current step: {Elapsed(now - activity.SinceUtc)}. ") + timing;
         else if (!IsDownloadActive && !_downloadsPaused && eligible.Length > 0 && _started && _nextDownloadCheckAt is { } next)
             timing += $" Next queue check in {Math.Max(0, (int)Math.Ceiling((next - now).TotalSeconds))}s.";
         SetProgressText(ref _downloadState, status, nameof(DownloadState));

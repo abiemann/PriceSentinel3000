@@ -11,19 +11,48 @@ public static class CollectionSchedule
 
     public static CollectionSessionWindow GetSessionWindow(DateOnly date, string bounds = "regular")
     {
-        if (!UsEquityTradingCalendar.IsTradingDay(date)) throw new ArgumentException("The date is not an equity trading session.");
-        if (bounds is not ("regular" or "extended")) throw new ArgumentException("Unknown session coverage.");
+        IReadOnlyList<CollectionSessionWindow> windows = GetSessionWindows(date, bounds);
+        if (windows.Count == 0) throw new ArgumentException("The date is not an equity collection session.");
+        return new(windows[0].FromUtc, windows[^1].ThroughUtc);
+    }
+
+    public static bool IsCollectionDate(DateOnly date, string bounds = "regular") =>
+        GetSessionWindows(date, bounds).Count > 0;
+
+    /// <summary>Active intervals within the candle's Eastern calendar date, including the next trading day's evening.</summary>
+    public static IReadOnlyList<CollectionSessionWindow> GetSessionWindows(DateOnly date, string bounds = "regular")
+    {
+        if (bounds is not ("regular" or "extended" or "24_5")) throw new ArgumentException("Unknown session coverage.");
+        bool trading = UsEquityTradingCalendar.IsTradingDay(date);
         bool early = UsEquityTradingCalendar.IsEarlyClose(date);
+        if (bounds == "24_5")
+        {
+            var windows = new List<CollectionSessionWindow>(2);
+            if (trading)
+                windows.Add(new(ToUtc(date.ToDateTime(TimeOnly.MinValue), Eastern),
+                    ToUtc(date.ToDateTime(new(early ? 17 : 20, 0)), Eastern)));
+            DateOnly next = date.AddDays(1);
+            if (UsEquityTradingCalendar.IsTradingDay(next))
+            {
+                var evening = new CollectionSessionWindow(ToUtc(date.ToDateTime(new(20, 0)), Eastern),
+                    ToUtc(next.ToDateTime(TimeOnly.MinValue), Eastern));
+                if (windows.Count > 0 && windows[^1].ThroughUtc == evening.FromUtc)
+                    windows[^1] = windows[^1] with { ThroughUtc = evening.ThroughUtc };
+                else windows.Add(evening);
+            }
+            return windows;
+        }
+        if (!trading) return [];
         TimeOnly start = bounds == "regular" ? new(9, 30) : new(4, 0);
         TimeOnly end = bounds == "regular" ? new(early ? 13 : 16, 0) : new(early ? 17 : 20, 0);
-        return new(ToUtc(date.ToDateTime(start), Eastern), ToUtc(date.ToDateTime(end), Eastern));
+        return [new(ToUtc(date.ToDateTime(start), Eastern), ToUtc(date.ToDateTime(end), Eastern))];
     }
 
     public static DateOnly LatestFinalizedSession(DateTimeOffset atUtc, string bounds, int finalizationDelayMinutes)
     {
         DateOnly date = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(atUtc, Eastern).DateTime);
         for (int i = 0; i < 14; i++, date = date.AddDays(-1))
-            if (UsEquityTradingCalendar.IsTradingDay(date) &&
+            if (IsCollectionDate(date, bounds) &&
                 GetSessionWindow(date, bounds).ThroughUtc.AddMinutes(finalizationDelayMinutes) <= atUtc)
                 return date;
         throw new InvalidOperationException("No finalized market session was found.");

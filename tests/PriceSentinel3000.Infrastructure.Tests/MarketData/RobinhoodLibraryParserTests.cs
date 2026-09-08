@@ -152,6 +152,25 @@ public sealed class RobinhoodLibraryParserTests
     }
 
     [Fact]
+    public void History_TwentyFourFiveRetainsOvernightCandlesAndBounds()
+    {
+        DateTimeOffset from = DateTimeOffset.Parse("2026-09-14T00:00:00Z");
+        var request = Request() with { SessionBounds = "24_5", FromUtc = from, ThroughUtc = from.AddMinutes(1) };
+        var root = Parse("{\"data\":{\"results\":[{\"symbol\":\"TEST\",\"interval\":\"15second\",\"bounds\":\"24_5\",\"bars\":[" + Candle(from) + "]}]}}");
+
+        HistoricalDownload result = RobinhoodLibraryParser.ParseHistory(root, request, from.AddMinutes(2));
+        Assert.Equal(from, Assert.Single(result.Candles).StartsAtUtc);
+        Assert.Equal("24_5", result.SessionBounds);
+        Assert.Equal("24_5", RobinhoodMcpGateway.BuildLibraryHistoryArguments(request)["bounds"]);
+    }
+
+    [Theory]
+    [InlineData("all")]
+    [InlineData("overnight")]
+    public void Request_RejectsUnsupportedSessionBoundsBeforeNetwork(string bounds) =>
+        Assert.Throws<ArgumentException>(() => RobinhoodMcpGateway.BuildLibraryHistoryArguments(Request() with { SessionBounds = bounds }));
+
+    [Fact]
     public async Task DisconnectedLibraryRequest_DoesNotAttemptAuthentication()
     {
         await using var gateway = RobinhoodMcpGateway.CreateDefault();

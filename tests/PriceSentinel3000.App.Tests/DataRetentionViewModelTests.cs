@@ -97,6 +97,7 @@ public sealed partial class SessionWorkflowTests
         await vm.SaveScheduleAsync();
         Assert.True(vm.SavedAutomaticDownloadsEnabled);
         Assert.Contains("10:05", vm.SavedSchedule);
+        Assert.Equal("24_5", fixture.Collector.State.Settings.SessionBounds);
         Assert.Equal("America/Los_Angeles", new JsonCollectionStateStore(fixture.StatePath).Load().Settings.TimeZoneId);
 
         vm.AutomaticDownloadsEnabled = false;
@@ -129,15 +130,28 @@ public sealed partial class SessionWorkflowTests
         Assert.Equal("NFLX", job.Symbol);
         Assert.All(fixture.Collector.State.Jobs, item => Assert.Equal("NFLX", item.Symbol));
         Assert.Equal(CollectionJobStatus.Complete, job.Status);
-        Assert.Equal(1, fixture.Provider.Requests.Count(request => request.FromUtc.Date == new DateTime(2026, 9, 4)));
+        DateOnly day = new(2026, 9, 4);
+        HistoricalDataRequest[] requests = fixture.Provider.Requests.Where(request => RetentionSessionDate(request.FromUtc) == day).ToArray();
+        Assert.NotEmpty(requests);
+        Assert.All(requests, request =>
+        {
+            Assert.Equal("24_5", request.SessionBounds);
+            Assert.Equal(15, request.SourceIntervalSeconds);
+            Assert.True(request.ThroughUtc - request.FromUtc <= TimeSpan.FromHours(6));
+        });
         await vm.ScanLibraryAsync();
-        HistoricalDatasetInfo dataset = Assert.Single(vm.Datasets);
-        Assert.True(dataset.Coverage.Complete);
-        Assert.Equal(1560, dataset.Coverage.ActualCandleCount);
-        Assert.Equal(15, dataset.SourceIntervalSeconds);
+        Assert.Equal(requests.Length, vm.Datasets.Count);
+        Assert.All(vm.Datasets, dataset => Assert.True(dataset.Coverage.Complete));
+        CollectionSessionWindow window = CollectionSchedule.GetSessionWindow(day, "24_5");
+        HistoricalDataQueryResult saved = new JsonMarketDataLibrary(fixture.LibraryRoot).Query(new("NFLX", window.FromUtc, window.ThroughUtc,
+            SessionBounds: "24_5", RevisionPolicy: HistoricalRevisionPolicy.CompatibleCoverage));
+        Assert.True(saved.Succeeded);
+        Assert.True(saved.Coverage.Complete);
+        Assert.Equal((int)((window.ThroughUtc - window.FromUtc).TotalSeconds / 15), saved.Candles.Count);
+        string[] hashes = vm.Datasets.Select(dataset => dataset.DatasetHash).Order().ToArray();
         await vm.DownloadNowAsync();
-        Assert.Equal(1, fixture.Provider.Requests.Count(request => request.FromUtc.Date == new DateTime(2026, 9, 4)));
-        Assert.Single(new JsonMarketDataLibrary(fixture.LibraryRoot).Scan().Datasets);
+        Assert.Equal(requests.Length, fixture.Provider.Requests.Count(request => RetentionSessionDate(request.FromUtc) == day));
+        Assert.Equal(hashes, new JsonMarketDataLibrary(fixture.LibraryRoot).Scan().Datasets.Select(dataset => dataset.DatasetHash).Order());
     });
 
     [Fact]
@@ -145,25 +159,28 @@ public sealed partial class SessionWorkflowTests
     {
         await using var fixture = new RetentionFixture();
         fixture.Clock.Now = new(2026, 9, 8, 17, 0, 10, TimeSpan.Zero);
+        fixture.Provider.AvailableDates = [new(2026, 9, 8)];
         await fixture.SaveSingleSymbol(queueDate: false);
         await fixture.ViewModel.DownloadNowCommand.ExecuteAsync();
         DateTimeOffset firstCutoff = new(2026, 9, 8, 17, 0, 0, TimeSpan.Zero);
-        HistoricalDataRequest first = Assert.Single(fixture.Provider.Requests,
-            request => request.FromUtc.Date == new DateTime(2026, 9, 8));
-        Assert.Equal(firstCutoff, first.ThroughUtc);
+        HistoricalDataRequest[] first = fixture.Provider.Requests
+            .Where(request => RetentionSessionDate(request.FromUtc) == new DateOnly(2026, 9, 8)).ToArray();
+        Assert.NotEmpty(first);
+        Assert.Equal(firstCutoff, first[^1].ThroughUtc);
+        Assert.All(first, request => Assert.True(request.ThroughUtc <= firstCutoff));
         Assert.All(fixture.Provider.Requests, request => Assert.Equal(15, request.SourceIntervalSeconds));
         CollectionJob snapshot = Assert.Single(fixture.Collector.State.Jobs,
             job => job.SessionDate == new DateOnly(2026, 9, 8));
         Assert.Equal(CollectionJobStatus.Complete, snapshot.Status);
         Assert.Equal(firstCutoff, snapshot.RequestedThroughUtc);
 
+        int previousRequests = fixture.Provider.Requests.Count;
         fixture.Clock.Now = fixture.Clock.Now.AddMinutes(1);
         await fixture.ViewModel.DownloadNowCommand.ExecuteAsync();
-        HistoricalDataRequest[] today = fixture.Provider.Requests
-            .Where(request => request.FromUtc.Date == new DateTime(2026, 9, 8)).ToArray();
-        Assert.Equal(2, today.Length);
-        Assert.Equal(firstCutoff, today[1].FromUtc);
-        Assert.Equal(firstCutoff.AddMinutes(1), today[1].ThroughUtc);
+        HistoricalDataRequest appended = Assert.Single(fixture.Provider.Requests.Skip(previousRequests),
+            request => RetentionSessionDate(request.FromUtc) == new DateOnly(2026, 9, 8));
+        Assert.Equal(firstCutoff, appended.FromUtc);
+        Assert.Equal(firstCutoff.AddMinutes(1), appended.ThroughUtc);
     });
 
     [Fact]
@@ -180,13 +197,24 @@ public sealed partial class SessionWorkflowTests
         Assert.False(missing.IsAvailabilityProbe);
 
         fixture.Provider.AvailableFrom = olderDay;
+        fixture.Provider.AvailableDates = [olderDay];
         await fixture.ViewModel.DownloadNowCommand.ExecuteAsync();
 
-        CollectionJob recovered = Assert.Single(fixture.Collector.State.Jobs, job => job.Id == missing.Id);
-        Assert.Equal(olderDay, recovered.SessionDate);
+        CollectionJob recovered = Assert.Single(fixture.Collector.State.Jobs,
+            job => job.SessionDate == olderDay && job.SessionBounds == "24_5");
         Assert.Equal(CollectionJobStatus.Complete, recovered.Status);
-        Assert.Equal(2, fixture.Provider.Requests.Count(request =>
-            DateOnly.FromDateTime(request.FromUtc.UtcDateTime) == olderDay));
+        Assert.NotEmpty(recovered.DatasetHashes);
+        CollectionJob retained = Assert.Single(fixture.Collector.State.Jobs, job => job.Id == missing.Id);
+        Assert.Equal(missing.Status, retained.Status);
+        Assert.Equal(missing.SessionBounds, retained.SessionBounds);
+        Assert.Equal(missing.Attempts, retained.Attempts);
+        Assert.Empty(retained.DatasetHashes);
+        HistoricalDataRequest[] recovery = fixture.Provider.Requests.Where(request =>
+            RetentionSessionDate(request.FromUtc) == olderDay && request.SessionBounds == "24_5").ToArray();
+        Assert.NotEmpty(recovery);
+        CollectionSessionWindow window = CollectionSchedule.GetSessionWindow(olderDay, "24_5");
+        Assert.Equal(window.FromUtc, recovery[0].FromUtc);
+        Assert.Equal(window.ThroughUtc, recovery[^1].ThroughUtc);
     });
 
     [Fact]
@@ -328,12 +356,16 @@ public sealed partial class SessionWorkflowTests
         }
     }
 
+    private static DateOnly RetentionSessionDate(DateTimeOffset at) =>
+        DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(at, TimeZoneInfo.FindSystemTimeZoneById("America/New_York")).DateTime);
+
     private sealed class RetentionProvider(Func<bool> connected) : IMarketHistoryProvider, IPersonalWatchlistSource, IEquityCatalogSource
     {
         public int Calls { get; private set; }
         public int DownloadCalls { get; private set; }
         public List<HistoricalDataRequest> Requests { get; } = [];
         public DateOnly AvailableFrom { get; set; } = new(2026, 9, 4);
+        public HashSet<DateOnly>? AvailableDates { get; set; }
         public bool HoldDownloads { get; set; }
         public IReadOnlyList<PersonalWatchlistMember> Members { get; set; } = [];
         public TaskCompletionSource DownloadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -349,7 +381,8 @@ public sealed partial class SessionWorkflowTests
             Requests.Add(request);
             DownloadStarted.TrySetResult();
             if (HoldDownloads) await Task.Delay(Timeout.Infinite, cancellationToken);
-            int count = DateOnly.FromDateTime(request.FromUtc.UtcDateTime) < AvailableFrom ? 0
+            DateOnly day = RetentionSessionDate(request.FromUtc);
+            int count = day < AvailableFrom || AvailableDates is not null && !AvailableDates.Contains(day) ? 0
                 : (int)((request.ThroughUtc - request.FromUtc).TotalSeconds / request.SourceIntervalSeconds);
             return new("Robinhood", "id-" + request.Symbol, request.Symbol, request.SourceIntervalSeconds,
                 request.AdjustmentPolicy, "robinhood-split-unversioned", request.SessionBounds, request.ThroughUtc.AddDays(1),

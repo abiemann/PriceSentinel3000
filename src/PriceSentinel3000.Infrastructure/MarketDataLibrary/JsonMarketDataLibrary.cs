@@ -147,7 +147,7 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
             (query.Provider is null || item.Provider == query.Provider) &&
             (query.AdjustmentPolicy is null || item.AdjustmentPolicy == query.AdjustmentPolicy) &&
             (query.AdjustmentBasis is null || item.AdjustmentBasis == query.AdjustmentBasis) &&
-            (query.SessionBounds is null || item.SessionBounds == query.SessionBounds);
+            query.MatchesSessionBounds(item.SessionBounds);
         HistoricalDatasetInfo[] candidates;
         if (query.PinnedHashes is { Count: > 0 } pins)
         {
@@ -159,10 +159,14 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
                 return Failed("pinned_dataset_unavailable", "A pinned dataset is missing, invalid, or incompatible with the requested data. No replacement was selected.");
         }
         else candidates = scan.Datasets.Where(Matches).ToArray();
-        if (candidates.Select(IdentityKey).Distinct().Count() > 1)
+        if (candidates.Select(item => IdentityKey(item with { SessionBounds = query.SessionIdentity(item.SessionBounds) }))
+            .Distinct().Count() > 1)
             return Failed("incompatible_provenance", "Choose one provider, instrument, adjustment policy/basis, and session bounds; incompatible datasets are never merged.");
+        if (query.PinnedHashes is { Count: > 0 } && candidates.GroupBy(item => item.TradingDate).Any(group => group.Count() > 1))
+            return Failed("revision_selection_required", "Multiple daily revisions are pinned. Pin one hash per day; no replacement was selected.");
         var selected = new List<HistoricalDatasetInfo>();
-        foreach (var group in candidates.GroupBy(item => item.TradingDate))
+        foreach (var group in candidates.GroupBy(item => (item.TradingDate,
+                     SessionBounds: query.IncludeCompatibleSessions ? item.SessionBounds : "")))
         {
             if (group.Count() > 1 && (query.PinnedHashes is { Count: > 0 } || query.RevisionPolicy == HistoricalRevisionPolicy.RejectConflicts))
                 return Failed("revision_selection_required", "Multiple daily revisions match. Pin one hash per day or explicitly choose LatestFetched.");
@@ -183,10 +187,10 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
                 return dataset.Candles;
             }).Where(item => item.StartsAtUtc >= query.FromUtc && item.EndsAtUtc <= query.ThroughUtc)
                 .OrderBy(item => item.StartsAtUtc).ToArray();
-            if (query.RevisionPolicy == HistoricalRevisionPolicy.CompatibleCoverage)
+            if (query.RevisionPolicy == HistoricalRevisionPolicy.CompatibleCoverage || query.IncludeCompatibleSessions)
             {
                 if (candles.GroupBy(item => item.StartsAtUtc).Any(group => group.Distinct().Skip(1).Any()))
-                    return Failed("revision_selection_required", "Saved revisions disagree on candle prices or volume. Choose one revision or explicitly use the latest fetched revision.");
+                    return Failed("revision_selection_required", "Saved revisions or compatible sessions disagree on candle prices or volume. Pin one revision or select matching session bounds.");
                 candles = candles.Distinct().ToArray();
             }
             return new(true, selected.OrderBy(item => item.TradingDate).ToArray(), candles,

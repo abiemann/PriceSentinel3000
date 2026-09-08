@@ -84,7 +84,16 @@ public sealed record HistoricalDataQuery(
     string? AdjustmentBasis = null,
     string? SessionBounds = null,
     IReadOnlyList<string>? PinnedHashes = null,
-    HistoricalRevisionPolicy RevisionPolicy = HistoricalRevisionPolicy.RejectConflicts);
+    HistoricalRevisionPolicy RevisionPolicy = HistoricalRevisionPolicy.RejectConflicts,
+    bool IncludeCompatibleSessions = false)
+{
+    public bool MatchesSessionBounds(string sessionBounds) => SessionBounds is null ||
+        SessionIdentity(sessionBounds) == SessionIdentity(SessionBounds);
+
+    // This key is only for comparison; native dataset session metadata stays intact.
+    public string SessionIdentity(string sessionBounds) => IncludeCompatibleSessions &&
+        sessionBounds is "regular" or "extended" or "24_5" ? "24_5" : sessionBounds;
+}
 
 public sealed record HistoricalDataQueryResult(
     bool Succeeded,
