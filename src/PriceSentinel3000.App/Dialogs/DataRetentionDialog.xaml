@@ -24,22 +24,6 @@
    <Border x:Name="TabBorder" Background="{StaticResource CardBrush}" Padding="20,12" Margin="0,0,4,0" CornerRadius="6,6,0,0"><ContentPresenter ContentSource="Header" /></Border>
    <ControlTemplate.Triggers><Trigger Property="IsSelected" Value="True"><Setter Property="Foreground" Value="{StaticResource AccentBrush}" /><Setter TargetName="TabBorder" Property="Background" Value="{StaticResource SuccessSurfaceBrush}" /></Trigger></ControlTemplate.Triggers>
   </ControlTemplate></Setter.Value></Setter></Style>
-  <Style x:Key="DownloadColumnHeader" TargetType="DataGridColumnHeader">
-   <Setter Property="Background" Value="{StaticResource HeaderSurfaceBrush}" /><Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}" /><Setter Property="Padding" Value="8" />
-   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="DataGridColumnHeader">
-    <Grid>
-     <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}"><StackPanel Orientation="Horizontal"><ContentPresenter VerticalAlignment="Center" /><TextBlock x:Name="DownloadSortIndicator" Margin="5,0,0,0" VerticalAlignment="Center" FontSize="10" Foreground="{StaticResource AccentBrush}" TextWrapping="NoWrap" Visibility="Collapsed" /></StackPanel></Border>
-     <Thumb x:Name="PART_LeftHeaderGripper" Width="5" HorizontalAlignment="Left" Cursor="SizeWE" Opacity="0" />
-     <Thumb x:Name="PART_RightHeaderGripper" Width="5" HorizontalAlignment="Right" Cursor="SizeWE" Opacity="0" />
-    </Grid>
-    <ControlTemplate.Triggers>
-     <Trigger Property="SortDirection" Value="Ascending"><Setter TargetName="DownloadSortIndicator" Property="Visibility" Value="Visible" /><Setter TargetName="DownloadSortIndicator" Property="Text" Value="↑" /></Trigger>
-     <Trigger Property="SortDirection" Value="Descending"><Setter TargetName="DownloadSortIndicator" Property="Visibility" Value="Visible" /><Setter TargetName="DownloadSortIndicator" Property="Text" Value="↓" /></Trigger>
-     <MultiTrigger><MultiTrigger.Conditions><Condition Property="Content" Value="Equity" /><Condition Property="SortDirection" Value="Ascending" /></MultiTrigger.Conditions><Setter TargetName="DownloadSortIndicator" Property="Text" Value="A–Z ↓" /></MultiTrigger>
-     <MultiTrigger><MultiTrigger.Conditions><Condition Property="Content" Value="Equity" /><Condition Property="SortDirection" Value="Descending" /></MultiTrigger.Conditions><Setter TargetName="DownloadSortIndicator" Property="Text" Value="Z–A ↓" /></MultiTrigger>
-    </ControlTemplate.Triggers>
-   </ControlTemplate></Setter.Value></Setter>
-  </Style>
   <Style x:Key="LibraryColumnHeader" TargetType="DataGridColumnHeader">
    <Setter Property="Background" Value="{StaticResource HeaderSurfaceBrush}" /><Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}" /><Setter Property="Padding" Value="8" />
    <Setter Property="ToolTip" Value="Click to sort. Shift-click to add or reverse a secondary sort. Arrow numbers show priority: 1 first, then 2." />
@@ -52,8 +36,10 @@
     </Grid>
     <ControlTemplate.Triggers>
      <Trigger Property="SortDirection" Value="{x:Null}"><Setter TargetName="LibrarySortIndicator" Property="Foreground" Value="{StaticResource SecondaryTextBrush}" /></Trigger>
+     <DataTrigger Binding="{Binding Column.CanUserSort, RelativeSource={RelativeSource Self}}" Value="False"><Setter TargetName="LibrarySortIndicator" Property="Visibility" Value="Collapsed" /></DataTrigger>
     </ControlTemplate.Triggers>
    </ControlTemplate></Setter.Value></Setter>
+   <Style.Triggers><DataTrigger Binding="{Binding Column.CanUserSort, RelativeSource={RelativeSource Self}}" Value="False"><Setter Property="ToolTip" Value="{x:Null}" /><Setter Property="AutomationProperties.HelpText" Value="" /></DataTrigger></Style.Triggers>
   </Style>
   <Style x:Key="LibraryGrid" TargetType="DataGrid">
    <Setter Property="Background" Value="{StaticResource WindowBrush}" /><Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" /><Setter Property="RowBackground" Value="{StaticResource CardBrush}" /><Setter Property="AlternatingRowBackground" Value="{StaticResource WindowBrush}" />
@@ -76,37 +62,12 @@
      <DockPanel HorizontalAlignment="Left">
       <Button x:Name="DownloadInfoButton" DockPanel.Dock="Left" Width="18" Height="18" Margin="0,0,6,0" Padding="0" FontSize="11"
               Style="{StaticResource SecondaryButtonStyle}" Content="i" AutomationProperties.Name="Download information"
-              ToolTipService.InitialShowDelay="200" ToolTipService.ShowDuration="60000">
-       <Button.ToolTip>
-        <ToolTip x:Name="DownloadActivityToolTip" Placement="Bottom" Padding="14" MaxWidth="480"
-                 Background="{StaticResource CardBrush}" Foreground="{StaticResource PrimaryTextBrush}"
-                 BorderBrush="{StaticResource SubtleBorderBrush}"
-                 DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-         <ToolTip.Template><ControlTemplate TargetType="ToolTip">
-          <Border Padding="{TemplateBinding Padding}" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                  BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6"><ContentPresenter /></Border>
-         </ControlTemplate></ToolTip.Template>
-         <ScrollViewer MaxHeight="360" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-          <StackPanel MaxWidth="440">
-           <TextBlock FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource PrimaryTextBrush}" Text="{Binding DownloadHeading}" />
-           <TextBlock x:Name="DownloadActivityDetail" FontSize="12" Margin="0,6,0,0" Text="{Binding DownloadDetail}" />
-           <TextBlock x:Name="DownloadActivityTiming" FontSize="11" Margin="0,6,0,0" Text="{Binding DownloadTiming}" />
-           <TextBlock x:Name="DownloadInteractionGuidance" FontSize="12" Margin="0,10,0,0" Text="{Binding DownloadInteractionHint}" />
-           <Separator Margin="0,12" />
-           <TextBlock FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource PrimaryTextBrush}" Text="How downloads work" />
-           <TextBlock x:Name="DownloadAvailableGuidance" Margin="0,6,0,0" FontSize="12" Text="Fill today's gaps, then older days. Nearby gaps are checked together; saved candles are reused. Known empty ranges are skipped; today's can be retried after 15 minutes." />
-           <TextBlock x:Name="DownloadCoverageGuidance" Margin="0,10,0,0" FontSize="12" Text="All available trading hours, including overnight. Only completed 15-second candles are saved. Market closures are excluded from expected coverage." />
-           <TextBlock x:Name="ScheduleHelpText" Margin="0,10,0,0" FontSize="12" Text="{Binding ScheduleHelp}" />
-           <TextBlock Margin="0,10,0,0" FontSize="12" Text="{Binding ContinuityWarnings}" />
-          </StackPanel>
-         </ScrollViewer>
-        </ToolTip>
-       </Button.ToolTip>
-      </Button>
+              AutomationProperties.HelpText="Hover or click to open download information. Scroll inside; click outside or press Escape to close."
+              MouseEnter="DownloadInfo_MouseEnter" Click="DownloadInfo_Click" />
       <TextBlock x:Name="DownloadActivityHeading" Style="{StaticResource DownloadStateText}" FontSize="13"
                  TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Text="{Binding DownloadHeading}" AutomationProperties.LiveSetting="Polite" />
      </DockPanel>
-     <TextBlock Margin="0,3,0,0" FontSize="11" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Text="{Binding JobSummary}" ToolTip="{Binding JobSummary}" />
+     <TextBlock Margin="0,3,0,0" FontSize="11" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Text="{Binding JobSummary}" />
      <ProgressBar x:Name="DownloadProgress" Height="4" Margin="0,6,0,0" Minimum="0" Maximum="100" Value="{Binding DownloadProgressPercent, Mode=OneWay}"
                   Foreground="{StaticResource AccentBrush}" Background="{StaticResource WindowBrush}" AutomationProperties.Name="Download jobs checked" AutomationProperties.HelpText="{Binding JobSummary}" />
     </StackPanel>
@@ -172,18 +133,22 @@
       <Button x:Name="ForcedDownloadButton" Margin="8,0,0,0" Style="{StaticResource SecondaryButtonStyle}" Content="FORCED DOWNLOAD" Command="{Binding ForcedDownloadCommand}" ToolTip="Retry missing candles with a fresh retry count, including ranges previously reported as unavailable. Saved candles are reused." />
       <Button x:Name="ClearDownloadQueueButton" Margin="8,0,0,0" Style="{StaticResource SecondaryButtonStyle}" Content="CLEAR" Command="{Binding ClearDownloadQueueCommand}" ToolTip="Clear finished queue entries. Saved candles and remembered gaps are kept." AutomationProperties.Name="Clear finished download queue" />
      </StackPanel>
-     <DataGrid x:Name="DownloadJobsGrid" Grid.Row="1" Style="{StaticResource LibraryGrid}" ColumnHeaderStyle="{StaticResource DownloadColumnHeader}" Loaded="DownloadJobsGrid_Loaded" ItemsSource="{Binding VisibleJobs}" EnableRowVirtualization="True" EnableColumnVirtualization="True" AutomationProperties.Name="Download queue">
-      <DataGrid.Columns><DataGridTextColumn Header="Equity" Binding="{Binding Symbol}" SortMemberPath="Symbol" Width="100" ElementStyle="{StaticResource DownloadCell}" /><DataGridTextColumn Header="Date" Binding="{Binding SessionDate, StringFormat=yyyy-MM-dd}" SortMemberPath="SessionDate" Width="87" ElementStyle="{StaticResource DownloadCell}" /><DataGridTextColumn Header="State" Binding="{Binding StateText}" CanUserSort="False" Width="92" ElementStyle="{StaticResource DownloadCoverageCell}" /><DataGridTextColumn Header="Details" Binding="{Binding DetailsText}" CanUserSort="False" Width="*" MinWidth="100" ElementStyle="{StaticResource DownloadCell}" /></DataGrid.Columns>
+     <DataGrid x:Name="DownloadJobsGrid" Grid.Row="1" Style="{StaticResource LibraryGrid}" ColumnHeaderStyle="{StaticResource LibraryColumnHeader}" Loaded="DownloadJobsGrid_Loaded" Unloaded="DownloadJobsGrid_Unloaded" ItemsSource="{Binding VisibleJobs}" EnableRowVirtualization="True" EnableColumnVirtualization="True" AutomationProperties.Name="Download queue">
+      <DataGrid.Columns><DataGridTextColumn Header="Equity" Binding="{Binding Symbol}" SortMemberPath="Symbol" Width="100" ElementStyle="{StaticResource DownloadCell}" /><DataGridTextColumn Header="Date" Binding="{Binding SessionDate, StringFormat=yyyy-MM-dd}" SortMemberPath="SessionDate" Width="87" ElementStyle="{StaticResource DownloadCell}" /><DataGridTextColumn Header="State" Binding="{Binding StateText}" SortMemberPath="StateCoveragePercent" Width="92" ElementStyle="{StaticResource DownloadCoverageCell}" /><DataGridTextColumn Header="Details" Binding="{Binding DetailsText}" CanUserSort="False" Width="*" MinWidth="100" ElementStyle="{StaticResource DownloadCell}" /></DataGrid.Columns>
      </DataGrid>
     </Grid>
    </Grid></TabItem>
    <TabItem x:Name="LocalLibraryTab" Header="LOCAL LIBRARY"><Grid Margin="16,8"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-    <WrapPanel Margin="0,0,0,8"><Grid Margin="0,0,8,0">
+    <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+     <StackPanel Orientation="Horizontal"><Grid Margin="0,0,8,0">
      <Button x:Name="RescanLibraryButton" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding ScanLibraryCommand}" AutomationProperties.Name="{Binding LibraryScanButtonText}" ToolTip="Scan saved history, including files copied into the library.">
       <TextBlock Text="RESCAN LIBRARY" TextWrapping="NoWrap" Foreground="{StaticResource PrimaryTextBrush}"><TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><DataTrigger Binding="{Binding IsLibraryScanning}" Value="True"><Setter Property="Visibility" Value="Hidden" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
      </Button>
      <TextBlock x:Name="LibraryScanProgressText" Text="{Binding LibraryScanButtonText}" Visibility="{Binding IsLibraryScanning, Converter={StaticResource BooleanVisibility}}" IsHitTestVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" TextWrapping="NoWrap" FontSize="11" FontWeight="SemiBold" LineHeight="14" LineStackingStrategy="BlockLineHeight" Foreground="{StaticResource PrimaryTextBrush}" />
-    </Grid><Button Style="{StaticResource SecondaryButtonStyle}" Content="OPEN FOLDER" Command="{Binding OpenFolderCommand}" ToolTip="Open the saved market data library folder." /><TextBlock Margin="16,0,0,0" VerticalAlignment="Center" FontSize="11" Text="Click a row for coverage. Click a column to sort; Shift-click adds a secondary sort." /></WrapPanel>
+     </Grid><Button Style="{StaticResource SecondaryButtonStyle}" Content="OPEN FOLDER" Command="{Binding OpenFolderCommand}" ToolTip="Open the saved market data library folder." /></StackPanel>
+     <TextBlock Grid.Column="1" Margin="16,0" VerticalAlignment="Center" FontSize="11" Text="Click a row for coverage. Click a column to sort; Shift-click adds a secondary sort." />
+     <TextBlock x:Name="LibrarySizeText" Grid.Column="2" MinWidth="100" Text="{Binding LibrarySizeText}" HorizontalAlignment="Right" VerticalAlignment="Center" TextAlignment="Right" TextWrapping="NoWrap" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource PrimaryTextBrush}" AutomationProperties.Name="Saved library file size" ToolTip="Size of active saved candle files from the latest scan. 1 MB = 1,000,000 bytes." />
+    </Grid>
     <DataGrid x:Name="LocalLibraryGrid" Grid.Row="1" FocusVisualStyle="{x:Null}" PreviewMouseLeftButtonUp="LocalLibraryGrid_MouseLeftButtonUp" PreviewKeyDown="LocalLibraryGrid_KeyDown" Style="{StaticResource LibraryGrid}" ColumnHeaderStyle="{StaticResource LibraryColumnHeader}" Loaded="LocalLibraryGrid_Loaded" Unloaded="LocalLibraryGrid_Unloaded" ItemsSource="{Binding VisibleLibraryDays}" SelectedItem="{Binding SelectedLibraryDay}" EnableRowVirtualization="True" EnableColumnVirtualization="True" ScrollViewer.VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Saved market data"><DataGrid.Resources>
      <Style TargetType="DataGridRow">
       <Setter Property="FocusVisualStyle" Value="{x:Null}" /><Setter Property="BorderThickness" Value="0" /><Setter Property="BorderBrush" Value="Transparent" />
@@ -200,6 +165,37 @@
    </Grid></TabItem>
   </TabControl>
   <Border Grid.Row="4" Background="{StaticResource HeaderSurfaceBrush}" Padding="24,8"><TextBlock x:Name="StatusSummaryText" MaxHeight="18" Text="{Binding Status}" Foreground="{StaticResource AccentBrush}" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"><TextBlock.ToolTip><ToolTip><ScrollViewer MaxHeight="160" VerticalScrollBarVisibility="Auto"><TextBlock MaxWidth="420" Text="{Binding Status}" TextWrapping="Wrap" /></ScrollViewer></ToolTip></TextBlock.ToolTip></TextBlock></Border>
+  <Popup x:Name="DownloadInfoPopup" PlacementTarget="{Binding ElementName=DownloadInfoButton}" Placement="Bottom"
+         VerticalOffset="4" StaysOpen="False" AllowsTransparency="True"
+         DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+   <Border x:Name="DownloadInfoPanel" Width="480" Padding="14" Background="{StaticResource CardBrush}"
+           BorderBrush="{StaticResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="6"
+           KeyboardNavigation.TabNavigation="Cycle" PreviewKeyDown="DownloadInfo_KeyDown" AutomationProperties.Name="Download information">
+    <Grid>
+     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+     <DockPanel>
+      <Button x:Name="DownloadInfoCloseButton" DockPanel.Dock="Right" Width="24" Height="24" Padding="0" FontSize="18"
+              Style="{StaticResource SecondaryButtonStyle}" Content="×" Click="DownloadInfoClose_Click" AutomationProperties.Name="Close download information" />
+      <TextBlock Margin="0,0,8,0" VerticalAlignment="Center" FontSize="13" FontWeight="SemiBold"
+                 Foreground="{StaticResource PrimaryTextBrush}" Text="{Binding DownloadHeading}" />
+     </DockPanel>
+     <ScrollViewer x:Name="DownloadInfoScrollViewer" Grid.Row="1" Margin="0,10,0,0" MaxHeight="360"
+                   VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel>
+       <TextBlock x:Name="DownloadActivityDetail" FontSize="12" Margin="0,6,0,0" Text="{Binding DownloadDetail}" />
+       <TextBlock x:Name="DownloadActivityTiming" FontSize="11" Margin="0,6,0,0" Text="{Binding DownloadTiming}" />
+       <TextBlock x:Name="DownloadInteractionGuidance" FontSize="12" Margin="0,10,0,0" Text="{Binding DownloadInteractionHint}" />
+       <Separator Margin="0,12" />
+       <TextBlock FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource PrimaryTextBrush}" Text="How downloads work" />
+       <TextBlock x:Name="DownloadAvailableGuidance" Margin="0,6,0,0" FontSize="12" Text="Fill today's gaps, then older days. Nearby gaps are checked together; saved candles are reused. Known empty ranges are skipped; today's can be retried after 15 minutes." />
+       <TextBlock x:Name="DownloadCoverageGuidance" Margin="0,10,0,0" FontSize="12" Text="All available trading hours, including overnight. Only completed 15-second candles are saved. Market closures are excluded from expected coverage." />
+       <TextBlock x:Name="ScheduleHelpText" Margin="0,10,0,0" FontSize="12" Text="{Binding ScheduleHelp}" />
+       <TextBlock Margin="0,10,0,0" FontSize="12" Text="{Binding ContinuityWarnings}" />
+      </StackPanel>
+     </ScrollViewer>
+    </Grid>
+   </Border>
+  </Popup>
   <Grid x:Name="LibraryCoverageOverlay" Grid.RowSpan="5" Panel.ZIndex="10" Background="#B0000000"
         Visibility="Collapsed" MouseUp="LibraryCoverageOverlay_MouseUp" shell:WindowChrome.IsHitTestVisibleInChrome="True">
    <Border x:Name="LibraryCoverageCard" Margin="24" Padding="24" MaxWidth="1000" VerticalAlignment="Center"

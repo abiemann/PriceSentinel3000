@@ -34,6 +34,7 @@ public sealed class MetadataCacheTests : IDisposable
                 MarketDataLibraryScan scan = library.Scan();
                 Assert.Empty(scan.Diagnostics);
                 Assert.Equal(6, scan.Datasets.Count);
+                Assert.Equal(scan.Datasets.Sum(item => new FileInfo(Path.Combine(Root, item.RelativePath)).Length), scan.TotalFileBytes);
                 Assert.Equal(next + 1, Assert.Single(scan.Datasets, item => item.Symbol == "AAPL").Coverage.ActualCandleCount);
             }
         }
@@ -57,6 +58,7 @@ public sealed class MetadataCacheTests : IDisposable
         Assert.Equal(content.Length, new FileInfo(path).Length);
         MarketDataLibraryScan damaged = library.Scan();
         Assert.Empty(damaged.Datasets);
+        Assert.Equal(0, damaged.TotalFileBytes);
         Assert.Contains(damaged.Diagnostics, item => item.Code == "invalid_dataset");
         Assert.Empty(library.Query(new("AAPL", Start, Start.AddSeconds(15))).Candles);
 
@@ -64,6 +66,7 @@ public sealed class MetadataCacheTests : IDisposable
         File.SetLastWriteTimeUtc(path, lastWrite.AddSeconds(2));
         MarketDataLibraryScan repaired = library.Scan();
         Assert.Empty(repaired.Diagnostics);
+        Assert.Equal(content.LongLength, repaired.TotalFileBytes);
         Assert.Equal(original.DatasetHash, Assert.Single(repaired.Datasets).DatasetHash);
         Assert.Equal(Bar(0), Assert.Single(library.Read(original.DatasetHash).Candles));
     }
@@ -88,7 +91,9 @@ public sealed class MetadataCacheTests : IDisposable
         Assert.Equal(length, new FileInfo(path).Length);
         Assert.Equal(lastWrite, File.GetLastWriteTimeUtc(path));
 
-        HistoricalDatasetInfo current = Assert.Single(library.Scan().Datasets);
+        MarketDataLibraryScan currentScan = library.Scan();
+        Assert.Equal(length, currentScan.TotalFileBytes);
+        HistoricalDatasetInfo current = Assert.Single(currentScan.Datasets);
         Assert.Equal(replacement.DatasetHash, current.DatasetHash);
         Assert.NotEqual(original.DatasetHash, current.DatasetHash);
         Assert.Equal(81m, Assert.Single(library.Query(new("AAPL", Start, Start.AddSeconds(15))).Candles).Close);
@@ -157,6 +162,56 @@ public sealed class MetadataCacheTests : IDisposable
         HistoricalDataQueryResult query = library.Query(new("AAPL", Start, Start.AddSeconds(45)));
         Assert.False(query.Succeeded);
         Assert.Contains(query.Diagnostics, item => item.Code == "dataset_read_failed");
+    }
+
+    [Fact]
+    public void ScanCountsPhysicalDuplicatesButExcludesArchivesTemporaryAndInvalidFiles()
+    {
+        var library = new JsonMarketDataLibrary(Root);
+        HistoricalDatasetInfo first = Assert.Single(library.Save(Download("AAPL", Bar(0))));
+        string path = Path.Combine(Root, first.RelativePath);
+        long fileBytes = new FileInfo(path).Length;
+        File.Copy(path, Path.Combine(Root, "duplicate.json"));
+        Directory.CreateDirectory(Path.Combine(Root, ".archive"));
+        File.Copy(path, Path.Combine(Root, ".archive", first.DatasetHash + ".json"));
+        File.Copy(path, Path.Combine(Root, "pending.json.tmp-test"));
+        File.Copy(path, Path.Combine(Root, "not-candle-data.txt"));
+        File.WriteAllText(Path.Combine(Root, "invalid.json"), "broken data");
+
+        MarketDataLibraryScan scan = library.Scan();
+
+        Assert.Single(scan.Datasets);
+        Assert.Equal(fileBytes * 2, scan.TotalFileBytes);
+        Assert.Contains(scan.Diagnostics, item => item.Code == "interrupted_write");
+        Assert.Contains(scan.Diagnostics, item => item.Code == "invalid_dataset");
+        Assert.Equal(scan.TotalFileBytes, library.Scan().TotalFileBytes);
+
+        MarketDataLibraryScan consolidated = library.ConsolidateDailyFiles();
+        HistoricalDatasetInfo merged = Assert.Single(consolidated.Datasets);
+        Assert.Equal(new FileInfo(Path.Combine(Root, merged.RelativePath)).Length, consolidated.TotalFileBytes);
+        Assert.Equal(fileBytes, consolidated.TotalFileBytes);
+    }
+
+    [Fact]
+    public void ScanRefreshesTotalAfterAFileIsReplacedAndDeleted()
+    {
+        var library = new JsonMarketDataLibrary(Root);
+        HistoricalDatasetInfo first = Assert.Single(library.Save(Download("AAPL", Bar(0))));
+        string path = Path.Combine(Root, first.RelativePath);
+        long initialBytes = library.Scan().TotalFileBytes;
+        (HistoricalDatasetInfo replacement, byte[] content) = Source(Download("AAPL", Bar(0), Bar(1), Bar(2)));
+        string temporary = path + ".replacement";
+        File.WriteAllBytes(temporary, content);
+        File.Move(temporary, path, overwrite: true);
+
+        MarketDataLibraryScan replaced = library.Scan();
+
+        Assert.Equal(replacement.DatasetHash, Assert.Single(replaced.Datasets).DatasetHash);
+        Assert.Equal(content.LongLength, replaced.TotalFileBytes);
+        Assert.NotEqual(initialBytes, replaced.TotalFileBytes);
+        Assert.Equal(replaced.TotalFileBytes, library.Scan().TotalFileBytes);
+        File.Delete(path);
+        Assert.Equal(0, library.Scan().TotalFileBytes);
     }
 
     private (HistoricalDatasetInfo Info, byte[] Bytes) Source(HistoricalDownload download)

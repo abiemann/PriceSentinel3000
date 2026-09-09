@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Reflection;
-using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Threading;
@@ -31,15 +30,18 @@ public sealed partial class SessionWorkflowTests
             Assert.Equal(new[] { original[2], original[1], original[0] }, grid.Items.Cast<DownloadJobViewModel>());
             Assert.Equal(original, vm.Jobs);
             Assert.Empty(vm.Collector.State.Jobs);
-            AssertDownloadSortIndicator(grid, "Date", ListSortDirection.Descending, "↓");
-            foreach (string name in new[] { "State", "Details" })
-            {
-                DataGridColumnHeader header = DownloadSortingHeader(grid, name);
-                Assert.False(header.Column.CanUserSort);
-                Assert.Null(header.Column.SortDirection);
-                TextBlock indicator = DownloadSortingIndicator(header);
-                Assert.False(indicator.IsVisible);
-            }
+            AssertLocalSortDescriptions(grid,
+                (nameof(DownloadJobViewModel.SessionDate), ListSortDirection.Descending),
+                (nameof(DownloadJobViewModel.Symbol), ListSortDirection.Ascending));
+            AssertLocalSortIndicator(grid, "Date", ListSortDirection.Descending, "↓ 1");
+            AssertLocalSortIndicator(grid, "Equity", ListSortDirection.Ascending, "↑ 2");
+            AssertLocalSortIndicator(grid, "State", null, "↕");
+            Assert.Equal(nameof(DownloadJobViewModel.StateCoveragePercent), DownloadSortingHeader(grid, "State").Column.SortMemberPath);
+            DataGridColumnHeader details = DownloadSortingHeader(grid, "Details");
+            Assert.False(details.Column.CanUserSort);
+            Assert.Null(details.Column.SortDirection);
+            Assert.Null(details.ToolTip);
+            Assert.False(Assert.IsType<TextBlock>(details.Template.FindName("LibrarySortIndicator", details)).IsVisible);
             CaptureLocalLayout(dialog, $"download-sort-{width}x{height}-date.png");
         }
         finally { dialog.Close(); }
@@ -60,14 +62,19 @@ public sealed partial class SessionWorkflowTests
             var grid = (DataGrid)dialog.FindName("DownloadJobsGrid");
             grid.SelectedItem = original[1];
 
-            await InvokeDownloadSortHeader(grid, "Equity");
+            await SetLocalPrimaryAscending(grid, "Equity");
             Assert.Equal(new[] { "AAPL", "MSFT", "NVDA" }, DownloadSortingSymbols(grid));
-            AssertDownloadSortIndicator(grid, "Equity", ListSortDirection.Ascending, "A–Z");
-            Assert.Null(DownloadSortingHeader(grid, "Date").Column.SortDirection);
+            AssertLocalSortIndicator(grid, "Equity", ListSortDirection.Ascending, "↑ 1");
+            AssertLocalSortIndicator(grid, "Date", null, "↕");
 
             await InvokeDownloadSortHeader(grid, "Equity");
             Assert.Equal(new[] { "NVDA", "MSFT", "AAPL" }, DownloadSortingSymbols(grid));
-            AssertDownloadSortIndicator(grid, "Equity", ListSortDirection.Descending, "Z–A");
+            AssertLocalSortIndicator(grid, "Equity", ListSortDirection.Descending, "↓ 1");
+            await InvokeLocalSecondarySort(grid, "State");
+            AssertLocalSortDescriptions(grid,
+                (nameof(DownloadJobViewModel.Symbol), ListSortDirection.Descending),
+                (nameof(DownloadJobViewModel.StateCoveragePercent), ListSortDirection.Ascending));
+            AssertLocalSortIndicator(grid, "State", ListSortDirection.Ascending, "↑ 2");
             CaptureLocalLayout(dialog, "download-sort-equity-descending.png");
 
             var discovered = new CollectionJob { Symbol = "TSLA", SessionDate = new(2026, 9, 9), IsAvailabilityProbe = true };
@@ -83,9 +90,17 @@ public sealed partial class SessionWorkflowTests
             await SettleLocalLayout(dialog);
             Assert.Equal(new[] { "NVDA", "MSFT", "AAPL" }, DownloadSortingSymbols(grid));
             Assert.Same(original[1], grid.SelectedItem);
-            AssertDownloadSortIndicator(grid, "Equity", ListSortDirection.Descending, "Z–A");
+            AssertLocalSortIndicator(grid, "Equity", ListSortDirection.Descending, "↓ 1");
+            AssertLocalSortIndicator(grid, "State", ListSortDirection.Ascending, "↑ 2");
             Assert.Equal(original.Append(added), vm.Jobs);
             Assert.Empty(vm.Collector.State.Jobs);
+
+            ((TabItem)dialog.FindName("LocalLibraryTab")).IsSelected = true;
+            await SettleLocalLayout(dialog);
+            ((TabItem)dialog.FindName("ScheduleDownloadsTab")).IsSelected = true;
+            await SettleLocalLayout(dialog);
+            AssertLocalSortIndicator(grid, "Equity", ListSortDirection.Descending, "↓ 1");
+            AssertLocalSortIndicator(grid, "State", ListSortDirection.Ascending, "↑ 2");
 
             dialog.Close();
             dialog = new DataRetentionDialog { DataContext = vm, ShowActivated = false };
@@ -93,21 +108,145 @@ public sealed partial class SessionWorkflowTests
             ((TabItem)dialog.FindName("ScheduleDownloadsTab")).IsSelected = true;
             await SettleLocalLayout(dialog);
             grid = (DataGrid)dialog.FindName("DownloadJobsGrid");
+            AssertLocalSortDescriptions(grid,
+                (nameof(DownloadJobViewModel.Symbol), ListSortDirection.Descending),
+                (nameof(DownloadJobViewModel.StateCoveragePercent), ListSortDirection.Ascending));
+            AssertLocalSortIndicator(grid, "State", ListSortDirection.Ascending, "↑ 2");
             Assert.Equal(new[] { "NVDA", "MSFT", "AAPL" }, DownloadSortingSymbols(grid));
-            AssertDownloadSortIndicator(grid, "Equity", ListSortDirection.Descending, "Z–A");
-            Assert.Null(DownloadSortingHeader(grid, "Date").Column.SortDirection);
+            AssertLocalSortIndicator(grid, "Equity", ListSortDirection.Descending, "↓ 1");
+            AssertLocalSortIndicator(grid, "Date", null, "↕");
 
             await InvokeDownloadSortHeader(grid, "Date");
             Assert.Equal(new[] { new DateOnly(2026, 9, 3), new DateOnly(2026, 9, 8), new DateOnly(2026, 9, 8) },
                 grid.Items.Cast<DownloadJobViewModel>().Select(row => row.SessionDate));
-            AssertDownloadSortIndicator(grid, "Date", ListSortDirection.Ascending, "↑");
-            Assert.Null(DownloadSortingHeader(grid, "Equity").Column.SortDirection);
+            AssertLocalSortDescriptions(grid, (nameof(DownloadJobViewModel.SessionDate), ListSortDirection.Ascending));
+            AssertLocalSortIndicator(grid, "Date", ListSortDirection.Ascending, "↑ 1");
+            AssertLocalSortIndicator(grid, "Equity", null, "↕");
+            AssertLocalSortIndicator(grid, "State", null, "↕");
             await InvokeDownloadSortHeader(grid, "Date");
             Assert.Equal(new[] { new DateOnly(2026, 9, 8), new DateOnly(2026, 9, 8), new DateOnly(2026, 9, 3) },
                 grid.Items.Cast<DownloadJobViewModel>().Select(row => row.SessionDate));
-            AssertDownloadSortIndicator(grid, "Date", ListSortDirection.Descending, "↓");
+            AssertLocalSortIndicator(grid, "Date", ListSortDirection.Descending, "↓ 1");
         }
         finally { dialog?.Close(); }
+    });
+
+    [Fact]
+    public Task DownloadSorting_SecondaryDateReversesWithoutChangingPrimaryEquity() => host.RunAsync(async () =>
+    {
+        await using var fixture = new ProgressFixture();
+        DataRetentionViewModel vm = fixture.ViewModel;
+        DownloadJobViewModel[] original =
+        [
+            new(new CollectionJob { Symbol = "MSFT", SessionDate = new(2026, 9, 3) }),
+            new(new CollectionJob { Symbol = "AAPL", SessionDate = new(2026, 9, 3) }),
+            new(new CollectionJob { Symbol = "MSFT", SessionDate = new(2026, 9, 8) }),
+            new(new CollectionJob { Symbol = "AAPL", SessionDate = new(2026, 9, 8) }),
+        ];
+        foreach (DownloadJobViewModel row in original) vm.Jobs.Add(row);
+        var dialog = new DataRetentionDialog { DataContext = vm, ShowActivated = false };
+        try
+        {
+            dialog.Show();
+            ((TabItem)dialog.FindName("ScheduleDownloadsTab")).IsSelected = true;
+            await SettleLocalLayout(dialog);
+            var grid = (DataGrid)dialog.FindName("DownloadJobsGrid");
+
+            await SetLocalPrimaryAscending(grid, "Equity");
+            await InvokeLocalSecondarySort(grid, "Date");
+            AssertLocalSortDescriptions(grid,
+                (nameof(DownloadJobViewModel.Symbol), ListSortDirection.Ascending),
+                (nameof(DownloadJobViewModel.SessionDate), ListSortDirection.Ascending));
+            Assert.Equal(new[] { original[1], original[3], original[0], original[2] }, grid.Items.Cast<DownloadJobViewModel>());
+            AssertLocalSortIndicator(grid, "Equity", ListSortDirection.Ascending, "↑ 1");
+            AssertLocalSortIndicator(grid, "Date", ListSortDirection.Ascending, "↑ 2");
+
+            await InvokeLocalSecondarySort(grid, "Date");
+            AssertLocalSortDescriptions(grid,
+                (nameof(DownloadJobViewModel.Symbol), ListSortDirection.Ascending),
+                (nameof(DownloadJobViewModel.SessionDate), ListSortDirection.Descending));
+            Assert.Equal(new[] { original[3], original[1], original[2], original[0] }, grid.Items.Cast<DownloadJobViewModel>());
+            AssertLocalSortIndicator(grid, "Equity", ListSortDirection.Ascending, "↑ 1");
+            AssertLocalSortIndicator(grid, "Date", ListSortDirection.Descending, "↓ 2");
+            Assert.Equal(original, vm.Jobs);
+            CaptureLocalLayout(dialog, "download-sort-equity-then-date.png");
+        }
+        finally { dialog.Close(); }
+    });
+
+    [Fact]
+    public Task DownloadSorting_StateUsesDisplayedNumericCoverageAndUpdatesWithinPrimaryDate() => host.RunAsync(async () =>
+    {
+        await using var fixture = new ProgressFixture();
+        DataRetentionViewModel vm = fixture.ViewModel;
+        CollectionJob[] jobs =
+        [
+            new() { Symbol = "HIGH", SessionDate = new(2026, 9, 3), SavedCoveragePercent = 100m },
+            new() { Symbol = "LOW", SessionDate = new(2026, 9, 3), SavedCoveragePercent = 9.25m },
+            new() { Symbol = "MID", SessionDate = new(2026, 9, 3), SavedCoveragePercent = 80m },
+            new() { Symbol = "FAILED", SessionDate = new(2026, 9, 8), Status = CollectionJobStatus.Failed, SavedCoveragePercent = 95m },
+            new() { Symbol = "UNAVAILABLE", SessionDate = new(2026, 9, 8), Status = CollectionJobStatus.Unavailable, SavedCoveragePercent = 65m },
+            new() { Symbol = "UNKNOWN", SessionDate = new(2026, 9, 8) },
+            new() { Symbol = "OVER", SessionDate = new(2026, 9, 8), SavedCoveragePercent = 120m },
+            new() { Symbol = "UNDER", SessionDate = new(2026, 9, 8), SavedCoveragePercent = -5m },
+        ];
+        DownloadJobViewModel[] original = jobs.Select(job => new DownloadJobViewModel(job)).ToArray();
+        foreach (DownloadJobViewModel row in original) vm.Jobs.Add(row);
+        Assert.Equal(new decimal?[] { 100m, 9.25m, 80m, 0m, 0m, null, 100m, 0m }, original.Select(row => row.StateCoveragePercent));
+        var dialog = new DataRetentionDialog { DataContext = vm, Width = 860, Height = 620, ShowActivated = false };
+        try
+        {
+            dialog.Show();
+            ((TabItem)dialog.FindName("ScheduleDownloadsTab")).IsSelected = true;
+            await SettleLocalLayout(dialog);
+            var grid = (DataGrid)dialog.FindName("DownloadJobsGrid");
+
+            await InvokeDownloadSortHeader(grid, "State");
+            AssertLocalSortDescriptions(grid, (nameof(DownloadJobViewModel.StateCoveragePercent), ListSortDirection.Ascending));
+            Assert.Equal(new decimal?[] { null, 0m, 0m, 0m, 9.25m, 80m, 100m, 100m },
+                grid.Items.Cast<DownloadJobViewModel>().Select(row => row.StateCoveragePercent));
+            AssertLocalSortIndicator(grid, "State", ListSortDirection.Ascending, "↑ 1");
+            AssertLocalSortIndicator(grid, "Equity", null, "↕");
+            AssertLocalSortIndicator(grid, "Date", null, "↕");
+            await InvokeDownloadSortHeader(grid, "State");
+            Assert.Equal(new decimal?[] { 100m, 100m, 80m, 9.25m, 0m, 0m, 0m, null },
+                grid.Items.Cast<DownloadJobViewModel>().Select(row => row.StateCoveragePercent));
+            AssertLocalSortIndicator(grid, "State", ListSortDirection.Descending, "↓ 1");
+
+            await SetLocalPrimaryAscending(grid, "Date");
+            await InvokeLocalSecondarySort(grid, "State");
+            AssertLocalSortDescriptions(grid,
+                (nameof(DownloadJobViewModel.SessionDate), ListSortDirection.Ascending),
+                (nameof(DownloadJobViewModel.StateCoveragePercent), ListSortDirection.Ascending));
+            Assert.Equal(new[] { original[1], original[2], original[0] }, grid.Items.Cast<DownloadJobViewModel>().Take(3));
+            AssertLocalSortIndicator(grid, "Date", ListSortDirection.Ascending, "↑ 1");
+            AssertLocalSortIndicator(grid, "State", ListSortDirection.Ascending, "↑ 2");
+            await InvokeLocalSecondarySort(grid, "State");
+            AssertLocalSortDescriptions(grid,
+                (nameof(DownloadJobViewModel.SessionDate), ListSortDirection.Ascending),
+                (nameof(DownloadJobViewModel.StateCoveragePercent), ListSortDirection.Descending));
+            Assert.Equal(new[] { original[0], original[2], original[1] }, grid.Items.Cast<DownloadJobViewModel>().Take(3));
+            AssertLocalSortIndicator(grid, "Date", ListSortDirection.Ascending, "↑ 1");
+            AssertLocalSortIndicator(grid, "State", ListSortDirection.Descending, "↓ 2");
+
+            grid.SelectedItem = original[1];
+            original[1].Update(jobs[1] with { SavedCoveragePercent = 90m });
+            await SettleLocalLayout(dialog);
+            Assert.Equal(new[] { original[0], original[1], original[2] }, grid.Items.Cast<DownloadJobViewModel>().Take(3));
+            Assert.Same(original[1], grid.SelectedItem);
+            original[0].Update(jobs[0] with { Status = CollectionJobStatus.Failed });
+            await SettleLocalLayout(dialog);
+            Assert.Equal(new[] { original[1], original[2], original[0] }, grid.Items.Cast<DownloadJobViewModel>().Take(3));
+            AssertLocalSortDescriptions(grid,
+                (nameof(DownloadJobViewModel.SessionDate), ListSortDirection.Ascending),
+                (nameof(DownloadJobViewModel.StateCoveragePercent), ListSortDirection.Descending));
+            AssertLocalSortIndicator(grid, "Date", ListSortDirection.Ascending, "↑ 1");
+            AssertLocalSortIndicator(grid, "State", ListSortDirection.Descending, "↓ 2");
+            Assert.Equal(original, vm.Jobs);
+            Assert.Empty(vm.Collector.State.Jobs);
+            CaptureLocalLayout(dialog, "download-sort-date-then-state.png");
+        }
+        finally { dialog.Close(); }
     });
 
     private static DownloadJobViewModel[] AddDownloadSortingRows(DataRetentionViewModel vm)
@@ -127,21 +266,6 @@ public sealed partial class SessionWorkflowTests
 
     private static DataGridColumnHeader DownloadSortingHeader(DataGrid grid, string name) =>
         Assert.Single(FindRetentionVisuals<DataGridColumnHeader>(grid), header => Equals(header.Column?.Header, name));
-
-    private static TextBlock DownloadSortingIndicator(DataGridColumnHeader header) =>
-        Assert.IsType<TextBlock>(header.Template.FindName("DownloadSortIndicator", header));
-
-    private static void AssertDownloadSortIndicator(DataGrid grid, string headerName, ListSortDirection direction, string text)
-    {
-        DataGridColumnHeader header = DownloadSortingHeader(grid, headerName);
-        Assert.Equal(direction, header.Column.SortDirection);
-        TextBlock indicator = DownloadSortingIndicator(header);
-        Assert.True(indicator.IsVisible);
-        Assert.Contains(text, indicator.Text);
-        Assert.True(indicator.ActualWidth > 0);
-        Point origin = indicator.TransformToAncestor(header).Transform(new Point());
-        Assert.True(origin.X >= 0 && origin.X + indicator.ActualWidth <= header.ActualWidth + 1);
-    }
 
     private static async Task InvokeDownloadSortHeader(DataGrid grid, string name)
     {

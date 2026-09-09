@@ -92,7 +92,7 @@ public sealed partial class SessionWorkflowTests
     }
 
     [Fact]
-    public Task DownloadCoverage_GridDisplaysLivePercentAndKeepsStateAndDetailsUnsortable() => host.RunAsync(async () =>
+    public Task DownloadCoverage_GridDisplaysLivePercentAndSortsStateNumerically() => host.RunAsync(async () =>
     {
         var job = new CollectionJob
         {
@@ -120,7 +120,8 @@ public sealed partial class SessionWorkflowTests
             Assert.Equal("53.39%", stateCell.Text);
             Assert.Equal(row.StateToolTip, stateCell.ToolTip);
             Assert.StartsWith("Saved with gaps.", detailsCell.Text);
-            Assert.False(state.CanUserSort);
+            Assert.True(state.CanUserSort);
+            Assert.Equal(nameof(DownloadJobViewModel.StateCoveragePercent), state.SortMemberPath);
             Assert.False(details.CanUserSort);
 
             row.Update(job with { SavedCoveragePercent = 70.25m });

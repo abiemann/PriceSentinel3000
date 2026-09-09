@@ -37,6 +37,7 @@ public partial class DataRetentionDialog
     internal async Task ShowLibraryCoverageAsync(LibraryDaySummary day)
     {
         if (DataContext is not DataRetentionViewModel viewModel) return;
+        CloseDownloadInfo(restoreFocus: false);
         CloseLibraryCoverage(restoreFocus: false);
         _coveragePreviousFocus = Keyboard.FocusedElement;
         _coverageViewModel = viewModel;
@@ -147,6 +148,7 @@ public partial class DataRetentionDialog
 
     protected override void OnClosed(EventArgs e)
     {
+        CloseDownloadInfo(restoreFocus: false);
         CloseLibraryCoverage(restoreFocus: false);
         base.OnClosed(e);
     }

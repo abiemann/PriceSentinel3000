@@ -29,11 +29,12 @@ public sealed partial class JsonMarketDataLibrary
 
     // Scans retain only validated descriptions. Selected query/merge inputs still
     // load their actual candles and validate the complete document and content hash.
-    private HistoricalDatasetInfo ScanDescription(string relative)
+    private HistoricalDatasetInfo ScanDescription(string relative, out long fileBytes)
     {
         string path = Resolve(relative);
         EnsureNoReparsePoint(path);
         FileStamp stamp = ReadStamp(path);
+        fileBytes = stamp.Length;
         if (_metadata.TryGetValue(path, out CachedMetadata? cached) && cached.Stamp == stamp)
             return cached.Info with { RelativePath = relative };
         InvalidateMetadata(path);

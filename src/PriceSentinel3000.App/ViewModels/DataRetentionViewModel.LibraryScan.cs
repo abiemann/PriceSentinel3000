@@ -7,6 +7,7 @@ public sealed partial class DataRetentionViewModel
     private bool _isLibraryScanning;
     private int _libraryScanPercent;
     private int _libraryScanGeneration;
+    private string _librarySizeText = "";
 
     public bool IsLibraryScanning
     {
@@ -34,6 +35,17 @@ public sealed partial class DataRetentionViewModel
 
     public string LibraryScanButtonText => IsLibraryScanning
         ? $"Processing\n{LibraryScanPercent}% Complete" : "RESCAN LIBRARY";
+
+    public string LibrarySizeText
+    {
+        get => _librarySizeText;
+        private set
+        {
+            if (_librarySizeText == value) return;
+            _librarySizeText = value;
+            Changed();
+        }
+    }
 
     public async Task ScanLibraryAsync()
     {
@@ -67,6 +79,7 @@ public sealed partial class DataRetentionViewModel
             LibraryDiagnostics = string.Join("\n\n", scan.Diagnostics.Select(d => $"{d.RelativePath} [{d.Code}]\n{d.Message}"));
             Status = $"Found {days.Count} daily entries from {scan.Datasets.Count} saved files. {scan.Diagnostics.Count} scan notices." +
                 (HasLibraryDiagnostics ? " Open Library details." : "");
+            LibrarySizeText = $"{scan.TotalFileBytes / 1_000_000m:#,0.##} MB";
             LibraryScanPercent = 100;
         }
         finally { IsLibraryScanning = false; }

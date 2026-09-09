@@ -31,6 +31,7 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
     {
         var datasets = new List<HistoricalDatasetInfo>();
         var hashes = new HashSet<string>(StringComparer.Ordinal);
+        long totalFileBytes = 0;
         var diagnostics = new List<MarketDataLibraryDiagnostic>();
         if (!Directory.Exists(RootPath)) return new(datasets, diagnostics);
         EnsureNoReparsePoint(RootPath);
@@ -61,7 +62,8 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
                     try
                     {
                         seen.Add(path);
-                        HistoricalDatasetInfo info = ScanDescription(relative);
+                        HistoricalDatasetInfo info = ScanDescription(relative, out long fileBytes);
+                        totalFileBytes += fileBytes;
                         if (hashes.Add(info.DatasetHash) || includeDuplicates)
                             datasets.Add(info);
                     }
@@ -82,7 +84,10 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
             diagnostics.Add(new(group.First().RelativePath, "conflicting_revisions",
                 $"{group.Count()} revisions exist for {group.First().Symbol} on {group.First().TradingDate:yyyy-MM-dd}; select hashes or a revision policy."));
         return new(datasets.OrderBy(item => item.TradingDate).ThenBy(item => item.Symbol, StringComparer.Ordinal)
-            .ThenBy(item => item.SourceIntervalSeconds).ThenBy(item => item.DatasetHash, StringComparer.Ordinal).ToArray(), diagnostics);
+            .ThenBy(item => item.SourceIntervalSeconds).ThenBy(item => item.DatasetHash, StringComparer.Ordinal).ToArray(), diagnostics)
+        {
+            TotalFileBytes = totalFileBytes,
+        };
     }
 
     public IReadOnlyList<HistoricalDatasetInfo> Save(HistoricalDownload download)

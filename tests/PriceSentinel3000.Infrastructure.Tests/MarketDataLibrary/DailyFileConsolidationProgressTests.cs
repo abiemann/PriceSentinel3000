@@ -15,6 +15,8 @@ public sealed partial class DailyFileConsolidationTests
         MarketDataLibraryScan result = Library.ConsolidateDailyFiles(progress);
 
         Assert.Empty(result.Datasets);
+        Assert.Equal(0, result.TotalFileBytes);
+        Assert.Equal(0, Library.Scan().TotalFileBytes);
         Assert.Empty(result.Diagnostics);
         AssertCompletedProgress(progress);
         Assert.Equal(exists, Directory.Exists(Root));
@@ -50,6 +52,7 @@ public sealed partial class DailyFileConsolidationTests
         Assert.Equal(3, filesAfterFirstMerge);
         Assert.Equal(2, filesAtCompletion);
         Assert.Equal(2, result.Datasets.Count);
+        Assert.Equal(result.Datasets.Sum(item => new FileInfo(Path.Combine(Root, item.RelativePath)).Length), result.TotalFileBytes);
         Assert.Empty(result.Diagnostics);
         Assert.All(result.Datasets, item => Assert.Equal(2, item.Coverage.ActualCandleCount));
 
@@ -58,6 +61,7 @@ public sealed partial class DailyFileConsolidationTests
         AssertCompletedProgress(unchangedProgress);
         Assert.Contains(unchangedProgress.Values, percent => percent is > 25 and < 90);
         Assert.Equal(result.Datasets.Select(item => item.DatasetHash), unchanged.Datasets.Select(item => item.DatasetHash));
+        Assert.Equal(result.TotalFileBytes, unchanged.TotalFileBytes);
     }
 
     [Fact]
@@ -74,6 +78,7 @@ public sealed partial class DailyFileConsolidationTests
 
         AssertCompletedProgress(progress);
         Assert.Equal(2, result.Datasets.Count);
+        Assert.Equal(result.Datasets.Sum(item => new FileInfo(Path.Combine(Root, item.RelativePath)).Length), result.TotalFileBytes);
         Assert.Contains(result.Diagnostics, item => item.Code == "daily_merge_blocked");
         Assert.Contains(result.Diagnostics, item => item.Code == "invalid_dataset");
         Assert.Contains(result.Diagnostics, item => item.Code == "interrupted_write");

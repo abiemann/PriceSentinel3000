@@ -1,7 +1,11 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using PriceSentinel3000.App.Dialogs;
 using PriceSentinel3000.App.ViewModels;
@@ -62,7 +66,7 @@ public sealed partial class SessionWorkflowTests
         Assert.True(ReferenceEquals(first, fixture.Provider.DownloadStarted.Task), vm.Status);
         vm.AutomaticDownloadsEnabled = !vm.SavedAutomaticDownloadsEnabled;
         DataRetentionDialog? dialog = null;
-        ToolTip? information = null;
+        Popup? information = null;
         try
         {
             dialog = new DataRetentionDialog { DataContext = vm, Width = width, Height = height, ShowActivated = false };
@@ -87,12 +91,20 @@ public sealed partial class SessionWorkflowTests
             Assert.Equal(13d, ((TextBlock)dialog.FindName("DownloadActivityHeading")).FontSize);
             AssertInsideWindow(dialog, info);
             Assert.True(info.IsEnabled);
-            information = Assert.IsType<ToolTip>(info.ToolTip);
+            information = (Popup)dialog.FindName("DownloadInfoPopup");
+            var informationPanel = (Border)dialog.FindName("DownloadInfoPanel");
+            var informationScroll = (ScrollViewer)dialog.FindName("DownloadInfoScrollViewer");
+            var informationClose = (Button)dialog.FindName("DownloadInfoCloseButton");
+            Assert.Null(info.ToolTip);
+            Assert.Same(info, information.PlacementTarget);
+            Assert.Same(card.Parent, information.Parent);
+            Assert.False(information.StaysOpen);
             Assert.False(information.IsOpen);
-            information.PlacementTarget = info;
-            information.IsOpen = true;
+            Point infoOrigin = info.TranslatePoint(new Point(), dialog);
+            info.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
-            var informationText = FindRetentionVisuals<TextBlock>(information).ToArray();
+            Assert.True(information.IsOpen);
+            var informationText = FindRetentionVisuals<TextBlock>(informationPanel).ToArray();
             Assert.Contains(informationText, text => text.Text == vm.DownloadDetail);
             Assert.Contains(informationText, text => text.Name == "DownloadActivityTiming" && !string.IsNullOrWhiteSpace(text.Text));
             Assert.Contains(informationText, text => text.Name == "DownloadInteractionGuidance" && !string.IsNullOrWhiteSpace(text.Text));
@@ -101,7 +113,9 @@ public sealed partial class SessionWorkflowTests
             Assert.Contains(informationText, text => text.Name == "DownloadAvailableGuidance" && !string.IsNullOrWhiteSpace(text.Text));
             Assert.DoesNotContain(FindRetentionVisuals<TextBlock>(card), text =>
                 text.Name is "DownloadActivityDetail" or "DownloadActivityTiming" or "DownloadInteractionGuidance");
-            information.IsOpen = false;
+            await AssertDownloadInformationInteractionAsync(dialog, info, information, informationPanel,
+                informationScroll, informationClose, informationText);
+            Assert.Equal(infoOrigin, info.TranslatePoint(new Point(), dialog));
             Assert.Equal(Visibility.Visible, ((TextBlock)dialog.FindName("UnsavedScheduleWarning")).Visibility);
             Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting((TextBlock)dialog.FindName("DownloadActivityHeading")));
             Assert.DoesNotContain(FindRetentionVisuals<TextBox>(dialog), field =>
@@ -138,6 +152,11 @@ public sealed partial class SessionWorkflowTests
             Assert.True(pause.IsVisible);
             Assert.True(tabs.IsEnabled);
             Assert.All(FindRetentionVisuals<TextBox>(dialog), field => Assert.True(field.IsEnabled));
+            info.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+            Assert.True(information.IsOpen);
+            dialog.Close();
+            Assert.False(information.IsOpen);
         }
         finally
         {
@@ -147,6 +166,87 @@ public sealed partial class SessionWorkflowTests
             dialog?.Close();
         }
     });
+
+    private static async Task AssertDownloadInformationInteractionAsync(DataRetentionDialog dialog, Button info,
+        Popup information, Border panel, ScrollViewer scroll, Button close, TextBlock[] informationText)
+    {
+        CaptureDownloadInformation(panel, $"download-information-{dialog.Width}x{dialog.Height}-full.png");
+        // Constrain this compact fixture so wheel and thumb interaction exercise real overflow.
+        double originalMaxHeight = scroll.MaxHeight;
+        scroll.MaxHeight = 240;
+        close.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+        Assert.False(information.IsOpen);
+        Assert.True(dialog.IsVisible);
+
+        info.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseEnterEvent });
+        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+        Assert.True(information.IsOpen);
+        info.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseLeaveEvent });
+        panel.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, 0) { RoutedEvent = Mouse.MouseEnterEvent });
+        Assert.True(information.IsOpen);
+
+        scroll.ScrollToTop();
+        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+        Assert.True(scroll.ScrollableHeight > 0, $"Information content height {scroll.ExtentHeight:0}px did not exceed viewport {scroll.ViewportHeight:0}px.");
+        CaptureDownloadInformation(panel, $"download-information-{dialog.Width}x{dialog.Height}-top.png");
+        scroll.RaiseEvent(new MouseWheelEventArgs(Mouse.PrimaryDevice, 0, -120)
+        {
+            RoutedEvent = Mouse.MouseWheelEvent,
+        });
+        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+        Assert.True(scroll.VerticalOffset > 0);
+        Assert.True(information.IsOpen);
+
+        scroll.ScrollToTop();
+        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+        ScrollBar scrollbar = Assert.Single(FindRetentionVisuals<ScrollBar>(scroll),
+            bar => bar.Orientation == Orientation.Vertical && bar.IsVisible);
+        Thumb thumb = Assert.Single(FindRetentionVisuals<Thumb>(scrollbar));
+        thumb.RaiseEvent(new DragStartedEventArgs(0, 0) { RoutedEvent = Thumb.DragStartedEvent });
+        thumb.RaiseEvent(new DragDeltaEventArgs(0, 30) { RoutedEvent = Thumb.DragDeltaEvent });
+        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+        Assert.True(scroll.VerticalOffset > 0);
+        Assert.True(information.IsOpen);
+        thumb.RaiseEvent(new DragCompletedEventArgs(0, 30, false) { RoutedEvent = Thumb.DragCompletedEvent });
+        Assert.True(information.IsOpen);
+
+        Point closeOrigin = close.TranslatePoint(new Point(), panel);
+        scroll.ScrollToEnd();
+        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+        Assert.Equal(scroll.ScrollableHeight, scroll.VerticalOffset, 1);
+        TextBlock lastInformation = informationText.Last(text => !string.IsNullOrWhiteSpace(text.Text));
+        ScrollContentPresenter viewport = Assert.Single(FindRetentionVisuals<ScrollContentPresenter>(scroll));
+        Point lastOrigin = lastInformation.TranslatePoint(new Point(), viewport);
+        Assert.True(lastOrigin.Y >= -1);
+        Assert.True(lastOrigin.Y + lastInformation.ActualHeight <= viewport.ActualHeight + 1);
+        Assert.True(close.IsVisible);
+        Assert.Equal(closeOrigin, close.TranslatePoint(new Point(), panel));
+        CaptureDownloadInformation(panel, $"download-information-{dialog.Width}x{dialog.Height}-bottom.png");
+
+        close.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(close)!, 0, Key.Escape)
+        {
+            RoutedEvent = Keyboard.PreviewKeyDownEvent,
+        });
+        Assert.False(information.IsOpen);
+        Assert.True(dialog.IsVisible);
+
+        scroll.MaxHeight = originalMaxHeight;
+    }
+
+    private static void CaptureDownloadInformation(FrameworkElement panel, string name)
+    {
+        string? captureDirectory = Environment.GetEnvironmentVariable("PRICESENTINEL_LAYOUT_CAPTURE_DIR");
+        if (string.IsNullOrWhiteSpace(captureDirectory)) return;
+        Directory.CreateDirectory(captureDirectory);
+        var bitmap = new RenderTargetBitmap((int)Math.Ceiling(panel.ActualWidth), (int)Math.Ceiling(panel.ActualHeight),
+            96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(panel);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using FileStream output = File.Create(Path.Combine(captureDirectory, name));
+        encoder.Save(output);
+    }
 
     private static void AssertInsideWindow(Window window, FrameworkElement element)
     {

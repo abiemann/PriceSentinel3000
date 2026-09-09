@@ -75,6 +75,7 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
                 (row.Status != CollectionJobStatus.Unavailable || !row.IsAvailabilityProbe) &&
                 (!row.AvailabilityCheckPending || row.Status is CollectionJobStatus.Partial or CollectionJobStatus.Failed),
             IsLiveFiltering = true,
+            IsLiveSorting = true,
             LiveFilteringProperties = { nameof(DownloadJobViewModel.Status), nameof(DownloadJobViewModel.IsAvailabilityProbe), nameof(DownloadJobViewModel.AvailabilityCheckPending) },
             SortDescriptions =
             {

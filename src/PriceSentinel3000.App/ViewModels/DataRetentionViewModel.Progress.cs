@@ -42,9 +42,9 @@ public sealed class DownloadJobViewModel(CollectionJob job) : INotifyPropertyCha
     public string CheckedProgressText => $"{CheckedProgressPercent:0.#}% of requested trading time checked.";
     public DateTimeOffset? RetryAfterUtc => _job.RetryAfterUtc;
     public decimal? SavedCoveragePercent => _job.SavedCoveragePercent;
-    public string StateText => Status is CollectionJobStatus.Failed or CollectionJobStatus.Unavailable ? "0%"
-        : SavedCoveragePercent is { } saved ? $"{Math.Clamp(saved, 0m, 100m):0.##}%"
-        : "--";
+    public decimal? StateCoveragePercent => Status is CollectionJobStatus.Failed or CollectionJobStatus.Unavailable ? 0m
+        : SavedCoveragePercent is { } saved ? Math.Clamp(saved, 0m, 100m) : null;
+    public string StateText => StateCoveragePercent is { } percent ? $"{percent:0.##}%" : "--";
     public string StateToolTip => Status == CollectionJobStatus.Failed
         ? "0% identifies this failed download attempt. Previously saved candles are kept; see Details for the error."
         : _job.RequestedFromUtc is not null && RequestedThroughUtc is not null

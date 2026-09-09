@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Windows.Controls;
 using System.Windows;
 using System.Windows.Input;
@@ -16,15 +15,7 @@ public partial class DataRetentionDialog : Window
     {
         InitializeComponent();
         Deactivated += CoverageWindow_Deactivated;
-    }
-
-    private void DownloadJobsGrid_Loaded(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is not DataRetentionViewModel viewModel) return;
-        SortDescription? primary = viewModel.VisibleJobs.SortDescriptions.Count > 0
-            ? viewModel.VisibleJobs.SortDescriptions[0] : null;
-        foreach (DataGridColumn column in DownloadJobsGrid.Columns)
-            column.SortDirection = column.SortMemberPath == primary?.PropertyName ? primary?.Direction : null;
+        Deactivated += (_, _) => CloseDownloadInfo(restoreFocus: false);
     }
 
     private void BrowseLibraryFolder_Click(object sender, RoutedEventArgs e)
@@ -73,6 +64,36 @@ public partial class DataRetentionDialog : Window
         });
     }
 
+    private void DownloadInfo_MouseEnter(object sender, MouseEventArgs e) => OpenDownloadInfo();
+
+    private void DownloadInfo_Click(object sender, RoutedEventArgs e)
+    {
+        OpenDownloadInfo();
+        DownloadInfoCloseButton.Focus();
+    }
+
+    private void OpenDownloadInfo()
+    {
+        if (!IsVisible || LibraryCoverageOverlay.IsVisible) return;
+        DownloadInfoPopup.IsOpen = true;
+    }
+
+    private void DownloadInfoClose_Click(object sender, RoutedEventArgs e) => CloseDownloadInfo();
+
+    private void DownloadInfo_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape) return;
+        e.Handled = true;
+        CloseDownloadInfo();
+    }
+
+    private void CloseDownloadInfo(bool restoreFocus = true)
+    {
+        if (!DownloadInfoPopup.IsOpen) return;
+        DownloadInfoPopup.IsOpen = false;
+        if (restoreFocus) DownloadInfoButton.Focus();
+    }
+
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
 
     protected override void OnPreviewKeyDown(KeyEventArgs e)
@@ -81,7 +102,8 @@ public partial class DataRetentionDialog : Window
         if (e.Key is Key.Escape)
         {
             e.Handled = true;
-            if (LibraryCoverageOverlay.Visibility == Visibility.Visible) CloseLibraryCoverage();
+            if (DownloadInfoPopup.IsOpen) CloseDownloadInfo();
+            else if (LibraryCoverageOverlay.Visibility == Visibility.Visible) CloseLibraryCoverage();
             else Close();
         }
     }

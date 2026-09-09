@@ -70,7 +70,11 @@ public sealed record MarketDataLibraryDiagnostic(string RelativePath, string Cod
 
 public sealed record MarketDataLibraryScan(
     IReadOnlyList<HistoricalDatasetInfo> Datasets,
-    IReadOnlyList<MarketDataLibraryDiagnostic> Diagnostics);
+    IReadOnlyList<MarketDataLibraryDiagnostic> Diagnostics)
+{
+    /// <summary>Bytes in validated active candle files, including duplicate copies.</summary>
+    public long TotalFileBytes { get; init; }
+}
 
 public enum HistoricalRevisionPolicy { RejectConflicts, LatestFetched, CompatibleCoverage }
 

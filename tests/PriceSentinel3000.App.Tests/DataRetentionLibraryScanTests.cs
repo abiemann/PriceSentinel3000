@@ -1,4 +1,6 @@
 using System.IO;
+using System.Windows;
+using System.Windows.Controls;
 using PriceSentinel3000.App.ViewModels;
 using PriceSentinel3000.Application.MarketDataLibrary;
 
@@ -84,6 +86,54 @@ public sealed partial class SessionWorkflowTests
         Assert.Same(original, Assert.Single(vm.Datasets));
         Assert.Equal("NFLX", Assert.Single(vm.LibraryDays).Symbol);
         Assert.Equal(0, fixture.Provider.Calls);
+    });
+
+    [Theory]
+    [InlineData(1080, 790)]
+    [InlineData(860, 620)]
+    public Task LibraryScan_FileSizeRefreshesAndAlignsWithTable(int width, int height) => host.RunAsync(async () =>
+    {
+        await using var fixture = new RetentionFixture();
+        var library = new ScanLibrary(fixture.LibraryRoot)
+        {
+            Result = new([ScanDataset("NFLX")], []) { TotalFileBytes = 1_234_567_890 },
+        };
+        await using DataRetentionViewModel vm = CreateScanViewModel(fixture, library);
+        var dialog = CreateLocalLayoutDialog(vm, width, height);
+        try
+        {
+            dialog.Show();
+            ((TabItem)dialog.FindName("LocalLibraryTab")).IsSelected = true;
+            await SettleLocalLayout(dialog);
+            var size = (TextBlock)dialog.FindName("LibrarySizeText");
+            var grid = (DataGrid)dialog.FindName("LocalLibraryGrid");
+            Point tablePosition = grid.TranslatePoint(new Point(), dialog);
+            Assert.Equal("", size.Text);
+
+            await vm.ScanLibraryCommand.ExecuteAsync();
+            await SettleLocalLayout(dialog);
+
+            Assert.Equal($"{1234.57m:#,0.##} MB", size.Text);
+            Assert.Equal(tablePosition, grid.TranslatePoint(new Point(), dialog));
+            double sizeRight = size.TranslatePoint(new Point(size.ActualWidth, 0), dialog).X;
+            double tableRight = grid.TranslatePoint(new Point(grid.ActualWidth, 0), dialog).X;
+            Assert.InRange(Math.Abs(sizeRight - tableRight), 0, 1);
+            Assert.True(size.TranslatePoint(new Point(0, size.ActualHeight), dialog).Y < tablePosition.Y);
+            AssertInsideWindow(dialog, size);
+            CaptureLocalLayout(dialog, $"library-size-{width}x{height}.png");
+
+            library.Failure = new IOException("Library scan failed.");
+            await vm.ScanLibraryCommand.ExecuteAsync();
+            Assert.Equal($"{1234.57m:#,0.##} MB", vm.LibrarySizeText);
+            library.Failure = null;
+            library.Result = new([], []) { TotalFileBytes = 0 };
+            await vm.ScanLibraryCommand.ExecuteAsync();
+            await SettleLocalLayout(dialog);
+            Assert.Equal("0 MB", size.Text);
+            Assert.Equal(tablePosition, grid.TranslatePoint(new Point(), dialog));
+            Assert.Equal(0, fixture.Provider.Calls);
+        }
+        finally { dialog.Close(); }
     });
 
     private static DataRetentionViewModel CreateScanViewModel(RetentionFixture fixture, IMarketDataLibrary library) =>
