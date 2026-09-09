@@ -262,6 +262,7 @@ internal sealed class ScriptParser
             "round" => (["number", "numberofdigits"], [null, Num(2)]),
             "truerange" => (["high", "close", "low"], [new NameExpr("high", token.Line), Close(), new NameExpr("low", token.Line)]),
             "crosses" => (["data1", "data2", "direction"], [null, null, new NameExpr("CrossingDirection.ANY", token.Line)]),
+            "countsince" => (["condition", "reset"], [null, null]),
             "open" or "high" or "low" or "close" or "hl2" or "hlc3" or "ohlc4" => ([], []),
             _ => throw Error(token, $"Unsupported function '{token.Text}'. Secondary symbols/timeframes, volume studies and external APIs are unavailable."),
         };
@@ -269,6 +270,8 @@ internal sealed class ScriptParser
         if (args.Length == 0) return Node(new NameExpr(name, token.Line));
         if (name is "expaverage" or "wildersaverage" or "rsi" or "movingaverage")
             Warn(token.Line, "Smoothing uses deterministic supplied-history seeds and explicit warmup; thinkorswim prefetch outside the supplied history is unavailable.");
+        if (name == "countsince")
+            Warn(token.Line, "CountSince is a PriceSentinel extension, not a native thinkScript function. Counts reset on missing observations and are retained within the running session.");
         return Node(new CallExpr(name, args, token.Line));
     }
 

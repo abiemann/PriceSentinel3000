@@ -89,6 +89,11 @@ Positional arguments must precede named arguments. Unknown, duplicate, missing r
 | `Round` | `number`, `numberOfDigits = 2`; digits from 0 through 12; midpoint rounds away from zero |
 | `TrueRange` | `high = high`, `close = close`, `low = low`; uses the previous close |
 | `Crosses` | `data1`, `data2`, `direction = CrossingDirection.ANY` |
+| `CountSince` (PriceSentinel extension) | `condition`, `reset`; counts true conditions since the last reset |
+
+`CountSince(condition, reset)` is a PriceSentinel extension, not a native thinkScript function. It starts at zero, adds one for each true condition, and resets to zero when `reset` is true; reset takes priority. Use a crossing condition to count separate dips, rather than every candle below a threshold. Missing input clears the count and returns an unavailable value unless reset is true. Data gaps also reset it.
+
+The host retains counter values across successive evaluations and rolling history windows within one session. A new session or interrupted candle history starts a fresh count. Direct compiler evaluations without a `ScriptEvaluationState` count only within supplied history; a state object supports sequential evaluation and must belong to one session. Corrected history, rewinds, changed programs or numeric inputs invalidate the checkpoint. Counter arrays use the existing evaluator memory and operation limits; a failed evaluation does not advance the checkpoint. General recursive definitions remain unsupported.
 
 Simple averages and rolling extrema require a full finite window. EMA seeds from the first supplied finite value with alpha `2 / (length + 1)`. Wilder smoothing seeds with a full simple average and then uses alpha `1 / length`. Missing series data resets smoothing. RSI applies the chosen average to positive and negative price changes; a flat series returns 50, gains without losses 100, and losses without gains 0.
 

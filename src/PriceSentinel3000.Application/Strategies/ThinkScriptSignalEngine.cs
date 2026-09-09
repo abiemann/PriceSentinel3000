@@ -9,6 +9,8 @@ public sealed class ThinkScriptSignalEngine : IPriceActionSignalEngine
 {
     private readonly CompiledThinkScript _program;
     private long _evaluatedVersion = -1;
+    private readonly ScriptEvaluationState _evaluationState = new();
+    private long _continuityVersion;
 
     public ThinkScriptSignalEngine(CompiledThinkScript program, int intervalSeconds)
     {
@@ -34,9 +36,14 @@ public sealed class ThinkScriptSignalEngine : IPriceActionSignalEngine
         if (bars.Count > 0 && bars[^1].EndsAtUtc > at)
             return StrategyDecision.Hold(at, "WAITING FOR CANDLE", "The newest strategy candle is not yet available at this observation.");
         _evaluatedVersion = Bars.Version;
+        if (_continuityVersion != Bars.ContinuityVersion)
+        {
+            _evaluationState.Reset();
+            _continuityVersion = Bars.ContinuityVersion;
+        }
         try
         {
-            ScriptProposal proposal = _program.Evaluate(bars, position);
+            ScriptProposal proposal = _program.Evaluate(bars, position, state: _evaluationState);
             LastEvaluation = new(at, Bars.Version, Bars.CompletedBarCount, bars.Count,
                 RequiredWarmupBars, bars.Count == 0 ? null : bars[^1], proposal);
             if (proposal.State == "SCRIPT ERROR")

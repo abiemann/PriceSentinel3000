@@ -6,13 +6,15 @@ namespace PriceSentinel3000.Core.Scripting;
 internal sealed class ScriptEvaluator(
     ScriptProgram program,
     IReadOnlyList<StrategyBar> bars,
-    IReadOnlyDictionary<string, decimal> inputs)
+    IReadOnlyDictionary<string, decimal> inputs,
+    ScriptEvaluationState? state = null)
 {
     private const int MaximumOperations = 4_000_000;
     private const int MaximumValues = 2_000_000;
     private readonly Dictionary<Expr, double[]> _cache = new(ReferenceEqualityComparer.Instance);
     private int _operations;
     private int _values;
+    private ScriptEvaluationState.Frame? _stateFrame;
 
     internal ScriptProposal Evaluate(StrategyPositionContext position)
     {
@@ -25,7 +27,9 @@ internal sealed class ScriptEvaluator(
         {
             proposal = CompiledThinkScript.Hold("SCRIPT ERROR", $"Line {exception.Line}: {exception.Message}");
         }
-        return CaptureIndicators(proposal);
+        proposal = CaptureIndicators(proposal);
+        if (proposal.State is not ("SCRIPT ERROR" or "WARMING UP")) _stateFrame?.Commit();
+        return proposal;
     }
 
     private ScriptProposal EvaluateStrategy(StrategyPositionContext position)
@@ -33,6 +37,7 @@ internal sealed class ScriptEvaluator(
         if (bars.Count > ThinkScriptCompiler.MaximumBars)
             throw new ScriptException(1, $"Evaluation exceeds the {ThinkScriptCompiler.MaximumBars}-bar history limit.");
         ValidateBars();
+        _stateFrame = state?.Begin(program, inputs, bars);
         int warmup = program.Warmup(inputs);
         if (bars.Count < warmup)
             return CompiledThinkScript.Hold("WARMING UP", $"Script requires {warmup} completed bars; received {bars.Count}.");
@@ -176,6 +181,7 @@ internal sealed class ScriptEvaluator(
             case "movingaverage":
                 return Smooth(Values(call.Args[1]), Period(2), program.Integer(call.Args[0], inputs, 0, 2, "Average type"), call.Line);
             case "rsi": return Rsi(call, Period(0));
+            case "countsince": return CountSince(call);
         }
         double[][] args = call.Args.Select(Values).ToArray();
         double[] result = Allocate(call.Line);
@@ -264,6 +270,33 @@ internal sealed class ScriptEvaluator(
             result[i] = !double.IsFinite(gain) || !double.IsFinite(loss) ? double.NaN
                 : gain == 0 && loss == 0 ? 50 : loss == 0 ? 100 : 100 - 100 / (1 + gain / loss);
         }
+        return result;
+    }
+
+    private double[] CountSince(CallExpr call)
+    {
+        double[] condition = Values(call.Args[0]), reset = Values(call.Args[1]);
+        double[] result = Allocate(call.Line);
+        Spend(bars.Count, call.Line);
+        double count = _stateFrame?.Seed(call) ?? 0;
+        for (int i = 0; i < bars.Count; i++)
+        {
+            if (_stateFrame is not null && _stateFrame.TryPrevious(call, bars[i], out double prior))
+            {
+                result[i] = prior;
+                count = double.IsFinite(prior) ? prior : 0;
+                continue;
+            }
+            if (i > 0 && bars[i].StartsAtUtc != bars[i - 1].EndsAtUtc) count = 0;
+            if (IsTrue(reset[i])) result[i] = count = 0;
+            else if (!double.IsFinite(condition[i]) || !double.IsFinite(reset[i]))
+            {
+                count = 0;
+                result[i] = double.NaN;
+            }
+            else result[i] = count += IsTrue(condition[i]) ? 1 : 0;
+        }
+        _stateFrame?.Record(call, result);
         return result;
     }
 

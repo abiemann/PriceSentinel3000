@@ -53,7 +53,8 @@ public sealed class CompiledThinkScript
     public ScriptProposal Evaluate(
         IReadOnlyList<StrategyBar> bars,
         StrategyPositionContext position,
-        IReadOnlyDictionary<string, decimal>? inputs = null)
+        IReadOnlyDictionary<string, decimal>? inputs = null,
+        ScriptEvaluationState? state = null)
     {
         ArgumentNullException.ThrowIfNull(bars);
         ArgumentNullException.ThrowIfNull(position);
@@ -77,7 +78,7 @@ public sealed class CompiledThinkScript
                 }
             }
 
-            return new ScriptEvaluator(_program!, bars, parameters).Evaluate(position);
+            return new ScriptEvaluator(_program!, bars, parameters, state).Evaluate(position);
         }
         catch (ScriptException exception)
         {
