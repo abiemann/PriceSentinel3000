@@ -45,6 +45,7 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
     private bool _listEnabled = true;
     private string _tickerInput = "";
     private string _libraryRoot;
+    private string _libraryDiagnostics = "";
     private bool _automatic;
     private string _dailyTime;
     private string _timeZone;
@@ -146,6 +147,12 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
     public string ReplayPinnedHashes { get => _replayPins; set { _replayPins = value; Changed(); } }
     public bool IsBusy => _busy || Collector.IsBusy || _downloadCancellation is not null || _pollTask is { IsCompleted: false };
     public string Status { get => _status; private set { _status = value; Changed(); } }
+    public string LibraryDiagnostics
+    {
+        get => _libraryDiagnostics;
+        private set { _libraryDiagnostics = value; Changed(); Changed(nameof(HasLibraryDiagnostics)); }
+    }
+    public bool HasLibraryDiagnostics => LibraryDiagnostics.Length > 0;
     public string SavedSchedule => SavedAutomaticDownloadsEnabled
         ? $"Daily at {Collector.State.Settings.DailyDownloadTime:HH:mm} · {Collector.State.Settings.TimeZoneId}: today's completed candles and earlier missing history. Keep this app open and connected."
         : "Automatic downloads are off. Manual downloads remain available.";
@@ -316,11 +323,14 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
 
     public async Task ScanLibraryAsync()
     {
+        LibraryDiagnostics = "";
         IMarketDataLibrary library = CreateLibrary();
         MarketDataLibraryScan scan = await Task.Run(library.Scan, _lifetime.Token);
         Datasets.Clear();
         foreach (HistoricalDatasetInfo dataset in scan.Datasets.OrderByDescending(d => d.TradingDate).ThenBy(d => d.Symbol)) Datasets.Add(dataset);
-        Status = $"Found {scan.Datasets.Count} validated datasets. " + string.Join(" ", scan.Diagnostics.Take(8).Select(d => $"{d.RelativePath}: {d.Message}"));
+        LibraryDiagnostics = string.Join("\n\n", scan.Diagnostics.Select(d => $"{d.RelativePath} [{d.Code}]\n{d.Message}"));
+        Status = $"Found {scan.Datasets.Count} validated datasets. {scan.Diagnostics.Count} scan notices." +
+            (HasLibraryDiagnostics ? " Open Library details." : "");
     }
 
     public string ExportLists() => DownloadListTransfer.Export(Collector.State.Settings.Lists);

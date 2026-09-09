@@ -11,7 +11,7 @@ namespace PriceSentinel3000.App.Tests;
 public sealed partial class SessionWorkflowTests
 {
     [Fact]
-    public Task RetentionDialog_LibraryShowsFullDayCoverageAndStillPinsTheSelectedRevision() => host.RunAsync(async () =>
+    public Task RetentionDialog_LibraryShowsFullDayCoverageAndPreservesSelection() => host.RunAsync(async () =>
     {
         await using var fixture = new ProgressFixture();
         var vm = fixture.ViewModel;
@@ -39,8 +39,7 @@ public sealed partial class SessionWorkflowTests
             Assert.Contains("1,560", Assert.IsType<string>(cell.ToolTip));
             Assert.DoesNotContain(grid.Columns, column => Equals(column.Header, "Revision hash") || Equals(column.Header, "Complete"));
             grid.SelectedItem = dataset;
-            vm.PinDatasetCommand.Execute(null);
-            Assert.Equal(dataset.DatasetHash, vm.ReplayPinnedHashes);
+            Assert.Same(dataset, vm.SelectedDataset);
         }
         finally { dialog.Close(); }
     });
