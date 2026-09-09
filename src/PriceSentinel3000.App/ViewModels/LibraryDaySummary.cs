@@ -12,13 +12,19 @@ public sealed record LibraryDaySummary(
     decimal? CoveragePercent,
     string CoverageDetails)
 {
-    public static IReadOnlyList<LibraryDaySummary> Create(IEnumerable<HistoricalDatasetInfo> datasets) =>
-        datasets.GroupBy(dataset => (dataset.Symbol, dataset.TradingDate))
+    private static readonly TimeZoneInfo Eastern = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
+
+    public static IReadOnlyList<LibraryDaySummary> Create(
+        IEnumerable<HistoricalDatasetInfo> datasets, DateTimeOffset? now = null)
+    {
+        DateTimeOffset atUtc = now ?? DateTimeOffset.UtcNow;
+        return datasets.GroupBy(dataset => (dataset.Symbol, dataset.TradingDate))
             .OrderByDescending(group => group.Key.TradingDate)
             .ThenBy(group => group.Key.Symbol, StringComparer.Ordinal)
-            .Select(group => Summarize(group.ToArray())).ToArray();
+            .Select(group => Summarize(group.ToArray(), atUtc)).ToArray();
+    }
 
-    private static LibraryDaySummary Summarize(HistoricalDatasetInfo[] datasets)
+    private static LibraryDaySummary Summarize(HistoricalDatasetInfo[] datasets, DateTimeOffset now)
     {
         HistoricalDatasetInfo first = datasets[0];
         int[] intervals = datasets.Select(dataset => dataset.SourceIntervalSeconds).Distinct().ToArray();
@@ -40,7 +46,7 @@ public sealed record LibraryDaySummary(
         if (intervals[0] is not (15 or 30 or 60 or 120) || datasets.Any(dataset =>
                 dataset.SessionBounds is not ("regular" or "extended" or "24_5") ||
                 !CollectionSchedule.IsCollectionDate(dataset.TradingDate, dataset.SessionBounds)))
-            return Unavailable("Full-day coverage is unavailable for these sessions, dates, or source intervals.");
+            return Unavailable("Coverage is unavailable for these sessions, dates, or source intervals.");
 
         string bounds = datasets.Any(dataset => dataset.SessionBounds == "24_5") ? "24_5" :
             datasets.Any(dataset => dataset.SessionBounds == "extended") ? "extended" : "regular";
@@ -64,24 +70,38 @@ public sealed record LibraryDaySummary(
             }
         }
 
-        long savedTicks = 0;
+        // Only whole native candles whose end has passed participate in coverage.
+        // The stored-candle total stays unchanged as the clock advances.
+        long cutoffTicks = now.UtcTicks - now.UtcTicks % intervalTicks;
+        long savedTicks = 0, completedSavedTicks = 0;
         DateTimeOffset? previousEnd = null;
         foreach (CollectionSessionWindow range in saved.OrderBy(range => range.FromUtc))
         {
             DateTimeOffset from = previousEnd is { } end && end > range.FromUtc ? end : range.FromUtc;
             if (range.ThroughUtc <= from) continue;
             savedTicks += (range.ThroughUtc - from).Ticks;
+            completedSavedTicks += Math.Max(0, Math.Min(range.ThroughUtc.UtcTicks, cutoffTicks) - from.UtcTicks);
             previousEnd = range.ThroughUtc;
         }
-        long expectedTicks = sessions.Sum(session => (session.ThroughUtc - session.FromUtc).Ticks);
+        long expectedTicks = sessions.Sum(session =>
+            Math.Max(0, Math.Min(session.ThroughUtc.UtcTicks, cutoffTicks) - session.FromUtc.UtcTicks));
         long count = savedTicks / intervalTicks;
+        long completedSaved = completedSavedTicks / intervalTicks;
         long expected = expectedTicks / intervalTicks;
         string sessionLabel = bounds == "24_5" ? "all-hours" : bounds;
-        string details = $"{count.ToString("N0", CultureInfo.CurrentCulture)} of {expected.ToString("N0", CultureInfo.CurrentCulture)} " +
-            $"{intervalDisplay}-second candles saved for the full {sessionLabel} day. " + fileSummary +
-            "The full-day total includes trading hours that have not finished yet. " + replayDetails;
+        string period = cutoffTicks >= sessions[^1].ThroughUtc.UtcTicks ? $"the full {sessionLabel} day" :
+            expected == 0 ? $"the {sessionLabel} day" :
+            $"the {sessionLabel} day through " +
+                $"{TimeZoneInfo.ConvertTime(new DateTimeOffset(cutoffTicks, TimeSpan.Zero), Eastern):HH:mm:ss} Eastern";
+        string details = expected == 0
+            ? $"No completed {intervalDisplay}-second candles are expected for {period} yet. "
+            : $"{completedSaved.ToString("N0", CultureInfo.CurrentCulture)} of " +
+                $"{expected.ToString("N0", CultureInfo.CurrentCulture)} {intervalDisplay}-second candles saved for {period}. ";
+        details += $"Eastern calendar date {first.TradingDate:yyyy-MM-dd}. " +
+            "Only completed candles through the cutoff count; market closures and future candles are excluded. " +
+            $"{count.ToString("N0", CultureInfo.CurrentCulture)} stored candles. " + fileSummary + replayDetails;
         return new(first.Symbol, first.TradingDate, intervalDisplay, providerDisplay,
-            count, 100m * savedTicks / expectedTicks, details);
+            count, expectedTicks == 0 ? null : 100m * completedSavedTicks / expectedTicks, details);
     }
 
     private static IEnumerable<CollectionSessionWindow> CoveredRanges(HistoricalCoverage coverage)

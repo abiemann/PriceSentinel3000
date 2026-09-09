@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Automation.Peers;
-using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using PriceSentinel3000.App.ViewModels;
@@ -20,12 +19,20 @@ public sealed class LibraryCoverageTimelineControl : FrameworkElement
     private static readonly SolidColorBrush PartialBrush = FrozenBrush("#A8EDBD");
     private static readonly SolidColorBrush MissingBrush = FrozenBrush("#000000");
     private static readonly SolidColorBrush ClosedBrush = FrozenBrush("#334155");
-    private static readonly SolidColorBrush FutureBrush = FrozenBrush("#18232F");
+    private static readonly SolidColorBrush FutureBrush = FrozenBrush("#173B5C");
     private static readonly SolidColorBrush LabelBrush = FrozenBrush("#CBD5E1");
     private static readonly Pen AxisPen = FrozenPen("#40546C");
     private static readonly Pen SeparatorPen = FrozenPen("#34445A");
-    private static readonly Pen ClosedHatchPen = FrozenPen("#526071");
-    private int _hoveredBlock = -1;
+    private static readonly Pen ClosedHatchPen = FrozenPen("#8292A5");
+    private static readonly Pen SelectionPen = FrozenPen("#F8FAFC", 2);
+
+    private static readonly DependencyPropertyKey SelectedBlockPropertyKey = DependencyProperty.RegisterReadOnly(
+        nameof(SelectedBlock),
+        typeof(LibraryCoverageBlock),
+        typeof(LibraryCoverageTimelineControl),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty SelectedBlockProperty = SelectedBlockPropertyKey.DependencyProperty;
 
     public static readonly DependencyProperty TimelineProperty = DependencyProperty.Register(
         nameof(Timeline),
@@ -37,9 +44,7 @@ public sealed class LibraryCoverageTimelineControl : FrameworkElement
     {
         SnapsToDevicePixels = true;
         UseLayoutRounding = true;
-        ToolTipService.SetInitialShowDelay(this, 100);
-        ToolTipService.SetBetweenShowDelay(this, 0);
-        ToolTipService.SetShowDuration(this, 60000);
+        Focusable = true;
     }
 
     public LibraryCoverageTimeline? Timeline
@@ -47,6 +52,13 @@ public sealed class LibraryCoverageTimelineControl : FrameworkElement
         get => (LibraryCoverageTimeline?)GetValue(TimelineProperty);
         set => SetValue(TimelineProperty, value);
     }
+
+    public LibraryCoverageBlock? SelectedBlock => (LibraryCoverageBlock?)GetValue(SelectedBlockProperty);
+
+    public event EventHandler? BlockSelectionChanged;
+
+    internal void SelectBlockStartingAt(DateTimeOffset fromUtc) =>
+        SetValue(SelectedBlockPropertyKey, Timeline?.Blocks.FirstOrDefault(block => block.FromUtc == fromUtc));
 
     protected override Size MeasureOverride(Size availableSize) =>
         new(double.IsInfinity(availableSize.Width) ? 800 : availableSize.Width, PreferredHeight);
@@ -90,6 +102,7 @@ public sealed class LibraryCoverageTimelineControl : FrameworkElement
         }
 
         double totalSeconds = (timeline.ThroughUtc - timeline.FromUtc).TotalSeconds;
+        Rect? selectedRectangle = null;
         foreach (var block in timeline.Blocks)
         {
             double left = HorizontalPadding + Math.Clamp(
@@ -104,6 +117,10 @@ public sealed class LibraryCoverageTimelineControl : FrameworkElement
             }
 
             var rectangle = new Rect(left, BlocksTop, right - left, BlocksHeight);
+            if (ReferenceEquals(block, SelectedBlock))
+            {
+                selectedRectangle = rectangle;
+            }
             Brush fill = block.State switch
             {
                 LibraryCoverageBlockState.Complete => CompleteBrush,
@@ -133,34 +150,82 @@ public sealed class LibraryCoverageTimelineControl : FrameworkElement
         drawingContext.DrawRectangle(null, SeparatorPen,
             new Rect(Snap(HorizontalPadding, pixelsPerDip), BlocksTop + 0.5 / pixelsPerDip,
                 width, BlocksHeight));
+        if (selectedRectangle is { } selection)
+        {
+            selection.Inflate(-Math.Min(1, selection.Width / 4), -1);
+            drawingContext.DrawRectangle(null, SelectionPen, selection);
+        }
     }
 
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
-        int blockIndex = HitTestBlock(e.GetPosition(this));
-        if (blockIndex == _hoveredBlock)
-        {
-            return;
-        }
-
-        _hoveredBlock = blockIndex;
-        ToolTip = blockIndex < 0 ? null : new ToolTip
-        {
-            Content = new TextBlock
-            {
-                Text = Timeline!.Blocks[blockIndex].ToolTip,
-                TextWrapping = TextWrapping.Wrap,
-                MaxWidth = 360,
-            },
-        };
+        Cursor = HitTestBlock(e.GetPosition(this)) >= 0 ? Cursors.Hand : null;
     }
 
     protected override void OnMouseLeave(MouseEventArgs e)
     {
         base.OnMouseLeave(e);
-        _hoveredBlock = -1;
-        ToolTip = null;
+        Cursor = null;
+    }
+
+    protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
+    {
+        base.OnMouseLeftButtonDown(e);
+        if (SelectBlockAt(e.GetPosition(this)))
+        {
+            Focus();
+            e.Handled = true;
+        }
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (Timeline is not { Blocks.Count: > 0 } timeline ||
+            e.Key is not (Key.Left or Key.Right or Key.Home or Key.End))
+        {
+            return;
+        }
+
+        int current = -1;
+        for (int index = 0; index < timeline.Blocks.Count; index++)
+        {
+            if (ReferenceEquals(timeline.Blocks[index], SelectedBlock))
+            {
+                current = index;
+                break;
+            }
+        }
+
+        int next = e.Key switch
+        {
+            Key.Home => 0,
+            Key.End => timeline.Blocks.Count - 1,
+            Key.Left => Math.Max(0, current - 1),
+            _ => Math.Min(timeline.Blocks.Count - 1, current + 1),
+        };
+        SelectUserBlock(timeline.Blocks[next]);
+        e.Handled = true;
+    }
+
+    internal bool SelectBlockAt(Point point)
+    {
+        int index = HitTestBlock(point);
+        if (index < 0)
+        {
+            return false;
+        }
+
+        SelectUserBlock(Timeline!.Blocks[index]);
+        return true;
+    }
+
+    private void SelectUserBlock(LibraryCoverageBlock block)
+    {
+        if (SelectedBlock?.FromUtc == block.FromUtc) return;
+        SetValue(SelectedBlockPropertyKey, block);
+        BlockSelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
     protected override AutomationPeer OnCreateAutomationPeer() => new TimelineAutomationPeer(this);
@@ -169,7 +234,7 @@ public sealed class LibraryCoverageTimelineControl : FrameworkElement
     {
         if (Timeline is not { } timeline || point.Y < BlocksTop || point.Y > BlocksTop + BlocksHeight ||
             point.X < HorizontalPadding || point.X >= ActualWidth - HorizontalPadding ||
-            ActualWidth <= HorizontalPadding * 2)
+            ActualWidth <= HorizontalPadding * 2 || timeline.ThroughUtc <= timeline.FromUtc)
         {
             return -1;
         }
@@ -191,8 +256,8 @@ public sealed class LibraryCoverageTimelineControl : FrameworkElement
     private static void OnTimelineChanged(DependencyObject source, DependencyPropertyChangedEventArgs args)
     {
         var control = (LibraryCoverageTimelineControl)source;
-        control._hoveredBlock = -1;
-        control.ToolTip = null;
+        control.SetValue(SelectedBlockPropertyKey, null);
+        control.Cursor = null;
     }
 
     private static double Snap(double value, double pixelsPerDip) =>
@@ -205,9 +270,9 @@ public sealed class LibraryCoverageTimelineControl : FrameworkElement
         return brush;
     }
 
-    private static Pen FrozenPen(string color)
+    private static Pen FrozenPen(string color, double thickness = 1)
     {
-        var pen = new Pen(FrozenBrush(color), 1);
+        var pen = new Pen(FrozenBrush(color), thickness);
         pen.Freeze();
         return pen;
     }
@@ -221,7 +286,8 @@ public sealed class LibraryCoverageTimelineControl : FrameworkElement
             : "Daily data coverage";
         protected override string GetHelpTextCore() => owner.Timeline is { } timeline
             ? $"{timeline.RangeLabel}. {timeline.TimeZoneLabel}. {timeline.Summary}. {timeline.Notice} " +
-              "Green: complete. Black: missing. Light green: partial. Hatched gray: market closed. Dark gray: future."
+              "Green: complete. Black: missing. Light green: partial. Hatched gray: market closed. Solid blue: future. " +
+              "Click a block for details, or use the Left and Right arrow keys to select a block."
             : "Hourly time axis with 15-minute data coverage blocks.";
     }
 }

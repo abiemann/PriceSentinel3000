@@ -108,6 +108,14 @@ public interface IMarketDataLibrary
     string RootPath { get; }
     MarketDataLibraryScan Scan();
     MarketDataLibraryScan ConsolidateDailyFiles() => Scan();
+    MarketDataLibraryScan ConsolidateDailyFiles(IProgress<int> progress)
+    {
+        ArgumentNullException.ThrowIfNull(progress);
+        progress.Report(0);
+        MarketDataLibraryScan result = ConsolidateDailyFiles();
+        progress.Report(100);
+        return result;
+    }
     IReadOnlyList<HistoricalDatasetInfo> Save(HistoricalDownload download);
     HistoricalDataset Read(string datasetHash);
     HistoricalDataQueryResult Query(HistoricalDataQuery query);

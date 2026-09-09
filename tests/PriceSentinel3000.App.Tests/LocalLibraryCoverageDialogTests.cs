@@ -47,7 +47,96 @@ public sealed partial class SessionWorkflowTests
             Assert.Contains(model.Blocks, block => block.State == LibraryCoverageBlockState.Partial);
             Assert.Contains(model.Blocks, block => block.State == LibraryCoverageBlockState.Complete);
             Assert.Contains(model.Blocks, block => block.State == LibraryCoverageBlockState.Missing);
-            CaptureLocalLayout(dialog, $"coverage-{width}x{height}-full-day.png");
+            var blockDetails = (TextBlock)dialog.FindName("LibraryCoverageBlockDetails");
+            var blockPanel = (Border)dialog.FindName("LibraryCoverageBlockPanel");
+            var title = (TextBlock)dialog.FindName("LibraryCoverageTitle");
+            var legend = (FrameworkElement)dialog.FindName("LibraryCoverageLegend");
+            var closeHint = (TextBlock)dialog.FindName("LibraryCoverageCloseHint");
+            Assert.Equal("Click outside or press Esc to close.", closeHint.Text);
+            AssertInsideWindow(dialog, closeHint);
+            AssertInsideWindow(dialog, blockPanel);
+            Point closeHintPosition = closeHint.TranslatePoint(new Point(), dialog);
+            Assert.True(closeHintPosition.X + closeHint.ActualWidth <= close.TranslatePoint(new Point(), dialog).X);
+            Point panelPosition = blockPanel.TranslatePoint(new Point(), dialog);
+            Assert.Equal(title.TranslatePoint(new Point(), dialog).X, panelPosition.X, 2);
+            Assert.Equal(content.TranslatePoint(new Point(), dialog).X + content.ActualWidth,
+                panelPosition.X + blockPanel.ActualWidth, 2);
+            Assert.Equal(80, blockPanel.ActualHeight);
+            double legendBottom = legend.TranslatePoint(new Point(), dialog).Y + legend.ActualHeight;
+            Assert.InRange(panelPosition.Y - legendBottom, 0, 12);
+            Assert.Null(timeline.SelectedBlock);
+            Assert.Equal("Click a 15-minute block for details.", blockDetails.Text);
+            Size panelSize = blockPanel.RenderSize;
+            Size cardSize = card.RenderSize;
+            Point cardPosition = card.TranslatePoint(new Point(), dialog);
+            foreach (LibraryCoverageBlockState blockState in new[]
+                { LibraryCoverageBlockState.Complete, LibraryCoverageBlockState.Missing, LibraryCoverageBlockState.Partial })
+            {
+                LibraryCoverageBlock block = model.Blocks.First(item => item.State == blockState);
+                double position = ((block.FromUtc - model.FromUtc).TotalSeconds +
+                    (block.ThroughUtc - block.FromUtc).TotalSeconds / 2) / (model.ThroughUtc - model.FromUtc).TotalSeconds;
+                Assert.True(timeline.SelectBlockAt(new Point(28 + position * (timeline.ActualWidth - 56), 70)));
+                await SettleLocalLayout(dialog);
+                Assert.Same(block, timeline.SelectedBlock);
+                Assert.Equal(block.ToolTip, blockDetails.Text);
+                Assert.True(overlay.IsVisible);
+                AssertInsideWindow(dialog, blockDetails);
+                Assert.Equal(cardSize, card.RenderSize);
+                Assert.Equal(cardPosition, card.TranslatePoint(new Point(), dialog));
+                Assert.Equal(panelSize, blockPanel.RenderSize);
+                Assert.Equal(panelPosition, blockPanel.TranslatePoint(new Point(), dialog));
+                Assert.True(blockDetails.TranslatePoint(new Point(), card).Y > timeline.TranslatePoint(new Point(), card).Y);
+            }
+            var downloadStatus = (TextBlock)dialog.FindName("LibraryCoverageDownloadStatus");
+            var download = (Button)dialog.FindName("LibraryCoverageDownloadButton");
+            SelectCoverageDownloadBlock(timeline, model, model.Blocks.First(block => block.State == LibraryCoverageBlockState.Missing));
+            await SettleLocalLayout(dialog);
+            Assert.True(download.IsVisible);
+            Point timelinePosition = timeline.TranslatePoint(new Point(), dialog);
+            Size timelineSize = timeline.RenderSize;
+            blockDetails.SetCurrentValue(TextBlock.TextProperty,
+                "15:00–15:15: 0 of 15 completed 15-second candles saved (0%). 15 missing. " +
+                "This block is still in progress; future candles are excluded.");
+            string[] downloadStatuses =
+            [
+                string.Empty,
+                "Downloading connected missing blocks…",
+                "Available candles saved; some selected gaps remain.",
+                "Coverage could not be refreshed. The connection was interrupted while downloading the selected " +
+                    "missing blocks. Saved candles are preserved; reconnect and retry the remaining gaps.",
+            ];
+            foreach (string statusText in downloadStatuses)
+            {
+                downloadStatus.Text = statusText;
+                await SettleLocalLayout(dialog);
+                Assert.Equal(cardSize, card.RenderSize);
+                Assert.Equal(cardPosition, card.TranslatePoint(new Point(), dialog));
+                Assert.Equal(panelSize, blockPanel.RenderSize);
+                Assert.Equal(panelPosition, blockPanel.TranslatePoint(new Point(), dialog));
+                Assert.Equal(timelineSize, timeline.RenderSize);
+                Assert.Equal(timelinePosition, timeline.TranslatePoint(new Point(), dialog));
+                Assert.True(downloadStatus.IsVisible);
+                Assert.True(downloadStatus.ActualHeight > 0);
+                Point statusPosition = downloadStatus.TranslatePoint(new Point(), blockPanel);
+                Point detailsPosition = blockDetails.TranslatePoint(new Point(), blockPanel);
+                Assert.Equal(detailsPosition.X, statusPosition.X, 2);
+                double panelInnerBottom = blockPanel.ActualHeight - blockPanel.Padding.Bottom - blockPanel.BorderThickness.Bottom;
+                Assert.InRange(Math.Abs(statusPosition.Y + downloadStatus.ActualHeight - panelInnerBottom), 0, 1);
+                Assert.True(detailsPosition.Y + blockDetails.ActualHeight <= statusPosition.Y);
+                Rect buttonBounds = new(download.TranslatePoint(new Point(), blockPanel), download.RenderSize);
+                Assert.False(buttonBounds.IntersectsWith(new Rect(detailsPosition, blockDetails.RenderSize)));
+                Assert.False(buttonBounds.IntersectsWith(new Rect(statusPosition, downloadStatus.RenderSize)));
+                Assert.True(statusPosition.X >= blockPanel.Padding.Left);
+                Assert.True(statusPosition.X + downloadStatus.ActualWidth <= blockPanel.ActualWidth - blockPanel.Padding.Right);
+                Assert.Equal(TextWrapping.NoWrap, downloadStatus.TextWrapping);
+                Assert.Equal(TextTrimming.CharacterEllipsis, downloadStatus.TextTrimming);
+                Assert.Equal(statusText, downloadStatus.ToolTip);
+            }
+            CaptureLocalLayout(dialog, $"coverage-{width}x{height}-selected-block-status.png");
+            downloadStatus.Text = string.Empty;
+            blockDetails.GetBindingExpression(TextBlock.TextProperty)?.UpdateTarget();
+            await SettleLocalLayout(dialog);
+            CaptureLocalLayout(dialog, $"coverage-{width}x{height}-selected-block.png");
 
             card.RaiseEvent(CoverageMouseEvent(Mouse.MouseUpEvent));
             Assert.True(overlay.IsVisible);
@@ -59,6 +148,9 @@ public sealed partial class SessionWorkflowTests
             Assert.Same(day, grid.SelectedItem);
 
             await dialog.ShowLibraryCoverageAsync(day);
+            await SettleLocalLayout(dialog);
+            Assert.Null(timeline.SelectedBlock);
+            Assert.Equal("Click a 15-minute block for details.", blockDetails.Text);
             close.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Assert.False(overlay.IsVisible);
             Assert.True(dialog.IsVisible);

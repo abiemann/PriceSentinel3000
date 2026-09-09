@@ -27,7 +27,7 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
 
     public MarketDataLibraryScan Scan() => Scan(includeDuplicates: false);
 
-    private MarketDataLibraryScan ScanCore(bool includeDuplicates, HashSet<string> seen)
+    private MarketDataLibraryScan ScanCore(bool includeDuplicates, HashSet<string> seen, Action<int, int>? fileProgress)
     {
         var datasets = new List<HistoricalDatasetInfo>();
         var hashes = new HashSet<string>(StringComparer.Ordinal);
@@ -36,27 +36,42 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
         EnsureNoReparsePoint(RootPath);
         try
         {
-            foreach (string path in ActiveFiles())
+            IEnumerable<string> paths = ActiveFiles();
+            int total = 0;
+            if (fileProgress is not null)
+            {
+                var discovered = new List<string>();
+                try { foreach (string path in paths) discovered.Add(path); }
+                catch (Exception exception) when (IsFileError(exception))
+                {
+                    // Keep and validate files found before a directory enumeration failure.
+                    diagnostics.Add(new("", "scan_failed", exception.Message));
+                }
+                paths = discovered;
+                total = discovered.Count;
+            }
+            int processed = 0;
+            foreach (string path in paths)
             {
                 string relative = Path.GetRelativePath(RootPath, path);
                 if (Path.GetFileName(path).Contains(".tmp-", StringComparison.Ordinal))
-                {
                     diagnostics.Add(new(relative, "interrupted_write", "An unfinished temporary file was ignored."));
-                    continue;
-                }
-                if (!string.Equals(Path.GetExtension(path), ".json", StringComparison.OrdinalIgnoreCase)) continue;
-                try
+                else if (string.Equals(Path.GetExtension(path), ".json", StringComparison.OrdinalIgnoreCase))
                 {
-                    seen.Add(path);
-                    HistoricalDatasetInfo info = ScanDescription(relative);
-                    if (hashes.Add(info.DatasetHash) || includeDuplicates)
-                        datasets.Add(info);
+                    try
+                    {
+                        seen.Add(path);
+                        HistoricalDatasetInfo info = ScanDescription(relative);
+                        if (hashes.Add(info.DatasetHash) || includeDuplicates)
+                            datasets.Add(info);
+                    }
+                    catch (Exception exception) when (IsFileError(exception))
+                    {
+                        InvalidateMetadata(path);
+                        diagnostics.Add(new(relative, "invalid_dataset", exception.Message));
+                    }
                 }
-                catch (Exception exception) when (IsFileError(exception))
-                {
-                    InvalidateMetadata(path);
-                    diagnostics.Add(new(relative, "invalid_dataset", exception.Message));
-                }
+                fileProgress?.Invoke(++processed, total);
             }
         }
         catch (Exception exception) when (IsFileError(exception))

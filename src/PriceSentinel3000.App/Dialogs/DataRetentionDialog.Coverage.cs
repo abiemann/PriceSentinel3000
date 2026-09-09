@@ -9,6 +9,11 @@ public partial class DataRetentionDialog
 {
     private CancellationTokenSource? _coverageCancellation;
     private IInputElement? _coveragePreviousFocus;
+    private DataRetentionViewModel? _coverageViewModel;
+    private LibraryDaySummary? _coverageDay;
+    private bool _coverageDownloadRequested;
+    private int _coverageSelectionVersion;
+    private int? _coverageDownloadSelectionVersion;
 
     private async void LocalLibraryGrid_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
@@ -34,6 +39,12 @@ public partial class DataRetentionDialog
         if (DataContext is not DataRetentionViewModel viewModel) return;
         CloseLibraryCoverage(restoreFocus: false);
         _coveragePreviousFocus = Keyboard.FocusedElement;
+        _coverageViewModel = viewModel;
+        _coverageDay = day;
+        _coverageDownloadRequested = false;
+        _coverageDownloadSelectionVersion = null;
+        LibraryCoverageDownloadStatus.Text = string.Empty;
+        viewModel.CoverageDownloadUpdated += OnCoverageDownloadUpdated;
         var cancellation = new CancellationTokenSource();
         _coverageCancellation = cancellation;
         LibraryCoverageTitle.Text = $"{day.Symbol} · {day.TradingDate:yyyy-MM-dd}";
@@ -59,6 +70,52 @@ public partial class DataRetentionDialog
         }
     }
 
+    private void LibraryCoverageBlockSelectionChanged(object? sender, EventArgs e)
+    {
+        _coverageSelectionVersion++;
+        LibraryCoverageDownloadStatus.Text = string.Empty;
+    }
+
+    private async void LibraryCoverageDownload_Click(object sender, RoutedEventArgs e)
+    {
+        if (_coverageViewModel is not { } viewModel || !viewModel.CanDownloadCoverage ||
+            LibraryCoverageContent.DataContext is not LibraryCoverageTimeline timeline ||
+            LibraryCoverageTimeline.SelectedBlock is not { State: LibraryCoverageBlockState.Missing } selected) return;
+        _coverageDownloadRequested = true;
+        int selectionVersion = ++_coverageSelectionVersion;
+        _coverageDownloadSelectionVersion = selectionVersion;
+        CancellationTokenSource? popup = _coverageCancellation;
+        LibraryCoverageDownloadStatus.Text = "Downloading connected missing blocks…";
+        await viewModel.DownloadCoverageAsync(timeline, selected);
+        if (ReferenceEquals(_coverageCancellation, popup) && _coverageSelectionVersion == selectionVersion)
+            LibraryCoverageDownloadStatus.Text = viewModel.CoverageDownloadStatus;
+    }
+
+    private async void OnCoverageDownloadUpdated(object? sender, EventArgs e)
+    {
+        if (!_coverageDownloadRequested || _coverageViewModel is not { } viewModel ||
+            _coverageDay is not { } day || _coverageCancellation is not { } cancellation) return;
+        int? selectionVersion = _coverageDownloadSelectionVersion;
+        try
+        {
+            LibraryCoverageTimeline timeline = await viewModel.LoadLibraryCoverageAsync(day, cancellation.Token);
+            if (!ReferenceEquals(_coverageCancellation, cancellation)) return;
+            // Keep the latest selection if the user moved while coverage was loading.
+            DateTimeOffset? selectedFrom = LibraryCoverageTimeline.SelectedBlock?.FromUtc;
+            LibraryCoverageContent.DataContext = timeline;
+            LibraryCoverageTimeline.GetBindingExpression(Controls.LibraryCoverageTimelineControl.TimelineProperty)?.UpdateTarget();
+            if (selectedFrom is { } from) LibraryCoverageTimeline.SelectBlockStartingAt(from);
+            if (_coverageSelectionVersion == selectionVersion)
+                LibraryCoverageDownloadStatus.Text = viewModel.CoverageDownloadStatus;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
+        {
+            if (ReferenceEquals(_coverageCancellation, cancellation) && _coverageSelectionVersion == selectionVersion)
+                LibraryCoverageDownloadStatus.Text = $"Coverage could not be refreshed. {exception.Message}";
+        }
+    }
+
     private void LibraryCoverageOverlay_MouseUp(object sender, MouseButtonEventArgs e)
     {
         if (ReferenceEquals(e.OriginalSource, LibraryCoverageOverlay))
@@ -74,6 +131,11 @@ public partial class DataRetentionDialog
 
     private void CloseLibraryCoverage(bool restoreFocus = true)
     {
+        if (_coverageViewModel is { } viewModel) viewModel.CoverageDownloadUpdated -= OnCoverageDownloadUpdated;
+        _coverageViewModel = null;
+        _coverageDay = null;
+        _coverageDownloadRequested = false;
+        _coverageDownloadSelectionVersion = null;
         _coverageCancellation?.Cancel();
         _coverageCancellation?.Dispose();
         _coverageCancellation = null;

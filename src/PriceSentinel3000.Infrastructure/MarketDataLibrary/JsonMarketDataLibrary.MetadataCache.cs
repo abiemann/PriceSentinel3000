@@ -13,12 +13,12 @@ public sealed partial class JsonMarketDataLibrary
     private sealed record CachedMetadata(FileStamp Stamp, HistoricalDatasetInfo Info);
     private readonly record struct FileStamp(long Length, DateTime LastWriteUtc, DateTime CreatedUtc, FileAttributes Attributes);
 
-    private MarketDataLibraryScan Scan(bool includeDuplicates)
+    private MarketDataLibraryScan Scan(bool includeDuplicates, Action<int, int>? fileProgress = null)
     {
         lock (_metadataGate)
         {
             var seen = new HashSet<string>(_metadata.Comparer);
-            try { return ScanCore(includeDuplicates, seen); }
+            try { return ScanCore(includeDuplicates, seen, fileProgress); }
             finally
             {
                 foreach (string path in _metadata.Keys.Where(path => !seen.Contains(path)).ToArray())

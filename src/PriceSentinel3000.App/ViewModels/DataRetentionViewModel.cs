@@ -95,10 +95,11 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
         _automatic = settings.AutomaticDownloadsEnabled;
         _dailyTime = settings.DailyDownloadTime.ToString("HH:mm", CultureInfo.InvariantCulture);
         _timeZone = settings.TimeZoneId;
+        InitializeListEditor();
         foreach (DownloadList list in settings.Lists) Lists.Add(list);
         if (Lists.Count > 0) SelectedList = Lists[0];
         NewListCommand = new RelayCommand(NewList, () => !IsBusy);
-        SaveListCommand = Command(SaveListAsync);
+        SaveListCommand = Command(SaveListAsync, () => ShowSaveListButton);
         DeleteListCommand = Command(DeleteListAsync);
         AddTickersCommand = Command(AddTickersAsync);
         LoadWatchlistsCommand = Command(LoadWatchlistsAsync);
@@ -128,7 +129,7 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
         _timer = new DispatcherTimer(TimeSpan.FromSeconds(30), DispatcherPriority.Background, OnTimerTick, _dispatcher);
         _timer.Stop();
         _progressTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background,
-            (_, _) => RefreshDownloadPresentation(), _dispatcher);
+            (_, _) => { RefreshDownloadPresentation(); RefreshLibraryCoverage(); }, _dispatcher);
         _progressTimer.Stop();
         Collector.StateChanged += OnCollectorChanged;
         RefreshState();
@@ -150,11 +151,11 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
     public IReadOnlyList<TimeZoneInfo> TimeZones { get; } = TimeZoneInfo.GetSystemTimeZones();
     public PersonalWatchlist? SelectedRobinhoodList { get; set; }
     public HistoricalDatasetInfo? SelectedDataset { get; set; }
-    public DownloadList? SelectedList { get => _selectedList; set { _selectedList = value; if (value is not null) LoadEditor(value); Changed(); Changed(nameof(ListSummary)); } }
+    public DownloadList? SelectedList { get => _selectedList; set { UpdateListEditor(() => { _selectedList = value; if (value is not null) LoadEditor(value); }); Changed(); Changed(nameof(ListSummary)); } }
     public string ListSummary => SelectedList is { } list
         ? $"{list.Members.Count(m => m.IsIncluded)} of {list.Members.Count} saved equities included · {(list.SourceListId is null ? "Local list" : "Robinhood snapshot")}" : "New local list";
-    public string ListName { get => _listName; set { _listName = value; Changed(); } }
-    public bool ListEnabled { get => _listEnabled; set { _listEnabled = value; Changed(); } }
+    public string ListName { get => _listName; set { _listName = value; Changed(); ListEditorChanged(); } }
+    public bool ListEnabled { get => _listEnabled; set { _listEnabled = value; Changed(); ListEditorChanged(); } }
     public string TickerInput { get => _tickerInput; set { _tickerInput = value; Changed(); } }
     public string LibraryRootPath { get => _libraryRoot; set { _libraryRoot = value; Changed(); ScheduleDraftChanged(); } }
     public bool AutomaticDownloadsEnabled { get => _automatic; set { _automatic = value; Changed(); ScheduleDraftChanged(); } }
@@ -164,7 +165,7 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
     public bool ReplayOfflineOnly { get => _replayOffline; set { _replayOffline = value; Changed(); } }
     public bool ReplayUseLatestRevision { get => _replayLatest; set { _replayLatest = value; Changed(); } }
     public string ReplayPinnedHashes { get => _replayPins; set { _replayPins = value; Changed(); } }
-    public bool IsBusy => _busy || Collector.IsBusy || _downloadCancellation is not null || _pollTask is { IsCompleted: false };
+    public bool IsBusy => _busy || IsLibraryScanning || Collector.IsBusy || _downloadCancellation is not null || _pollTask is { IsCompleted: false };
     public string Status { get => _status; private set { _status = value; Changed(); } }
     public string LibraryDiagnostics
     {
@@ -178,7 +179,17 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
     public string ScheduleHelp => SavedAutomaticDownloadsEnabled
         ? "Runs at your saved daily time while PriceSentinel is open and connected. Each run saves today's completed candles and checks earlier missing history for every included equity. Saved files are reused; older unresolved gaps remain visible."
         : "Automatic downloads are off. Download gaps now saves today's completed candles and checks earlier missing history. To run daily while PriceSentinel is open and connected, enable automatic downloads and save the schedule.";
-    public string JobSummary => $"Retained queue: {DownloadProcessed}/{DownloadTotal} checked · {Jobs.Count(j => j.Status == CollectionJobStatus.Complete && j.RequestedThroughUtc is null)} complete · {Jobs.Count(j => j.Status == CollectionJobStatus.Complete && j.RequestedThroughUtc is not null)} saved so far · {Jobs.Count(j => j.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading)} remaining · {Jobs.Count(j => j.NeedsAttention)} need attention";
+    public string JobSummary
+    {
+        get
+        {
+            int unavailable = Jobs.Count(j => j.Status == CollectionJobStatus.Unavailable && !j.IsAvailabilityProbe);
+            int failed = Jobs.Count(j => j.Status == CollectionJobStatus.Failed);
+            return $"Retained queue: {DownloadProcessed}/{DownloadTotal} checked · {Jobs.Count(j => j.Status == CollectionJobStatus.Complete && j.RequestedThroughUtc is null)} complete · {Jobs.Count(j => j.Status == CollectionJobStatus.Complete && j.RequestedThroughUtc is not null)} saved so far · {Jobs.Count(j => j.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading)} remaining · {Jobs.Count(j => j.Status == CollectionJobStatus.Partial)} partials" +
+                (unavailable > 0 ? $" · {unavailable} unavailable" : "") +
+                (failed > 0 ? $" · {failed} failed" : "");
+        }
+    }
     public string ContinuityWarnings
     {
         get
@@ -215,11 +226,14 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
 
     public void NewList()
     {
-        SelectedList = null;
-        _sourceListId = _sourceListName = null;
-        ListName = "My equities";
-        ListEnabled = true;
-        Members.Clear();
+        UpdateListEditor(() =>
+        {
+            SelectedList = null;
+            _sourceListId = _sourceListName = null;
+            ListName = "My equities";
+            ListEnabled = true;
+            Members.Clear();
+        });
         Status = "Enter a name and paste symbols separated by spaces or commas.";
     }
 
@@ -297,13 +311,16 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
             .Select(m => m.Symbol!).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         IReadOnlyList<EquityResolution> resolved = symbols.Length == 0 ? [] : await _equities.ResolveEquitiesAsync(symbols, _lifetime.Token);
         var previous = Members.ToDictionary(m => m.Symbol, m => m.IsIncluded);
-        if (!refresh) { NewList(); ListName = source.Name; }
-        Members.Clear();
-        foreach (EquityResolution equity in resolved.Where(r => r.IsSupported))
-            Members.Add(new(new(equity.Symbol, equity.CompanyName,
-                !refresh || !previous.TryGetValue(equity.Symbol, out bool included) || included, equity.ProviderInstrumentId)));
-        _sourceListId = source.Id;
-        _sourceListName = source.Name;
+        UpdateListEditor(() =>
+        {
+            if (!refresh) { NewList(); ListName = source.Name; }
+            Members.Clear();
+            foreach (EquityResolution equity in resolved.Where(r => r.IsSupported))
+                Members.Add(new(new(equity.Symbol, equity.CompanyName,
+                    !refresh || !previous.TryGetValue(equity.Symbol, out bool included) || included, equity.ProviderInstrumentId)));
+            _sourceListId = source.Id;
+            _sourceListName = source.Name;
+        });
         int added = Members.Count(m => !previous.ContainsKey(m.Symbol));
         int removed = previous.Keys.Except(Members.Select(m => m.Symbol)).Count();
         int excluded = result.Members.Count - Members.Count;
@@ -353,29 +370,8 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
         _downloadsPaused = false;
         await PollAsync(connect: true);
         Status = DownloadProcessed == DownloadTotal
-            ? "Queue checked. See the download status for complete files and any dates that need attention."
+            ? "Queue checked. See the download status for saved coverage and request results."
             : "Queued work is kept. The download status shows any connection or retry wait.";
-    }
-
-    public async Task ScanLibraryAsync()
-    {
-        LibraryDiagnostics = "";
-        IMarketDataLibrary library = CreateLibrary();
-        var (scan, days) = await Task.Run(() =>
-        {
-            MarketDataLibraryScan result = library.ConsolidateDailyFiles();
-            return (result, LibraryDaySummary.Create(result.Datasets));
-        }, _lifetime.Token);
-        LibraryDaySummary? selected = SelectedLibraryDay;
-        LibraryDays.Clear();
-        foreach (LibraryDaySummary day in days) LibraryDays.Add(day);
-        SelectedLibraryDay = LibraryDays.FirstOrDefault(day => selected is not null && day.Symbol == selected.Symbol && day.TradingDate == selected.TradingDate);
-        Changed(nameof(SelectedLibraryDay));
-        Datasets.Clear();
-        foreach (HistoricalDatasetInfo dataset in scan.Datasets.OrderByDescending(d => d.TradingDate).ThenBy(d => d.Symbol)) Datasets.Add(dataset);
-        LibraryDiagnostics = string.Join("\n\n", scan.Diagnostics.Select(d => $"{d.RelativePath} [{d.Code}]\n{d.Message}"));
-        Status = $"Found {days.Count} daily entries from {scan.Datasets.Count} saved files. {scan.Diagnostics.Count} scan notices." +
-            (HasLibraryDiagnostics ? " Open Library details." : "");
     }
 
     public string ExportLists() => DownloadListTransfer.Export(Collector.State.Settings.Lists);
@@ -389,9 +385,12 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
 
     private void ReloadLists(Guid? selectedId)
     {
-        Lists.Clear();
-        foreach (DownloadList list in Collector.State.Settings.Lists) Lists.Add(list);
-        SelectedList = Lists.FirstOrDefault(l => l.Id == selectedId);
+        UpdateListEditor(() =>
+        {
+            Lists.Clear();
+            foreach (DownloadList list in Collector.State.Settings.Lists) Lists.Add(list);
+            SelectedList = Lists.FirstOrDefault(l => l.Id == selectedId);
+        });
     }
 
     private async void OnTimerTick(object? sender, EventArgs e)
@@ -433,6 +432,7 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
         {
             _downloadCancellation = null;
             ScheduleNextDownloadCheck(result == CollectionBatchResult.WaitingForRetry);
+            await RefreshCoverageDownloadAsync();
             RefreshState();
         }
     }
@@ -454,6 +454,7 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
         ScheduleDraftChanged();
         RefreshDownloadPresentation();
         Changed(nameof(CanEditPlan));
+        Changed(nameof(CanDownloadCoverage));
         CancelDownloadsCommand?.RaiseCanExecuteChanged();
         PauseDownloadsCommand?.RaiseCanExecuteChanged();
         NewListCommand?.RaiseCanExecuteChanged();
@@ -485,9 +486,10 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
         _timer.Stop();
         _progressTimer.Stop();
         Collector.StateChanged -= OnCollectorChanged;
+        DisposeListEditor();
         await _lifetime.CancelAsync();
         Task[] active = Commands().Select(c => c.ExecutionTask).Append(PauseDownloadsCommand.ExecutionTask)
-            .Append(_pollTask).OfType<Task>().ToArray();
+            .Append(_pollTask).Append(_coverageDownloadTask).OfType<Task>().ToArray();
         try { await Task.WhenAll(active); } catch (OperationCanceledException) { }
         _lifetime.Dispose();
     }

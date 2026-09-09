@@ -377,7 +377,7 @@ public sealed partial class MarketDataCollector
     private void Update(CollectionJob job) => Commit(_state with
     {
         Jobs = _state.Jobs.Select(j => j.Id == job.Id ? job : j).ToArray(),
-        ContinuityGaps = job.Status == CollectionJobStatus.Complete
+        ContinuityGaps = job.Status == CollectionJobStatus.Complete && job.RequestedFromUtc is null
             ? _state.ContinuityGaps.SelectMany(g => RemoveRepairedSession(g, job)).ToArray() : _state.ContinuityGaps,
     });
 
@@ -419,6 +419,8 @@ public sealed partial class MarketDataCollector
             left.ProviderInstrumentId == right.ProviderInstrumentId) &&
         (left.Symbol == right.Symbol || (left.ProviderInstrumentId is not null && left.ProviderInstrumentId == right.ProviderInstrumentId)) &&
         left.SessionDate == right.SessionDate && left.SourceIntervalSeconds == right.SourceIntervalSeconds &&
+        left.RequestedFromUtc == right.RequestedFromUtc &&
+        (left.RequestedFromUtc is null || left.RequestedThroughUtc == right.RequestedThroughUtc) &&
         left.SessionBounds == right.SessionBounds && left.AdjustmentPolicy == right.AdjustmentPolicy &&
         left.AdjustmentBasis == right.AdjustmentBasis && SamePath(left.LibraryRootPath, right.LibraryRootPath);
 

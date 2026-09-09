@@ -28,19 +28,18 @@ public sealed class DownloadJobViewModel(CollectionJob job) : INotifyPropertyCha
             long totalTicks = 0, checkedTicks = 0;
             foreach (CollectionSessionWindow window in CollectionSchedule.GetSessionWindows(SessionDate, _job.SessionBounds))
             {
+                DateTimeOffset from = _job.RequestedFromUtc is { } start && start > window.FromUtc ? start : window.FromUtc;
                 DateTimeOffset through = RequestedThroughUtc is { } cutoff && cutoff < window.ThroughUtc ? cutoff : window.ThroughUtc;
-                if (through <= window.FromUtc) continue;
-                totalTicks += (through - window.FromUtc).Ticks;
-                DateTimeOffset cursor = NextGapFromUtc ?? (Status == CollectionJobStatus.Complete ? through : window.FromUtc);
+                if (through <= from) continue;
+                totalTicks += (through - from).Ticks;
+                DateTimeOffset cursor = NextGapFromUtc ?? (Status == CollectionJobStatus.Complete ? through : from);
                 DateTimeOffset checkedThrough = cursor < through ? cursor : through;
-                if (checkedThrough > window.FromUtc) checkedTicks += (checkedThrough - window.FromUtc).Ticks;
+                if (checkedThrough > from) checkedTicks += (checkedThrough - from).Ticks;
             }
             return totalTicks == 0 ? 0 : 100d * checkedTicks / totalTicks;
         }
     }
     public string CheckedProgressText => $"{CheckedProgressPercent:0.#}% of requested trading time checked.";
-    public bool NeedsAttention => Status is CollectionJobStatus.Partial or CollectionJobStatus.Failed ||
-        Status == CollectionJobStatus.Unavailable && !IsAvailabilityProbe;
     public DateTimeOffset? RetryAfterUtc => _job.RetryAfterUtc;
     public decimal? SavedCoveragePercent => _job.SavedCoveragePercent;
     public string StateText => Status is CollectionJobStatus.Failed or CollectionJobStatus.Unavailable ? "0%"
@@ -48,6 +47,8 @@ public sealed class DownloadJobViewModel(CollectionJob job) : INotifyPropertyCha
         : "--";
     public string StateToolTip => Status == CollectionJobStatus.Failed
         ? "0% identifies this failed download attempt. Previously saved candles are kept; see Details for the error."
+        : _job.RequestedFromUtc is not null && RequestedThroughUtc is not null
+            ? "Genuine 15-second candles saved as a percentage of the selected trading range. Market closures and future time are excluded. -- means saved coverage has not been verified."
         : "Genuine 15-second candles saved as a percentage of the full day's available trading hours. Market closures are excluded. Today's remaining hours still count toward the full day. -- means saved coverage has not been verified.";
     public string StatusText => Status switch
     {
@@ -82,7 +83,8 @@ public sealed class DownloadJobViewModel(CollectionJob job) : INotifyPropertyCha
         bool changed = Status != next.Status || ActualSourceIntervalSeconds != next.ActualSourceIntervalSeconds ||
             Error != next.Error || IsAutomatic != next.IsAutomatic || RetryAfterUtc != next.RetryAfterUtc ||
             IsAvailabilityProbe != next.IsAvailabilityProbe || AvailabilityCheckPending != next.AvailabilityCheckPending ||
-            RequestedThroughUtc != next.RequestedThroughUtc || SavedCoveragePercent != next.SavedCoveragePercent ||
+            _job.RequestedFromUtc != next.RequestedFromUtc || RequestedThroughUtc != next.RequestedThroughUtc ||
+            SavedCoveragePercent != next.SavedCoveragePercent ||
             NextGapFromUtc != next.NextGapFromUtc;
         _job = next;
         if (changed) PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
@@ -160,7 +162,7 @@ public sealed partial class DataRetentionViewModel
         catch (Exception exception)
         {
             _collectionError = exception.Message;
-            Status = $"Collection needs attention: {exception.Message}";
+            Status = $"Download error: {exception.Message}";
         }
         finally
         {
@@ -241,8 +243,9 @@ public sealed partial class DataRetentionViewModel
         CollectionActivity? activity = Collector.Activity;
         CollectionJob[] pending = state.Jobs.Where(j => j.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading).ToArray();
         CollectionJob[] eligible = pending.Where(j => !j.IsAutomatic || state.Settings.AutomaticDownloadsEnabled).ToArray();
-        int attention = state.Jobs.Count(j => j.Status is CollectionJobStatus.Partial or CollectionJobStatus.Failed ||
-            j.Status == CollectionJobStatus.Unavailable && !j.IsAvailabilityProbe);
+        int partials = state.Jobs.Count(j => j.Status == CollectionJobStatus.Partial);
+        int unavailable = state.Jobs.Count(j => j.Status == CollectionJobStatus.Unavailable && !j.IsAvailabilityProbe);
+        int failed = state.Jobs.Count(j => j.Status == CollectionJobStatus.Failed);
         string status, heading, detail;
         if (_downloadsPaused)
         {
@@ -283,7 +286,7 @@ public sealed partial class DataRetentionViewModel
         }
         else if (_collectionError is not null)
         {
-            status = "Attention"; heading = "Downloads need attention"; detail = _collectionError;
+            status = "Attention"; heading = "Download error"; detail = _collectionError;
         }
         else if (eligible.Length > 0)
         {
@@ -307,10 +310,18 @@ public sealed partial class DataRetentionViewModel
             status = "Paused"; heading = "Automatic queue paused";
             detail = $"{pending.Length} automatic downloads are queued. Enable and save the automatic schedule, or use Download gaps now for a manual request.";
         }
-        else if (attention > 0)
+        else if (failed > 0)
         {
-            status = "Attention"; heading = "Queue finished with items to review";
-            detail = $"{attention} dates have gaps, unavailable data, or errors. See Details in the table. Known empty ranges are skipped; today's can be retried after 15 minutes.";
+            status = "Attention"; heading = "Queue finished with failed downloads";
+            detail = $"{failed} stock-day requests failed. See Details in the table for the errors. Previously saved candles are kept; Download gaps now retries failed requests.";
+        }
+        else if (partials > 0 || unavailable > 0)
+        {
+            status = "Complete";
+            heading = partials > 0 ? "Queue finished with partial data" : "Available-history check complete";
+            detail = $"{partials} partials: stock-days with saved candles and remaining gaps. " +
+                (unavailable > 0 ? $"{unavailable} stock-days have no available data. " : "") +
+                "Saved candles are kept. No action is needed for ranges the broker cannot supply. Known empty ranges are skipped; today's can be retried after 15 minutes.";
         }
         else if (state.Jobs.Count > 0)
         {

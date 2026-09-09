@@ -339,11 +339,65 @@ public sealed partial class SessionWorkflowTests
         Assert.Equal(0, fixture.Provider.DownloadCalls);
     });
 
+    [Theory]
+    [InlineData(null, CollectionJobStatus.Pending, 0d)]
+    [InlineData(null, CollectionJobStatus.Downloading, 0d)]
+    [InlineData(null, CollectionJobStatus.Complete, 100d)]
+    [InlineData(-30, CollectionJobStatus.Pending, 0d)]
+    [InlineData(0, CollectionJobStatus.Pending, 0d)]
+    [InlineData(30, CollectionJobStatus.Pending, 50d)]
+    [InlineData(60, CollectionJobStatus.Pending, 100d)]
+    [InlineData(90, CollectionJobStatus.Pending, 100d)]
+    public Task DownloadProgress_SelectedRangeCountsOnlyRequestedTradingTime(
+        int? checkedMinutes, CollectionJobStatus status, double expectedPercent) => host.RunAsync(async () =>
+    {
+        DateTimeOffset from = new(2026, 9, 4, 14, 0, 0, TimeSpan.Zero);
+        await using var fixture = new ProgressFixture(new CollectionJob
+        {
+            Symbol = "NFLX", SessionBounds = "24_5", Status = status,
+            RequestedFromUtc = from, RequestedThroughUtc = from.AddHours(1),
+            NextGapFromUtc = checkedMinutes is { } minutes ? from.AddMinutes(minutes) : null,
+        });
+        DownloadJobViewModel row = Assert.Single(fixture.ViewModel.Jobs);
+
+        Assert.Equal(expectedPercent, row.CheckedProgressPercent);
+        Assert.Equal(expectedPercent, fixture.ViewModel.DownloadProgressPercent);
+        Assert.Contains("selected trading range", row.StateToolTip);
+        Assert.DoesNotContain("full day", row.StateToolTip);
+        Assert.Equal(0, fixture.Provider.DownloadCalls);
+    });
+
+    [Fact]
+    public void DownloadProgress_FullDayAndCurrentDayCutoffKeepTheirExistingProgressAndCoverageMeaning()
+    {
+        var job = new CollectionJob
+        {
+            Symbol = "NFLX", SessionDate = new(2026, 9, 4), SessionBounds = "24_5",
+            NextGapFromUtc = new(2026, 9, 4, 14, 30, 0, TimeSpan.Zero),
+        };
+        var fullDay = new DownloadJobViewModel(job);
+        var currentDay = new DownloadJobViewModel(job with
+        {
+            RequestedThroughUtc = new(2026, 9, 4, 15, 0, 0, TimeSpan.Zero),
+        });
+
+        Assert.Equal(52.5d, fullDay.CheckedProgressPercent);
+        Assert.Equal(100d * 10.5 / 11, currentDay.CheckedProgressPercent, 8);
+        Assert.Contains("full day's available trading hours", fullDay.StateToolTip);
+        Assert.Equal(fullDay.StateToolTip, currentDay.StateToolTip);
+        Assert.Equal(0d, new DownloadJobViewModel(job with { NextGapFromUtc = null }).CheckedProgressPercent);
+        Assert.Contains("failed download attempt", new DownloadJobViewModel(job with
+        {
+            Status = CollectionJobStatus.Failed, RequestedFromUtc = job.NextGapFromUtc,
+            RequestedThroughUtc = new(2026, 9, 4, 15, 0, 0, TimeSpan.Zero),
+        }).StateToolTip);
+    }
+
     [Fact]
     public Task DownloadProgress_ProcessedCountDoesNotDescribeMissingOrFailedDataAsComplete() => host.RunAsync(async () =>
     {
         await using var fixture = new ProgressFixture(
-            new() { Symbol = "NFLX", Status = CollectionJobStatus.Complete },
+            new CollectionJob { Symbol = "NFLX", Status = CollectionJobStatus.Complete },
             new() { Symbol = "SOXL", Status = CollectionJobStatus.Partial },
             new() { Symbol = "MSFT", Status = CollectionJobStatus.Unavailable },
             new() { Symbol = "NVDA", Status = CollectionJobStatus.Failed });
@@ -353,12 +407,16 @@ public sealed partial class SessionWorkflowTests
         Assert.Equal(100d, vm.DownloadProgressPercent);
         Assert.Equal("Attention", vm.DownloadState);
         Assert.Contains("1 complete", vm.JobSummary);
-        Assert.Contains("3", vm.JobSummary);
+        Assert.Contains("1 partials", vm.JobSummary);
+        Assert.Contains("1 unavailable", vm.JobSummary);
+        Assert.Contains("1 failed", vm.JobSummary);
+        Assert.DoesNotContain("need attention", vm.JobSummary);
+        Assert.Equal("Queue finished with failed downloads", vm.DownloadHeading);
         Assert.False(vm.IsDownloadActive);
     });
 
     [Fact]
-    public Task DownloadProgress_EmptyAvailabilityProbeCompletesTheCheckWithoutAnAttentionWarning() => host.RunAsync(async () =>
+    public Task DownloadProgress_EmptyAvailabilityProbeCompletesTheCheckWithoutCountingUnavailableData() => host.RunAsync(async () =>
     {
         await using var fixture = new ProgressFixture(new CollectionJob
         {
@@ -368,7 +426,9 @@ public sealed partial class SessionWorkflowTests
         Assert.Equal("Complete", vm.DownloadState);
         Assert.Equal("Available-history check complete", vm.DownloadHeading);
         Assert.Contains("newest to oldest", vm.DownloadDetail);
-        Assert.Contains("0 need attention", vm.JobSummary);
+        Assert.Contains("0 partials", vm.JobSummary);
+        Assert.DoesNotContain("unavailable", vm.JobSummary);
+        Assert.DoesNotContain("failed", vm.JobSummary);
         Assert.Equal("0%", Assert.Single(vm.Jobs).StateText);
     });
 
@@ -395,7 +455,7 @@ public sealed partial class SessionWorkflowTests
         row.Update(checking with { Status = CollectionJobStatus.Failed, Error = "Connection check failed." });
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         Assert.Same(row, Assert.Single(vm.VisibleJobs.Cast<DownloadJobViewModel>()));
-        Assert.True(row.NeedsAttention);
+        Assert.Equal(CollectionJobStatus.Failed, row.Status);
     });
 
     [Fact]
@@ -414,20 +474,78 @@ public sealed partial class SessionWorkflowTests
         Assert.Contains(cutoff.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"), row.DetailsText);
         Assert.Contains("0 complete", vm.JobSummary);
         Assert.Contains("1 saved so far", vm.JobSummary);
-        Assert.Contains("0 need attention", vm.JobSummary);
+        Assert.Contains("0 partials", vm.JobSummary);
     });
 
     [Theory]
-    [InlineData(CollectionJobStatus.Partial)]
-    [InlineData(CollectionJobStatus.Failed)]
-    public Task DownloadProgress_AvailabilityProbeGapsAndErrorsStillNeedAttention(CollectionJobStatus status) => host.RunAsync(async () =>
+    [InlineData(CollectionJobStatus.Partial, "Complete", "Queue finished with partial data", "1 partials")]
+    [InlineData(CollectionJobStatus.Failed, "Attention", "Queue finished with failed downloads", "1 failed")]
+    public Task DownloadProgress_AvailabilityProbeDistinguishesPartialDataFromFailedRequests(
+        CollectionJobStatus status, string expectedState, string expectedHeading, string expectedSummary) => host.RunAsync(async () =>
     {
         await using var fixture = new ProgressFixture(new CollectionJob
         {
             Symbol = "NFLX", Status = status, IsAvailabilityProbe = true,
         });
-        Assert.Equal("Attention", fixture.ViewModel.DownloadState);
-        Assert.Contains("1 need attention", fixture.ViewModel.JobSummary);
+        DataRetentionViewModel vm = fixture.ViewModel;
+        Assert.Equal(expectedState, vm.DownloadState);
+        Assert.Equal(expectedHeading, vm.DownloadHeading);
+        Assert.Contains(expectedSummary, vm.JobSummary);
+        Assert.DoesNotContain("unavailable", vm.JobSummary);
+        Assert.DoesNotContain("need attention", vm.JobSummary);
+    });
+
+    [Fact]
+    public Task DownloadProgress_PartialAndUnavailableDaysFinishWithoutAnActionWarning() => host.RunAsync(async () =>
+    {
+        await using var fixture = new ProgressFixture(
+            new() { Symbol = "NFLX", Status = CollectionJobStatus.Partial },
+            new() { Symbol = "SOXL", Status = CollectionJobStatus.Partial },
+            new() { Symbol = "MSFT", Status = CollectionJobStatus.Unavailable },
+            new() { Symbol = "NVDA", Status = CollectionJobStatus.Unavailable, IsAvailabilityProbe = true });
+        DataRetentionViewModel vm = fixture.ViewModel;
+        Assert.Equal("Complete", vm.DownloadState);
+        Assert.Equal("Queue finished with partial data", vm.DownloadHeading);
+        Assert.Equal(4, vm.DownloadProcessed);
+        Assert.Contains("2 partials", vm.JobSummary);
+        Assert.Contains("1 unavailable", vm.JobSummary);
+        Assert.DoesNotContain("failed", vm.JobSummary);
+        Assert.DoesNotContain("need attention", vm.JobSummary);
+        Assert.DoesNotContain("review", vm.DownloadHeading);
+        Assert.False(vm.HasDownloadWork);
+    });
+
+    [Fact]
+    public Task DownloadProgress_UnavailableDayCompletesTheAvailabilityCheckWithoutClaimingSavedData() => host.RunAsync(async () =>
+    {
+        await using var fixture = new ProgressFixture(new CollectionJob
+        {
+            Symbol = "NFLX", Status = CollectionJobStatus.Unavailable,
+        });
+        DataRetentionViewModel vm = fixture.ViewModel;
+        Assert.Equal("Complete", vm.DownloadState);
+        Assert.Equal("Available-history check complete", vm.DownloadHeading);
+        Assert.Contains("0 complete", vm.JobSummary);
+        Assert.Contains("0 partials", vm.JobSummary);
+        Assert.Contains("1 unavailable", vm.JobSummary);
+        Assert.DoesNotContain("failed", vm.JobSummary);
+        Assert.False(vm.HasDownloadWork);
+    });
+
+    [Fact]
+    public Task DownloadProgress_CompleteDaysDoNotCountAsPartialsOrFailures() => host.RunAsync(async () =>
+    {
+        await using var fixture = new ProgressFixture(
+            new CollectionJob { Symbol = "NFLX", Status = CollectionJobStatus.Complete },
+            new() { Symbol = "SOXL", Status = CollectionJobStatus.Complete });
+        DataRetentionViewModel vm = fixture.ViewModel;
+        Assert.Equal("Complete", vm.DownloadState);
+        Assert.Equal("All queued downloads complete", vm.DownloadHeading);
+        Assert.Contains("2 complete", vm.JobSummary);
+        Assert.Contains("0 partials", vm.JobSummary);
+        Assert.DoesNotContain("unavailable", vm.JobSummary);
+        Assert.DoesNotContain("failed", vm.JobSummary);
+        Assert.False(vm.HasDownloadWork);
     });
 
     [Fact]
@@ -461,6 +579,7 @@ public sealed partial class SessionWorkflowTests
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
 
         Assert.Equal("Attention", vm.DownloadState);
+        Assert.Equal("Download error", vm.DownloadHeading);
         Assert.Contains(fixture.ConnectionError, vm.DownloadDetail);
         Assert.False(vm.IsDownloadActive);
         Assert.Equal(0, fixture.Provider.DownloadCalls);

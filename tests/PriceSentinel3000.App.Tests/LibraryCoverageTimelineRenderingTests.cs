@@ -37,7 +37,7 @@ public sealed partial class SessionWorkflowTests
             Colors.Black,
             Color.FromRgb(168, 237, 189),
             Color.FromRgb(51, 65, 85),
-            Color.FromRgb(24, 35, 47),
+            Color.FromRgb(23, 59, 92),
         ];
         for (int index = 0; index < blocks.Length; index++)
         {

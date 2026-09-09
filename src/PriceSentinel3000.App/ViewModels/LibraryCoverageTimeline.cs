@@ -31,6 +31,30 @@ public sealed record LibraryCoverageTimeline(
     private const long CandleTicks = 15 * TimeSpan.TicksPerSecond;
     private static readonly TimeZoneInfo Eastern = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
 
+    public (DateTimeOffset FromUtc, DateTimeOffset ThroughUtc)? GetConnectedMissingRange(
+        LibraryCoverageBlock? selected, DateTimeOffset now)
+    {
+        if (selected is null || selected.State != LibraryCoverageBlockState.Missing) return null;
+        int index = -1;
+        for (int i = 0; i < Blocks.Count; i++)
+        {
+            if (Blocks[i] != selected) continue;
+            index = i;
+            break;
+        }
+        long completedThrough = now.UtcTicks - now.UtcTicks % CandleTicks;
+        if (index < 0 || selected.FromUtc.UtcTicks >= completedThrough) return null;
+
+        int first = index, last = index;
+        while (first > 0 && Blocks[first - 1].State == LibraryCoverageBlockState.Missing &&
+            Blocks[first - 1].ThroughUtc == Blocks[first].FromUtc) first--;
+        while (last + 1 < Blocks.Count && Blocks[last + 1].State == LibraryCoverageBlockState.Missing &&
+            Blocks[last].ThroughUtc == Blocks[last + 1].FromUtc) last++;
+
+        return (Blocks[first].FromUtc.ToUniversalTime(),
+            new DateTimeOffset(Math.Min(Blocks[last].ThroughUtc.UtcTicks, completedThrough), TimeSpan.Zero));
+    }
+
     public static LibraryCoverageTimeline Create(
         string symbol, DateOnly date, TimeZoneInfo timezone, bool? overnight,
         IEnumerable<HistoricalDatasetInfo> datasets, DateTimeOffset now)

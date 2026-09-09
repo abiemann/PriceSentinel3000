@@ -1,5 +1,6 @@
 using System.Globalization;
 using PriceSentinel3000.App.Converters;
+using PriceSentinel3000.App.ViewModels;
 using PriceSentinel3000.Application.MarketDataLibrary;
 
 namespace PriceSentinel3000.App.Tests;
@@ -8,7 +9,10 @@ public sealed class DatasetSessionCoverageConverterTests
 {
     private static readonly DateOnly RegularDay = new(2026, 9, 8);
     private static readonly DateOnly EarlyCloseDay = new(2026, 11, 27);
-    private readonly DatasetSessionCoverageConverter _converter = new();
+    private readonly TestClock _clock = new() { Now = new(2027, 1, 1, 0, 0, 0, TimeSpan.Zero) };
+    private readonly DatasetSessionCoverageConverter _converter;
+
+    public DatasetSessionCoverageConverterTests() => _converter = new(_clock);
 
     [Theory]
     [InlineData(15, "1,560")]
@@ -20,7 +24,7 @@ public sealed class DatasetSessionCoverageConverterTests
         HistoricalDatasetInfo dataset = Dataset(RegularDay, seconds: seconds);
         Assert.Equal("100%", Percent(dataset));
         Assert.Contains($"{expected} of {expected} {seconds}-second candles", Details(dataset));
-        Assert.Contains("full regular session", Details(dataset));
+        Assert.Contains("full regular day", Details(dataset));
     }
 
     [Fact]
@@ -48,7 +52,7 @@ public sealed class DatasetSessionCoverageConverterTests
         Assert.Equal(dataset.Coverage.ExpectedCandleCount, dataset.Coverage.ActualCandleCount);
         Assert.Equal("7.69%", Percent(dataset));
         Assert.Contains("120 of 1,560", Details(dataset));
-        Assert.Contains("An open session stays below 100%", Details(dataset));
+        Assert.Contains("future candles are excluded", Details(dataset));
     }
 
     [Theory]
@@ -59,7 +63,7 @@ public sealed class DatasetSessionCoverageConverterTests
         HistoricalDatasetInfo dataset = Dataset(EarlyCloseDay, bounds);
         Assert.Equal("100%", Percent(dataset));
         Assert.Contains($"{expected} of {expected}", Details(dataset));
-        Assert.Contains($"full {bounds} session", Details(dataset));
+        Assert.Contains($"full {bounds} day", Details(dataset));
     }
 
     [Fact]
@@ -170,6 +174,34 @@ public sealed class DatasetSessionCoverageConverterTests
         Assert.Contains("unavailable", Details(dataset));
     }
 
+    [Fact]
+    public void CurrentRawDatasetAndDailySummaryUseTheSameCompletedTimeCoverage()
+    {
+        CollectionSessionWindow session = CollectionSchedule.GetSessionWindow(RegularDay);
+        _clock.Now = session.FromUtc.AddMinutes(30).AddSeconds(14);
+        HistoricalDatasetInfo dataset = Dataset(RegularDay, through: session.FromUtc.AddMinutes(30));
+        LibraryDaySummary summary = Assert.Single(LibraryDaySummary.Create([dataset], _clock.Now));
+
+        Assert.Equal("100%", Percent(dataset));
+        Assert.Equal(summary.CoverageDetails, Details(dataset));
+        Assert.Contains("120 of 120", Details(dataset));
+        Assert.Contains("Eastern calendar date", Details(dataset));
+        Assert.Equal("100%", _converter.Convert(summary, typeof(string), "", CultureInfo.GetCultureInfo("en-US")));
+
+        _clock.Now = _clock.Now.AddSeconds(1);
+        Assert.Equal("99.17%", Percent(dataset));
+        Assert.Contains("120 of 121", Details(dataset));
+    }
+
+    [Fact]
+    public void BeforeTheFirstCompletedCandleRawDatasetShowsNoPercentage()
+    {
+        HistoricalDatasetInfo dataset = Dataset(RegularDay);
+        _clock.Now = dataset.Coverage.RequestedFromUtc.AddSeconds(14);
+
+        Assert.Equal("--", Percent(dataset));
+        Assert.Contains("No completed 15-second candles are expected", Details(dataset));
+    }
     private string Percent(HistoricalDatasetInfo dataset) =>
         (string)_converter.Convert(dataset, typeof(string), "", CultureInfo.GetCultureInfo("en-US"));
 

@@ -6,6 +6,7 @@ namespace PriceSentinel3000.App.Tests;
 public sealed class LibraryDaySummaryTests
 {
     private static readonly DateOnly Day = new(2026, 9, 8);
+    private static readonly DateTimeOffset Finished = new(2027, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
     [Fact]
     public void GrowingRevisionsCountEachSavedCandleOnlyOnce()
@@ -85,7 +86,7 @@ public sealed class LibraryDaySummaryTests
         Assert.Equal(120L, summary.CandleCount);
         Assert.Equal(100m * 120 / 1560, summary.CoveragePercent);
         Assert.Contains("full regular day", summary.CoverageDetails);
-        Assert.Contains("have not finished yet", summary.CoverageDetails);
+        Assert.Contains("future candles are excluded", summary.CoverageDetails);
     }
 
     [Theory]
@@ -128,7 +129,7 @@ public sealed class LibraryDaySummaryTests
         HistoricalDatasetInfo original = Dataset();
         IReadOnlyList<LibraryDaySummary> summaries = LibraryDaySummary.Create([
             original with { Symbol = "MSFT" }, original,
-            Dataset(day: Day.AddDays(-4)), original with { Symbol = "AMD" }]);
+            Dataset(day: Day.AddDays(-4)), original with { Symbol = "AMD" }], Finished);
         Assert.Equal(new[] { "AAPL", "AMD", "MSFT", "AAPL" }, summaries.Select(item => item.Symbol));
         Assert.Equal(new[] { Day, Day, Day, Day.AddDays(-4) }, summaries.Select(item => item.TradingDate));
     }
@@ -215,8 +216,117 @@ public sealed class LibraryDaySummaryTests
         Assert.Equal(0m, summary.CoveragePercent);
     }
 
+    [Theory]
+    [InlineData("regular", 600)]
+    [InlineData("extended", 1920)]
+    [InlineData("24_5", 2880)]
+    public void NoonIsCompleteWhenEveryCompletedCandleIsSaved(string bounds, long expected)
+    {
+        DateTimeOffset noon = new(2026, 9, 8, 16, 0, 0, TimeSpan.Zero);
+        LibraryDaySummary summary = Assert.Single(LibraryDaySummary.Create(
+            [Dataset(bounds: bounds, through: noon)], noon));
+
+        Assert.Equal(expected, summary.CandleCount);
+        Assert.Equal(100m, summary.CoveragePercent);
+        Assert.Contains("12:00:00 Eastern", summary.CoverageDetails);
+        Assert.Contains("Eastern calendar date 2026-09-08", summary.CoverageDetails);
+        Assert.Contains("market closures and future candles are excluded", summary.CoverageDetails);
+    }
+
+    [Fact]
+    public void SavedAndExpectedCoverageStopAtTheSameCompletedCutoffWhileStoredCountIsPreserved()
+    {
+        CollectionSessionWindow session = CollectionSchedule.GetSessionWindow(Day);
+        DateTimeOffset noon = session.FromUtc.AddHours(2.5);
+        HistoricalDatasetInfo dataset = Dataset(gaps:
+        [
+            new(session.FromUtc, session.FromUtc.AddMinutes(30)),
+            new(noon.AddHours(1), noon.AddHours(2)),
+        ]);
+        LibraryDaySummary summary = Assert.Single(LibraryDaySummary.Create([dataset], noon));
+
+        Assert.Equal(1200L, summary.CandleCount);
+        Assert.Equal(80m, summary.CoveragePercent);
+        Assert.Contains("480 of 600", summary.CoverageDetails);
+        Assert.Contains("1,200 stored candles", summary.CoverageDetails);
+    }
+
+    [Fact]
+    public void SavedCandlesAfterNowDoNotInflateCoverageAndTheUnfinishedCandleIsExcluded()
+    {
+        CollectionSessionWindow session = CollectionSchedule.GetSessionWindow(Day);
+        HistoricalDatasetInfo completeFile = Dataset();
+        DateTimeOffset oneCandleAndFourteenSeconds = session.FromUtc.AddSeconds(29);
+        LibraryDaySummary summary = Assert.Single(LibraryDaySummary.Create(
+            [completeFile], oneCandleAndFourteenSeconds));
+
+        Assert.Equal(1560L, summary.CandleCount);
+        Assert.Equal(100m, summary.CoveragePercent);
+        Assert.Contains("1 of 1", summary.CoverageDetails);
+        Assert.Contains("09:30:15 Eastern", summary.CoverageDetails);
+        Assert.Equal(summary, Assert.Single(LibraryDaySummary.Create([completeFile], session.FromUtc.AddSeconds(15))));
+        Assert.Contains("2 of 2", Assert.Single(LibraryDaySummary.Create(
+            [completeFile], session.FromUtc.AddSeconds(30))).CoverageDetails);
+    }
+
+    [Fact]
+    public void MissingCompletedPrefixHasZeroCoverageEvenWhenLaterCandlesAreStored()
+    {
+        CollectionSessionWindow session = CollectionSchedule.GetSessionWindow(Day);
+        HistoricalDatasetInfo later = Dataset(from: session.FromUtc.AddHours(1));
+        LibraryDaySummary summary = Assert.Single(LibraryDaySummary.Create(
+            [later], session.FromUtc.AddMinutes(30)));
+
+        Assert.Equal(1320L, summary.CandleCount);
+        Assert.Equal(0m, summary.CoveragePercent);
+        Assert.Contains("0 of 120", summary.CoverageDetails);
+    }
+
+    [Theory]
+    [InlineData(-86400)]
+    [InlineData(-1)]
+    [InlineData(0)]
+    [InlineData(14)]
+    public void BeforeAnyCompletedCandleCoverageIsUnknownAndStoredCountRemainsVisible(int secondsFromOpen)
+    {
+        CollectionSessionWindow session = CollectionSchedule.GetSessionWindow(Day);
+        LibraryDaySummary summary = Assert.Single(LibraryDaySummary.Create(
+            [Dataset()], session.FromUtc.AddSeconds(secondsFromOpen)));
+
+        Assert.Equal(1560L, summary.CandleCount);
+        Assert.Null(summary.CoveragePercent);
+        Assert.Contains("No completed 15-second candles are expected", summary.CoverageDetails);
+    }
+
+    [Fact]
+    public void HolidayEveningIsExcludedUntilItsFirstCandleCompletes()
+    {
+        DateOnly holiday = new(2026, 9, 7);
+        CollectionSessionWindow session = CollectionSchedule.GetSessionWindow(holiday, "24_5");
+        HistoricalDatasetInfo dataset = Dataset(day: holiday, bounds: "24_5");
+        LibraryDaySummary before = Assert.Single(LibraryDaySummary.Create([dataset], session.FromUtc.AddSeconds(14)));
+        LibraryDaySummary after = Assert.Single(LibraryDaySummary.Create([dataset], session.FromUtc.AddMinutes(30)));
+
+        Assert.Null(before.CoveragePercent);
+        Assert.Equal(960L, before.CandleCount);
+        Assert.Equal(100m, after.CoveragePercent);
+        Assert.Contains("120 of 120", after.CoverageDetails);
+        Assert.Contains("20:30:00 Eastern", after.CoverageDetails);
+    }
+
+    [Fact]
+    public void PastDaysIncludingEarlyCloseRemainEqualAsTheClockAdvances()
+    {
+        HistoricalDatasetInfo[] datasets =
+        [
+            Dataset(), Dataset(day: new(2026, 11, 27), bounds: "24_5"),
+            Dataset(day: new(2026, 9, 7), bounds: "24_5"),
+        ];
+        Assert.Equal(LibraryDaySummary.Create(datasets, Finished),
+            LibraryDaySummary.Create(datasets, Finished.AddDays(5)));
+    }
     private static LibraryDaySummary Single(params HistoricalDatasetInfo[] datasets) =>
-        Assert.Single(LibraryDaySummary.Create(datasets));
+        Assert.Single(LibraryDaySummary.Create(datasets, Finished));
 
     private static HistoricalDatasetInfo Dataset(DateOnly? day = null, string bounds = "regular", int seconds = 15,
         DateTimeOffset? from = null, DateTimeOffset? through = null, HistoricalGap[]? gaps = null)

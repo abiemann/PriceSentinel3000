@@ -131,7 +131,7 @@ public sealed partial class MarketDataCollector
         Commit(_state with
         {
             Jobs = jobs.ToArray(),
-            ContinuityGaps = job.Status == CollectionJobStatus.Complete && job.RequestedThroughUtc is null
+            ContinuityGaps = job.Status == CollectionJobStatus.Complete && job.RequestedFromUtc is null && job.RequestedThroughUtc is null
                 ? _state.ContinuityGaps.SelectMany(g => RemoveRepairedSession(g, job)).ToArray() : _state.ContinuityGaps,
         });
     }

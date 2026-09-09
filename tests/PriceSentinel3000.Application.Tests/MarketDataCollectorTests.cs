@@ -3,7 +3,7 @@ using PriceSentinel3000.Application.MarketDataLibrary;
 
 namespace PriceSentinel3000.Application.Tests;
 
-public sealed class MarketDataCollectorTests
+public sealed partial class MarketDataCollectorTests
 {
     private static readonly DateOnly Day = new(2026, 9, 4);
 

@@ -9,31 +9,62 @@ public sealed partial class JsonMarketDataLibrary
 {
     private const string ArchiveDirectory = ".archive";
 
-    public MarketDataLibraryScan ConsolidateDailyFiles() => WithLibraryWriteLock(() =>
+    public MarketDataLibraryScan ConsolidateDailyFiles() => ConsolidateDailyFilesCore(null);
+
+    public MarketDataLibraryScan ConsolidateDailyFiles(IProgress<int> progress)
     {
-        MarketDataLibraryScan before = Scan(includeDuplicates: true);
-        if (before.Diagnostics.Any(item => item.Code == "scan_failed")) return before;
-        var notices = new List<MarketDataLibraryDiagnostic>();
-        foreach (var group in before.Datasets.Where(item => item.SourceIntervalSeconds == 15)
-                     .GroupBy(item => (item.Symbol, item.TradingDate)))
+        ArgumentNullException.ThrowIfNull(progress);
+        return ConsolidateDailyFilesCore(progress);
+    }
+
+    private MarketDataLibraryScan ConsolidateDailyFilesCore(IProgress<int>? progress)
+    {
+        int lastPercent = -1;
+        void Report(int percent)
         {
-            HistoricalDatasetInfo[] files = group.ToArray();
-            try
-            {
-                HistoricalDataset[] sources = files.Select(LoadExact).ToArray();
-                if (sources.Length == 1 && SamePath(files[0].RelativePath, DailyPath(sources[0]))) continue;
-                PersistDaily(MergeDaily(sources), files);
-            }
-            catch (Exception exception) when (IsFileError(exception))
-            {
-                notices.Add(new(files[0].RelativePath, "daily_merge_blocked",
-                    $"Could not combine {group.Key.Symbol} on {group.Key.TradingDate:yyyy-MM-dd}: {exception.Message} Original files were retained."));
-            }
+            if (percent <= lastPercent) return;
+            lastPercent = percent;
+            progress?.Report(percent);
         }
-        if (before.Datasets.Count > 0) EnsureReadme();
-        MarketDataLibraryScan after = Scan();
-        return after with { Diagnostics = after.Diagnostics.Concat(notices).ToArray() };
-    });
+
+        Report(0);
+        MarketDataLibraryScan result = WithLibraryWriteLock(() =>
+        {
+            // Count file validation, daily merges, and final validation separately;
+            // the final 1% is reserved until metadata cleanup and lock release finish.
+            MarketDataLibraryScan before = Scan(includeDuplicates: true,
+                progress is null ? null : (done, total) => Report((int)(25L * done / total)));
+            Report(25);
+            if (before.Diagnostics.Any(item => item.Code == "scan_failed")) return before;
+            var notices = new List<MarketDataLibraryDiagnostic>();
+            var groups = before.Datasets.Where(item => item.SourceIntervalSeconds == 15)
+                .GroupBy(item => (item.Symbol, item.TradingDate)).ToArray();
+            int completedGroups = 0;
+            foreach (var group in groups)
+            {
+                HistoricalDatasetInfo[] files = group.ToArray();
+                try
+                {
+                    HistoricalDataset[] sources = files.Select(LoadExact).ToArray();
+                    if (sources.Length == 1 && SamePath(files[0].RelativePath, DailyPath(sources[0]))) continue;
+                    PersistDaily(MergeDaily(sources), files);
+                }
+                catch (Exception exception) when (IsFileError(exception))
+                {
+                    notices.Add(new(files[0].RelativePath, "daily_merge_blocked",
+                        $"Could not combine {group.Key.Symbol} on {group.Key.TradingDate:yyyy-MM-dd}: {exception.Message} Original files were retained."));
+                }
+                finally { Report(25 + (int)(65L * ++completedGroups / groups.Length)); }
+            }
+            Report(90);
+            if (before.Datasets.Count > 0) EnsureReadme();
+            MarketDataLibraryScan after = Scan(includeDuplicates: false,
+                progress is null ? null : (done, total) => Report(90 + (int)(9L * done / total)));
+            return after with { Diagnostics = after.Diagnostics.Concat(notices).ToArray() };
+        });
+        Report(100);
+        return result;
+    }
 
     private T WithLibraryWriteLock<T>(Func<T> action)
     {

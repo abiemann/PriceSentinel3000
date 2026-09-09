@@ -5,7 +5,7 @@ using PriceSentinel3000.Infrastructure.MarketDataLibrary;
 
 namespace PriceSentinel3000.Infrastructure.Tests.MarketDataLibrary;
 
-public sealed class DailyFileConsolidationTests : IDisposable
+public sealed partial class DailyFileConsolidationTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "PriceSentinel-daily-merge-tests", Guid.NewGuid().ToString("N"));
     private static readonly DateTimeOffset Start = new(2026, 9, 4, 13, 30, 0, TimeSpan.Zero);

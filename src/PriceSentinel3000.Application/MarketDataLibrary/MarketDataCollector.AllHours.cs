@@ -14,13 +14,15 @@ public sealed partial class MarketDataCollector
         try
         {
             CollectionSessionWindow day = CollectionSchedule.GetSessionWindow(job.SessionDate, job.SessionBounds);
+            DateTimeOffset requestedFrom = job.RequestedFromUtc ?? day.FromUtc;
             DateTimeOffset through = job.RequestedThroughUtc ?? day.ThroughUtc;
-            if (through <= day.FromUtc || through > day.ThroughUtc ||
+            if (requestedFrom < day.FromUtc || through <= requestedFrom || through > day.ThroughUtc ||
+                requestedFrom.UtcTicks % (15 * TimeSpan.TicksPerSecond) != 0 ||
                 through.UtcTicks % (15 * TimeSpan.TicksPerSecond) != 0)
                 throw new InvalidDataException("The requested collection cutoff is outside the market session.");
             IMarketDataLibrary library = GetCollectionLibrary(job.LibraryRootPath);
             SetActivity("CheckingLocalHistory", job);
-            var query = new HistoricalDataQuery(job.Symbol, day.FromUtc, through, 15,
+            var query = new HistoricalDataQuery(job.Symbol, requestedFrom, through, 15,
                 AdjustmentPolicy: job.AdjustmentPolicy, AdjustmentBasis: job.AdjustmentBasis,
                 SessionBounds: job.SessionBounds, RevisionPolicy: HistoricalRevisionPolicy.CompatibleCoverage,
                 IncludeCompatibleSessions: true);
@@ -37,7 +39,7 @@ public sealed partial class MarketDataCollector
                     gap.ThroughUtc < window.ThroughUtc ? gap.ThroughUtc : window.ThroughUtc)))
                 .Where(gap => gap.FromUtc < gap.ThroughUtc).OrderBy(gap => gap.FromUtc).ToArray();
             ICollectionGapIndex? gapIndex = GetGapIndex(job.LibraryRootPath);
-            CollectionGapSnapshot known = gapIndex?.Query(GapKey(job), day.FromUtc, through, _clock.GetUtcNow()) ?? new([], false);
+            CollectionGapSnapshot known = gapIndex?.Query(GapKey(job), requestedFrom, through, _clock.GetUtcNow()) ?? new([], false);
             HistoricalGap[] requestable = job.IgnoreKnownGaps ? missing : ExcludeKnownGaps(missing, known.UnavailableRanges);
             HistoricalGap? next = requestable.FirstOrDefault(gap =>
                 job.NextGapFromUtc is null || gap.ThroughUtc > job.NextGapFromUtc);

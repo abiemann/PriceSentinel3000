@@ -30,6 +30,7 @@ public sealed record CollectionJob
     public bool IsAutomatic { get; init; }
     public bool IsAvailabilityProbe { get; init; }
     public bool IgnoreKnownGaps { get; init; }
+    public DateTimeOffset? RequestedFromUtc { get; init; }
     public DateTimeOffset? RequestedThroughUtc { get; init; }
     public DateOnly? DiscoveryAsOfDate { get; init; }
     public bool AvailabilityCheckPending { get; init; }

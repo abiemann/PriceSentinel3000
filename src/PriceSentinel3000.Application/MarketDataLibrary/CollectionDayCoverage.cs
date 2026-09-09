@@ -9,6 +9,11 @@ public static class CollectionDayCoverage
             job.SessionDate == DateOnly.MaxValue)
             return null;
         IReadOnlyList<CollectionSessionWindow> sessions = CollectionSchedule.GetSessionWindows(job.SessionDate, job.SessionBounds);
+        if (job.RequestedFromUtc is { } requestedFrom && job.RequestedThroughUtc is { } requestedThrough)
+            sessions = sessions.Select(session => new CollectionSessionWindow(
+                session.FromUtc > requestedFrom ? session.FromUtc : requestedFrom,
+                session.ThroughUtc < requestedThrough ? session.ThroughUtc : requestedThrough))
+                .Where(session => session.FromUtc < session.ThroughUtc).ToArray();
         if (sessions.Count == 0) return null;
 
         HistoricalDatasetInfo[] matching = datasets.Where(dataset =>

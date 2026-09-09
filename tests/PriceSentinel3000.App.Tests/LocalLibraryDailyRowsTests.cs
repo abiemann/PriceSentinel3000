@@ -12,6 +12,7 @@ public sealed partial class SessionWorkflowTests
     public Task LocalLibrary_DailyRowsCombineRevisionsAndKeepSelectionAfterRescan(int width, int height) => host.RunAsync(async () =>
     {
         await using var fixture = new RetentionFixture();
+        fixture.Clock.Now = new(2026, 9, 9, 12, 0, 0, TimeSpan.Zero);
         var date = new DateOnly(2026, 9, 8);
         DateTimeOffset open = CollectionSchedule.GetSessionWindow(date).FromUtc;
         var library = new ScanLibrary(fixture.LibraryRoot)

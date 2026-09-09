@@ -74,7 +74,7 @@
    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="170" /></Grid.ColumnDefinitions>
     <StackPanel>
      <DockPanel HorizontalAlignment="Left">
-      <Button x:Name="DownloadInfoButton" DockPanel.Dock="Right" Width="18" Height="18" Margin="6,0,0,0" Padding="0" FontSize="11"
+      <Button x:Name="DownloadInfoButton" DockPanel.Dock="Left" Width="18" Height="18" Margin="0,0,6,0" Padding="0" FontSize="11"
               Style="{StaticResource SecondaryButtonStyle}" Content="i" AutomationProperties.Name="Download information"
               ToolTipService.InitialShowDelay="200" ToolTipService.ShowDuration="60000">
        <Button.ToolTip>
@@ -137,14 +137,19 @@
     </StackPanel></ScrollViewer>
     <Grid Grid.Column="2"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
      <TextBlock Style="{StaticResource SectionLabelStyle}" Text="EQUITIES TO INCLUDE" Margin="0,0,0,10" />
-     <ListBox Grid.Row="1" ItemsSource="{Binding Members}" Background="{StaticResource CardBrush}" BorderBrush="{StaticResource SubtleBorderBrush}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+     <ListBox Grid.Row="1" Margin="0,0,0,12" ItemsSource="{Binding Members}" Background="{StaticResource CardBrush}" BorderBrush="{StaticResource SubtleBorderBrush}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
       <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Padding" Value="8" /></Style></ListBox.ItemContainerStyle>
       <ListBox.ItemTemplate><DataTemplate><CheckBox Style="{StaticResource PaperCheckBoxStyle}" IsChecked="{Binding IsIncluded}" ToolTip="{Binding CompanyName}">
        <TextBlock TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"><Run Foreground="{StaticResource PrimaryTextBrush}" FontWeight="SemiBold" Text="{Binding Symbol, Mode=OneWay}" /><Run Text="   " /><Run FontSize="11" Text="{Binding CompanyName, Mode=OneWay}" /></TextBlock>
       </CheckBox></DataTemplate></ListBox.ItemTemplate>
      </ListBox>
-     <Button Grid.Row="2" Margin="0,12,0,10" Style="{StaticResource PrimaryButtonStyle}" Content="SAVE LIST" Command="{Binding SaveListCommand}" />
-     <WrapPanel Grid.Row="3"><Button Style="{StaticResource SecondaryButtonStyle}" Content="IMPORT LIST FILE" Click="ImportListFile_Click" IsEnabled="{Binding CanEditPlan}" Margin="0,0,8,0" /><Button Style="{StaticResource SecondaryButtonStyle}" Content="EXPORT LISTS" Click="ExportLists_Click" IsEnabled="{Binding CanEditPlan}" /></WrapPanel>
+     <Button x:Name="SaveListButton" Grid.Row="2" Margin="0,0,0,10" Style="{StaticResource PrimaryButtonStyle}"
+             Content="{Binding SaveListButtonText}" Command="{Binding SaveListCommand}"
+             Visibility="{Binding ShowSaveListButton, Converter={StaticResource BooleanVisibility}}"
+             IsVisibleChanged="SaveListButton_IsVisibleChanged" AutomationProperties.Name="{Binding SaveListButtonText}">
+      <Button.RenderTransform><TranslateTransform /></Button.RenderTransform>
+     </Button>
+     <WrapPanel Grid.Row="3"><Button Style="{StaticResource SecondaryButtonStyle}" Content="IMPORT LIST FILE" Click="ImportListFile_Click" IsEnabled="{Binding CanEditPlan}" Margin="0,0,8,0" /><Button x:Name="ExportListsButton" Style="{StaticResource SecondaryButtonStyle}" Content="EXPORT LISTS" Click="ExportLists_Click" IsEnabled="{Binding CanEditPlan}" Visibility="{Binding HasSavedLists, Converter={StaticResource BooleanVisibility}}" ToolTip="Save all saved list names, symbols and checkbox settings to a file for backup or import into PriceSentinel." /></WrapPanel>
     </Grid>
    </Grid></TabItem>
    <TabItem x:Name="ScheduleDownloadsTab" Header="SCHEDULE &amp; DOWNLOADS"><Grid Margin="16,8"><Grid.ColumnDefinitions><ColumnDefinition Width="3*" MinWidth="230" /><ColumnDefinition Width="20" /><ColumnDefinition Width="5*" /></Grid.ColumnDefinitions>
@@ -173,8 +178,22 @@
     </Grid>
    </Grid></TabItem>
    <TabItem x:Name="LocalLibraryTab" Header="LOCAL LIBRARY"><Grid Margin="16,8"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-    <WrapPanel Margin="0,0,0,8"><Button Style="{StaticResource SecondaryButtonStyle}" Content="RESCAN LIBRARY" Command="{Binding ScanLibraryCommand}" Margin="0,0,8,0" ToolTip="Scan saved history, including files copied into the library." /><Button Style="{StaticResource SecondaryButtonStyle}" Content="OPEN FOLDER" Command="{Binding OpenFolderCommand}" ToolTip="Open the saved market data library folder." /><TextBlock Margin="16,0,0,0" VerticalAlignment="Center" FontSize="11" Text="Click a row for coverage. Click a column to sort; Shift-click adds a secondary sort." /></WrapPanel>
-    <DataGrid x:Name="LocalLibraryGrid" Grid.Row="1" PreviewMouseLeftButtonUp="LocalLibraryGrid_MouseLeftButtonUp" PreviewKeyDown="LocalLibraryGrid_KeyDown" Style="{StaticResource LibraryGrid}" ColumnHeaderStyle="{StaticResource LibraryColumnHeader}" Loaded="LocalLibraryGrid_Loaded" Unloaded="LocalLibraryGrid_Unloaded" ItemsSource="{Binding VisibleLibraryDays}" SelectedItem="{Binding SelectedLibraryDay}" EnableRowVirtualization="True" EnableColumnVirtualization="True" ScrollViewer.VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Saved market data"><DataGrid.Resources><Style TargetType="DataGridCell"><Style.Triggers><Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{StaticResource SuccessSurfaceBrush}" /><Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" /></Trigger></Style.Triggers></Style></DataGrid.Resources><DataGrid.Columns><DataGridTextColumn Header="Equity" SortMemberPath="Symbol" Binding="{Binding Symbol}" Width="100" /><DataGridTextColumn Header="Date" SortMemberPath="TradingDate" Binding="{Binding TradingDate, StringFormat=yyyy-MM-dd}" Width="120" /><DataGridTextColumn Header="Day coverage" SortMemberPath="CoveragePercent" Binding="{Binding Converter={StaticResource DatasetSessionCoverage}, Mode=OneWay}" ElementStyle="{StaticResource DatasetCoverageCell}" Width="140" /><DataGridTextColumn Header="Candles" SortMemberPath="CandleCount" Binding="{Binding CandleCount, TargetNullValue=--}" Width="100" /><DataGridTextColumn Header="Provider" SortMemberPath="Provider" Binding="{Binding Provider}" Width="*" MinWidth="100" /></DataGrid.Columns></DataGrid>
+    <WrapPanel Margin="0,0,0,8"><Grid Margin="0,0,8,0">
+     <Button x:Name="RescanLibraryButton" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding ScanLibraryCommand}" AutomationProperties.Name="{Binding LibraryScanButtonText}" ToolTip="Scan saved history, including files copied into the library.">
+      <TextBlock Text="RESCAN LIBRARY" TextWrapping="NoWrap" Foreground="{StaticResource PrimaryTextBrush}"><TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers><DataTrigger Binding="{Binding IsLibraryScanning}" Value="True"><Setter Property="Visibility" Value="Hidden" /></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+     </Button>
+     <TextBlock x:Name="LibraryScanProgressText" Text="{Binding LibraryScanButtonText}" Visibility="{Binding IsLibraryScanning, Converter={StaticResource BooleanVisibility}}" IsHitTestVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" TextWrapping="NoWrap" FontSize="11" FontWeight="SemiBold" LineHeight="14" LineStackingStrategy="BlockLineHeight" Foreground="{StaticResource PrimaryTextBrush}" />
+    </Grid><Button Style="{StaticResource SecondaryButtonStyle}" Content="OPEN FOLDER" Command="{Binding OpenFolderCommand}" ToolTip="Open the saved market data library folder." /><TextBlock Margin="16,0,0,0" VerticalAlignment="Center" FontSize="11" Text="Click a row for coverage. Click a column to sort; Shift-click adds a secondary sort." /></WrapPanel>
+    <DataGrid x:Name="LocalLibraryGrid" Grid.Row="1" FocusVisualStyle="{x:Null}" PreviewMouseLeftButtonUp="LocalLibraryGrid_MouseLeftButtonUp" PreviewKeyDown="LocalLibraryGrid_KeyDown" Style="{StaticResource LibraryGrid}" ColumnHeaderStyle="{StaticResource LibraryColumnHeader}" Loaded="LocalLibraryGrid_Loaded" Unloaded="LocalLibraryGrid_Unloaded" ItemsSource="{Binding VisibleLibraryDays}" SelectedItem="{Binding SelectedLibraryDay}" EnableRowVirtualization="True" EnableColumnVirtualization="True" ScrollViewer.VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Saved market data"><DataGrid.Resources>
+     <Style TargetType="DataGridRow">
+      <Setter Property="FocusVisualStyle" Value="{x:Null}" /><Setter Property="BorderThickness" Value="0" /><Setter Property="BorderBrush" Value="Transparent" />
+      <Style.Triggers><Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{StaticResource SuccessSurfaceBrush}" /><Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" /></Trigger></Style.Triggers>
+     </Style>
+     <Style TargetType="DataGridCell">
+      <Setter Property="FocusVisualStyle" Value="{x:Null}" /><Setter Property="BorderThickness" Value="0" /><Setter Property="BorderBrush" Value="Transparent" />
+      <Style.Triggers><Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{StaticResource SuccessSurfaceBrush}" /><Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" /></Trigger></Style.Triggers>
+     </Style>
+    </DataGrid.Resources><DataGrid.Columns><DataGridTextColumn Header="Equity" SortMemberPath="Symbol" Binding="{Binding Symbol}" Width="100" /><DataGridTextColumn Header="Date" SortMemberPath="TradingDate" Binding="{Binding TradingDate, StringFormat=yyyy-MM-dd}" Width="120" /><DataGridTextColumn Header="Day coverage" SortMemberPath="CoveragePercent" Binding="{Binding Converter={StaticResource DatasetSessionCoverage}, Mode=OneWay}" ElementStyle="{StaticResource DatasetCoverageCell}" Width="140" /><DataGridTextColumn Header="Candles" SortMemberPath="CandleCount" Binding="{Binding CandleCount, TargetNullValue=--}" Width="100" /><DataGridTextColumn Header="Provider" SortMemberPath="Provider" Binding="{Binding Provider}" Width="*" MinWidth="100" /></DataGrid.Columns></DataGrid>
     <Expander x:Name="LibraryDiagnosticsExpander" Grid.Row="2" Margin="0,8,0,0" Header="LIBRARY DETAILS" IsExpanded="False" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}" Visibility="{Binding HasLibraryDiagnostics, Converter={StaticResource BooleanVisibility}}">
      <TextBox x:Name="LibraryDiagnosticsText" Margin="0,6,0,0" Padding="8" MaxHeight="90" IsReadOnly="True" Text="{Binding LibraryDiagnostics, Mode=OneWay}" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Background="{StaticResource WindowBrush}" Foreground="{StaticResource SecondaryTextBrush}" BorderBrush="{StaticResource SubtleBorderBrush}" AutomationProperties.Name="Library scan details" />
     </Expander>
@@ -192,6 +211,8 @@
       <Button x:Name="LibraryCoverageCloseButton" DockPanel.Dock="Right" Width="36" Height="36" Padding="0"
               Style="{StaticResource SecondaryButtonStyle}" Content="×" FontSize="22"
               Click="LibraryCoverageClose_Click" ToolTip="Close coverage" AutomationProperties.Name="Close coverage dialog" />
+      <TextBlock x:Name="LibraryCoverageCloseHint" DockPanel.Dock="Right" Margin="12,0,12,0" VerticalAlignment="Center"
+                 FontSize="11" Foreground="{StaticResource MutedTextBrush}" Text="Click outside or press Esc to close." />
       <StackPanel><TextBlock FontSize="11" Foreground="{StaticResource AccentBrush}" Text="SAVED DATA COVERAGE" />
        <TextBlock x:Name="LibraryCoverageTitle" Margin="0,4,12,0" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource PrimaryTextBrush}" />
       </StackPanel>
@@ -201,17 +222,50 @@
       <WrapPanel Margin="0,0,0,4"><TextBlock Text="{Binding RangeLabel}" Margin="0,0,12,0" />
        <TextBlock Text="{Binding TimeZoneLabel}" Foreground="{StaticResource AccentBrush}" /></WrapPanel>
       <TextBlock Text="{Binding Summary}" Margin="0,0,0,16" Foreground="{StaticResource PrimaryTextBrush}" />
-      <controls:LibraryCoverageTimelineControl x:Name="LibraryCoverageTimeline" Timeline="{Binding}" Height="104" MinWidth="600" />
-      <WrapPanel Margin="0,12,0,8">
+      <controls:LibraryCoverageTimelineControl x:Name="LibraryCoverageTimeline" Timeline="{Binding}" BlockSelectionChanged="LibraryCoverageBlockSelectionChanged" Height="104" MinWidth="600" />
+      <WrapPanel x:Name="LibraryCoverageLegend" Margin="28,12,0,8">
        <StackPanel Orientation="Horizontal" Margin="0,0,20,8"><Border Background="#24BD83" Width="14" Height="14" Margin="0,0,7,0" /><TextBlock Text="Complete" /></StackPanel>
        <StackPanel Orientation="Horizontal" Margin="0,0,20,8"><Border Background="#000000" BorderBrush="#61788A" BorderThickness="1" Width="14" Height="14" Margin="0,0,7,0" /><TextBlock Text="Missing" /></StackPanel>
        <StackPanel Orientation="Horizontal" Margin="0,0,20,8"><Border Background="#A8EDBD" Width="14" Height="14" Margin="0,0,7,0" /><TextBlock Text="Partial" /></StackPanel>
-       <StackPanel Orientation="Horizontal" Margin="0,0,20,8"><Border Background="#334155" Width="14" Height="14" Margin="0,0,7,0" /><TextBlock Text="Market closed" /></StackPanel>
-       <StackPanel Orientation="Horizontal" Margin="0,0,0,8"><Border Background="#18232F" BorderBrush="#61788A" BorderThickness="1" Width="14" Height="14" Margin="0,0,7,0" /><TextBlock Text="Future" /></StackPanel>
+       <StackPanel Orientation="Horizontal" Margin="0,0,20,8"><Border x:Name="LibraryCoverageClosedKey" Background="#334155" Width="14" Height="14" Margin="0,0,7,0" ClipToBounds="True"><Path Stroke="#8292A5" StrokeThickness="1" Data="M -6,14 L 8,0 M 2,14 L 16,0 M 10,14 L 24,0" /></Border><TextBlock Text="Market closed" /></StackPanel>
+       <StackPanel Orientation="Horizontal" Margin="0,0,0,8"><Border x:Name="LibraryCoverageFutureKey" Background="#173B5C" BorderBrush="#61788A" BorderThickness="1" Width="14" Height="14" Margin="0,0,7,0" /><TextBlock Text="Future" /></StackPanel>
       </WrapPanel>
-      <TextBlock Text="{Binding Notice}" Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,8" />
+      <Border x:Name="LibraryCoverageBlockPanel" Height="80" Padding="10,8"
+              Background="{StaticResource HeaderSurfaceBrush}" BorderBrush="{StaticResource SubtleBorderBrush}" BorderThickness="1" CornerRadius="6">
+       <Grid>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+        <TextBlock FontSize="10" Foreground="{StaticResource AccentBrush}" Text="SELECTED BLOCK" />
+        <TextBlock x:Name="LibraryCoverageBlockDetails" Grid.Row="1" Margin="0,4,12,0" FontSize="11" LineHeight="14" LineStackingStrategy="BlockLineHeight"
+                   TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Foreground="{StaticResource PrimaryTextBrush}"
+                   Text="{Binding SelectedBlock.ToolTip, ElementName=LibraryCoverageTimeline, TargetNullValue=Click a 15-minute block for details., FallbackValue=Click a 15-minute block for details.}"
+                   AutomationProperties.LiveSetting="Polite" />
+        <TextBlock x:Name="LibraryCoverageDownloadStatus" Grid.Row="2" Grid.ColumnSpan="2" Height="14" Margin="0,2,0,0"
+                   VerticalAlignment="Bottom" FontSize="11" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                   Foreground="{StaticResource SecondaryTextBrush}" AutomationProperties.LiveSetting="Polite" Text=""
+                   ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+        <Button x:Name="LibraryCoverageDownloadButton" Grid.Column="1" Grid.RowSpan="2" HorizontalAlignment="Right" VerticalAlignment="Top"
+                Height="30" MinWidth="92" Padding="10,4" Content="DOWNLOAD" FontSize="11"
+                Click="LibraryCoverageDownload_Click"
+                IsEnabled="{Binding DataContext.CanDownloadCoverage, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                ToolTip="Retry this block and adjacent missing blocks. Saved candles are kept; future time is excluded."
+                AutomationProperties.Name="Download connected missing blocks">
+         <Button.Style><Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+          <Setter Property="Visibility" Value="Collapsed" />
+          <Style.Triggers><DataTrigger Binding="{Binding SelectedBlock.State, ElementName=LibraryCoverageTimeline}" Value="Missing">
+           <Setter Property="Visibility" Value="Visible" />
+          </DataTrigger></Style.Triggers>
+         </Style></Button.Style>
+        </Button>
+       </Grid>
+      </Border>
+      <TextBlock Text="{Binding Notice}" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}">
+       <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Margin" Value="0,8,0,0" /><Style.Triggers>
+        <DataTrigger Binding="{Binding Notice}" Value="{x:Null}"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+        <DataTrigger Binding="{Binding Notice}" Value=""><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+       </Style.Triggers></Style></TextBlock.Style>
+      </TextBlock>
      </StackPanel>
-     <TextBlock FontSize="11" Foreground="{StaticResource MutedTextBrush}" Text="Each block covers 15 minutes. Hover for saved and missing candle counts. Click outside or press Esc to close." />
     </StackPanel>
    </Border>
   </Grid>

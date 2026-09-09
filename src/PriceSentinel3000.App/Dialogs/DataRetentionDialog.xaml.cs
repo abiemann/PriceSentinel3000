@@ -2,6 +2,8 @@ using System.ComponentModel;
 using System.Windows.Controls;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.IO;
 using Microsoft.Win32;
 using PriceSentinel3000.App.ViewModels;
@@ -51,10 +53,24 @@ public partial class DataRetentionDialog : Window
 
     private async void ExportLists_Click(object sender, RoutedEventArgs e)
     {
-        if (DataContext is not DataRetentionViewModel { CanEditPlan: true } viewModel) return;
+        if (DataContext is not DataRetentionViewModel { CanEditPlan: true, HasSavedLists: true } viewModel) return;
         var picker = new SaveFileDialog { Filter = "Download lists (*.json)|*.json", FileName = "download-lists.json" };
         if (picker.ShowDialog(this) == true)
             await viewModel.ExecuteAsync(() => File.WriteAllTextAsync(picker.FileName, viewModel.ExportLists()));
+    }
+
+    private void SaveListButton_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (sender is not Button button || button.RenderTransform is not TranslateTransform offset) return;
+        button.BeginAnimation(OpacityProperty, null);
+        offset.BeginAnimation(TranslateTransform.YProperty, null);
+        if (e.NewValue is not true || !SystemParameters.ClientAreaAnimation) return;
+        var duration = TimeSpan.FromMilliseconds(180);
+        button.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, duration) { FillBehavior = FillBehavior.Stop });
+        offset.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(6, 0, duration)
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }, FillBehavior = FillBehavior.Stop,
+        });
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
