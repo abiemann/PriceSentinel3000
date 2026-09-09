@@ -161,7 +161,7 @@ public sealed class ClearCollectionQueueTests
         public string RootPath => Path.GetFullPath("test-library");
         public HistoricalDataQueryResult Query(HistoricalDataQuery query) => new(true, [], [],
             new(query.FromUtc, query.ThroughUtc, null, null, 1560, 0, false, false, []), []);
-        public MarketDataLibraryScan Scan() => throw new NotSupportedException();
+        public MarketDataLibraryScan Scan() => new([], []);
         public IReadOnlyList<HistoricalDatasetInfo> Save(HistoricalDownload download) => throw new NotSupportedException();
         public HistoricalDataset Read(string datasetHash) => throw new NotSupportedException();
     }

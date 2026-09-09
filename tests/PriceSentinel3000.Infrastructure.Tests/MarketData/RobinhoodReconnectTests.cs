@@ -3,6 +3,7 @@ using System.Threading.Channels;
 using ModelContextProtocol.Authentication;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
+using PriceSentinel3000.Application.MarketDataLibrary;
 using PriceSentinel3000.Infrastructure.Authentication;
 using PriceSentinel3000.Infrastructure.MarketData;
 
@@ -100,6 +101,96 @@ public sealed class RobinhoodReconnectTests : IDisposable
         Assert.True(original.Disposed);
     }
 
+    [Fact]
+    public async Task MarketHours_UsesSharedWatchlistCacheAndRefreshesAfterReconnect()
+    {
+        var transports = new List<FakeTransport>();
+        await using var gateway = new RobinhoodMcpGateway(Store, (_, token) => CreateClient(transports, token));
+        await gateway.ConnectAsync(default);
+        FakeTransport original = Assert.Single(transports);
+        original.ToolReply = MarketHoursReply;
+        IEquityMarketHoursSource source = gateway;
+
+        Assert.True(await source.IsTwentyFourHourEligibleAsync(" nvda ", default));
+        Assert.True(await source.IsTwentyFourHourEligibleAsync("AAPL", default));
+        Assert.False(await source.IsTwentyFourHourEligibleAsync("SMALL", default));
+        Assert.Equal(new[] { "get_popular_watchlists", "get_watchlist_items" }, original.ToolCalls);
+
+        await gateway.ReconnectAsync(default);
+        FakeTransport reconnected = transports[1];
+        reconnected.ToolReply = MarketHoursReply;
+        Assert.True(await source.IsTwentyFourHourEligibleAsync("NVDA", default));
+        Assert.Equal(new[] { "get_popular_watchlists", "get_watchlist_items" }, reconnected.ToolCalls);
+    }
+
+    [Theory]
+    [InlineData("api-error")]
+    [InlineData("missing-list")]
+    [InlineData("invalid-items")]
+    [InlineData("empty-items")]
+    public async Task MarketHours_UnknownResponsesThrowWithoutCachingIneligibility(string failure)
+    {
+        var transports = new List<FakeTransport>();
+        await using var gateway = new RobinhoodMcpGateway(Store, (_, token) => CreateClient(transports, token));
+        await gateway.ConnectAsync(default);
+        FakeTransport transport = Assert.Single(transports);
+        transport.ToolReply = name => failure switch
+        {
+            "missing-list" => ToolResult(new { data = new { lists = Array.Empty<object>() } }),
+            _ when name == "get_popular_watchlists" => MarketHoursReply(name),
+            "api-error" => new { content = Array.Empty<object>(), isError = true },
+            "empty-items" => ToolResult(new { data = new { items = Array.Empty<object>() } }),
+            _ => ToolResult(new { data = new { } }),
+        };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => gateway.IsTwentyFourHourEligibleAsync("NVDA", default));
+        transport.ToolReply = MarketHoursReply;
+        Assert.True(await gateway.IsTwentyFourHourEligibleAsync("NVDA", default));
+        Assert.Equal(2, transport.ToolCalls.Count(name => name == "get_popular_watchlists"));
+    }
+
+    [Fact]
+    public async Task MarketHours_DisconnectedLookupDoesNotStartAuthentication()
+    {
+        int connectionAttempts = 0;
+        await using var gateway = new RobinhoodMcpGateway(Store, (_, _) =>
+        {
+            connectionAttempts++;
+            throw new InvalidOperationException("No connection should be started by a library lookup.");
+        });
+
+        await Assert.ThrowsAsync<MarketDataConnectionUnavailableException>(() =>
+            gateway.IsTwentyFourHourEligibleAsync("NVDA", default));
+        Assert.Equal(0, connectionAttempts);
+    }
+
+    [Fact]
+    public async Task MarketHours_CancelledLookupHonorsCancellationEvenWithWarmCache()
+    {
+        var transports = new List<FakeTransport>();
+        await using var gateway = new RobinhoodMcpGateway(Store, (_, token) => CreateClient(transports, token));
+        await gateway.ConnectAsync(default);
+        FakeTransport transport = Assert.Single(transports);
+        transport.ToolReply = MarketHoursReply;
+        Assert.True(await gateway.IsTwentyFourHourEligibleAsync("NVDA", default));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            gateway.IsTwentyFourHourEligibleAsync("NVDA", cancellation.Token));
+        Assert.Equal(2, transport.ToolCalls.Count);
+    }
+
+    private static object MarketHoursReply(string name) => name == "get_popular_watchlists"
+        ? ToolResult(new { data = new { lists = new[] { new { id = "overnight", display_name = "24 Hour Market" } } } })
+        : ToolResult(new { data = new { items = new[]
+        {
+            new { object_type = "instrument", symbol = "NVDA" },
+            new { object_type = "instrument", symbol = "AAPL" },
+        } } });
+
+    private static object ToolResult(object data) => new { content = Array.Empty<object>(), structuredContent = data };
+
     private static async Task<McpClient> CreateClient(List<FakeTransport> transports, CancellationToken token)
     {
         var transport = new FakeTransport();
@@ -120,6 +211,8 @@ public sealed class RobinhoodReconnectTests : IDisposable
         public ChannelReader<JsonRpcMessage> MessageReader => _messages.Reader;
         public bool Disposed { get; private set; }
         public bool HoldTools { get; set; }
+        public Func<string, object>? ToolReply { get; set; }
+        public List<string> ToolCalls { get; } = [];
         public TaskCompletionSource ToolStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public Task<ITransport> ConnectAsync(CancellationToken cancellationToken = default) => Task.FromResult<ITransport>(this);
         public Task SendMessageAsync(JsonRpcMessage message, CancellationToken cancellationToken = default)
@@ -140,10 +233,15 @@ public sealed class RobinhoodReconnectTests : IDisposable
             return Task.CompletedTask;
         }
         public void ReleaseTool() { ReplyTool(_held!); _held = null; }
-        private void ReplyTool(JsonRpcRequest request) => Reply(request, new
+        private void ReplyTool(JsonRpcRequest request)
         {
-            content = Array.Empty<object>(), structuredContent = new { data = new { watchlists = Array.Empty<object>(), results = Array.Empty<object>() } },
-        });
+            string name = request.Params!["name"]!.GetValue<string>();
+            ToolCalls.Add(name);
+            Reply(request, ToolReply?.Invoke(name) ?? new
+            {
+                content = Array.Empty<object>(), structuredContent = new { data = new { watchlists = Array.Empty<object>(), results = Array.Empty<object>() } },
+            });
+        }
         private void Reply(JsonRpcRequest request, object result) => _messages.Writer.TryWrite(new JsonRpcResponse
         {
             Id = request.Id, Result = JsonSerializer.SerializeToNode(result),

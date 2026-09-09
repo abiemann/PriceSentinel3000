@@ -1,7 +1,10 @@
 using System.Collections.Specialized;
 using System.Globalization;
+using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Threading;
 using PriceSentinel3000.App.ViewModels;
+using PriceSentinel3000.App.Views;
 using PriceSentinel3000.Application.MarketDataLibrary;
 
 namespace PriceSentinel3000.App.Tests;
@@ -45,6 +48,24 @@ public sealed partial class SessionWorkflowTests
         Assert.Equal(0d, row.CheckedProgressPercent);
         var collectionChanges = new List<NotifyCollectionChangedAction>();
         vm.Jobs.CollectionChanged += (_, change) => collectionChanges.Add(change.Action);
+        var progressUpdates = new List<double>();
+        vm.PropertyChanged += (_, change) =>
+        {
+            if (change.PropertyName == nameof(DataRetentionViewModel.DownloadProgressPercent))
+                progressUpdates.Add(vm.DownloadProgressPercent);
+        };
+        await using var workspace = new TestWorkspace();
+        workspace.ViewModel.DataRetention = vm;
+        var header = new AppHeaderView { DataContext = workspace.ViewModel };
+        var headerWindow = new Window
+        {
+            Content = header, Width = 1500, Height = 110, ShowActivated = false, ShowInTaskbar = false,
+            WindowStartupLocation = WindowStartupLocation.Manual, Left = -10000, Top = -10000,
+        };
+        headerWindow.Show();
+        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+        var headerProgress = (ProgressBar)header.FindName("HeaderDownloadProgress");
+        Assert.Equal(0d, headerProgress.Value);
         var properties = new List<string?>();
         row.PropertyChanged += (_, change) => properties.Add(change.PropertyName);
         fixture.Provider.HoldCall = 2;
@@ -58,6 +79,11 @@ public sealed partial class SessionWorkflowTests
             Assert.Equal(new DateTimeOffset(2026, 9, 4, 16, 0, 0, TimeSpan.Zero), activity.ThroughUtc);
             Assert.Equal("Working", vm.DownloadState);
             Assert.Equal(30d, row.CheckedProgressPercent);
+            Assert.Equal(30d, vm.DownloadProgressPercent);
+            Assert.Contains(30d, progressUpdates);
+            Assert.True(headerProgress.IsVisible);
+            Assert.Equal(30d, headerProgress.Value);
+            Assert.False(headerProgress.IsIndeterminate);
             Assert.Contains("06:00:00–12:00:00 Eastern", vm.DownloadDetail);
             Assert.Contains("30% of requested trading time checked", vm.DownloadDetail);
             Assert.DoesNotContain("coverage", vm.DownloadDetail);
@@ -74,11 +100,15 @@ public sealed partial class SessionWorkflowTests
             Assert.Contains("Last progress 5s ago", vm.DownloadTiming);
             Assert.Contains("06:00:00–12:00:00 Eastern", vm.DownloadDetail);
             Assert.Equal(2, fixture.Provider.Requests.Count);
+            Assert.Equal(30d, vm.DownloadProgressPercent);
+            Assert.Equal(30d, headerProgress.Value);
+            Assert.All(progressUpdates, value => Assert.InRange(value, 0d, 100d));
             Assert.Same(row, Assert.Single(vm.Jobs));
             Assert.Empty(collectionChanges);
         }
         finally
         {
+            headerWindow.Close();
             await vm.PauseDownloadsCommand.ExecuteAsync();
             await downloading.WaitAsync(TimeSpan.FromSeconds(5));
         }

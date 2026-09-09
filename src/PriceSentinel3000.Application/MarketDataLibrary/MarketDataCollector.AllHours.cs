@@ -18,7 +18,7 @@ public sealed partial class MarketDataCollector
             if (through <= day.FromUtc || through > day.ThroughUtc ||
                 through.UtcTicks % (15 * TimeSpan.TicksPerSecond) != 0)
                 throw new InvalidDataException("The requested collection cutoff is outside the market session.");
-            IMarketDataLibrary library = _libraryFactory(job.LibraryRootPath);
+            IMarketDataLibrary library = GetCollectionLibrary(job.LibraryRootPath);
             SetActivity("CheckingLocalHistory", job);
             var query = new HistoricalDataQuery(job.Symbol, day.FromUtc, through, 15,
                 AdjustmentPolicy: job.AdjustmentPolicy, AdjustmentBasis: job.AdjustmentBasis,
@@ -28,6 +28,8 @@ public sealed partial class MarketDataCollector
             if (!saved.Succeeded || job.ProviderInstrumentId is not null &&
                 saved.Datasets.Any(d => d.InstrumentId != job.ProviderInstrumentId))
                 throw new InvalidDataException("Saved history could not be validated for gap recovery. Existing files were preserved.");
+            job = job with { SavedCoveragePercent = CollectionDayCoverage.Calculate(job, saved.Datasets) };
+            active = job;
             IReadOnlyList<CollectionSessionWindow> windows = CollectionSchedule.GetSessionWindows(job.SessionDate, job.SessionBounds);
             HistoricalGap[] missing = windows
                 .SelectMany(window => saved.Coverage.Gaps.Select(gap => new HistoricalGap(
@@ -60,14 +62,11 @@ public sealed partial class MarketDataCollector
             }
             if (requestBudget < 1) return (0, false);
             DateTimeOffset from = job.NextGapFromUtc is { } cursor && cursor > next.FromUtc ? cursor : next.FromUtc;
-            // Cover entire missing hours, rather than sample one candle and miss a
-            // retention boundary or a sparse interval inside the hour.
-            DateTimeOffset limit = from + (job.AvailabilityCheckPending ? TimeSpan.FromHours(1) : AllHoursRequestSpan);
-            // Indexed and forced checks stay inside an actual gap. Bridging saved candles can
-            // repeatedly return only those candles without ever confirming the hole is empty.
-            DateTimeOffset end = job.AvailabilityCheckPending || job.IgnoreKnownGaps || gapIndex is not null
-                ? (limit < next.ThroughUtc ? limit : next.ThroughUtc)
-                : GroupedGapEnd(requestable, from, windows);
+            // Batch nearby holes across short saved spans. The durable cursor checks each
+            // batch once per run; a partial response never proves its omitted candles absent.
+            DateTimeOffset end = GroupedGapEnd(requestable, from, windows,
+                job.AvailabilityCheckPending ? TimeSpan.FromHours(1) : AllHoursRequestSpan,
+                job.IgnoreKnownGaps ? [] : known.UnavailableRanges);
             active = job with
             {
                 Status = CollectionJobStatus.Downloading, Attempts = job.Attempts + 1,
@@ -141,6 +140,7 @@ public sealed partial class MarketDataCollector
                 AvailabilityCheckPending = job.AvailabilityCheckPending && downloaded.Candles.Count == 0,
                 ActualSourceIntervalSeconds = saved.Candles.Count > 0 || downloaded.Candles.Count > 0 ? 15 : null,
                 DatasetHashes = saved.Datasets.Concat(added).Select(d => d.DatasetHash).Distinct().ToArray(),
+                SavedCoveragePercent = CollectionDayCoverage.Calculate(job, saved.Datasets.Concat(added)),
             });
         }
         catch (MarketDataConnectionUnavailableException exception)
@@ -155,7 +155,8 @@ public sealed partial class MarketDataCollector
                 Error = "Download interrupted; saved sections will be reused on resume.", RetryAfterUtc = null });
             throw;
         }
-        catch (Exception exception) when (exception is HttpRequestException or TimeoutException)
+        catch (Exception exception) when (exception is HttpRequestException or TimeoutException ||
+            exception is OperationCanceledException && !cancellationToken.IsCancellationRequested)
         {
             bool retry = active.Attempts < _options.MaximumTransientAttempts;
             Update(active with { Status = retry ? CollectionJobStatus.Pending : CollectionJobStatus.Failed,
@@ -169,10 +170,12 @@ public sealed partial class MarketDataCollector
     }
 
     private static DateTimeOffset GroupedGapEnd(IReadOnlyList<HistoricalGap> missing, DateTimeOffset from,
-        IReadOnlyList<CollectionSessionWindow> windows)
+        IReadOnlyList<CollectionSessionWindow> windows, TimeSpan maximumSpan, IReadOnlyList<HistoricalGap> unavailable)
     {
         DateTimeOffset sessionEnd = windows.First(window => window.FromUtc <= from && window.ThroughUtc > from).ThroughUtc;
-        DateTimeOffset limit = sessionEnd < from + AllHoursRequestSpan ? sessionEnd : from + AllHoursRequestSpan;
+        DateTimeOffset limit = sessionEnd < from + maximumSpan ? sessionEnd : from + maximumSpan;
+        HistoricalGap? barrier = unavailable.FirstOrDefault(gap => gap.FromUtc >= from && gap.FromUtc < limit);
+        if (barrier is not null) limit = barrier.FromUtc;
         DateTimeOffset end = from;
         foreach (HistoricalGap gap in missing)
         {

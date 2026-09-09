@@ -27,7 +27,7 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
 
     public MarketDataLibraryScan Scan() => Scan(includeDuplicates: false);
 
-    private MarketDataLibraryScan Scan(bool includeDuplicates)
+    private MarketDataLibraryScan ScanCore(bool includeDuplicates, HashSet<string> seen)
     {
         var datasets = new List<HistoricalDatasetInfo>();
         var hashes = new HashSet<string>(StringComparer.Ordinal);
@@ -47,14 +47,14 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
                 if (!string.Equals(Path.GetExtension(path), ".json", StringComparison.OrdinalIgnoreCase)) continue;
                 try
                 {
-                    long length = new FileInfo(path).Length;
-                    if (length > MaximumFileBytes) throw new InvalidDataException("The candle file exceeds the 8 MiB limit.");
-                    HistoricalDataset dataset = Load(path);
-                    if (hashes.Add(dataset.DatasetHash) || includeDuplicates)
-                        datasets.Add(Describe(dataset, relative));
+                    seen.Add(path);
+                    HistoricalDatasetInfo info = ScanDescription(relative);
+                    if (hashes.Add(info.DatasetHash) || includeDuplicates)
+                        datasets.Add(info);
                 }
                 catch (Exception exception) when (IsFileError(exception))
                 {
+                    InvalidateMetadata(path);
                     diagnostics.Add(new(relative, "invalid_dataset", exception.Message));
                 }
             }
@@ -304,7 +304,7 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
             if ((File.Exists(current) || Directory.Exists(current)) && (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
                 throw new InvalidDataException("Library paths must not traverse symbolic links or junctions.");
     }
-    private static void WriteAtomic(string path, byte[] content, bool overwrite = false)
+    private void WriteAtomic(string path, byte[] content, bool overwrite = false)
     {
         string temporary = path + ".tmp-" + Guid.NewGuid().ToString("N");
         try
@@ -315,6 +315,7 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
                 stream.Flush(flushToDisk: true);
             }
             File.Move(temporary, path, overwrite);
+            InvalidateMetadata(path);
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
@@ -347,7 +348,7 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
             Complete price coverage with unknown volume is not complete OHLCV data.
 
             datasetHash is SHA-256 over the canonical schema document with datasetHash replaced by an empty string.
-            PriceSentinel validates schema, timestamps, prices, derived coverage and the full hash when scanning/reading.
+            PriceSentinel fully validates new or changed files during scans and validates every candle document it reads.
             Compatible 15-second sections merge into one date.15s.json file per stock and Eastern calendar date.
             Overlaps count once; conflicting candles or provenance are never overwritten. Replacement is atomic.
             Superseded files live in .archive by exact hash for prior Replay records; normal scans exclude them.

@@ -34,19 +34,21 @@ public sealed partial class SessionWorkflowTests
             localTab.IsSelected = true;
             await SettleLocalLayout(dialog);
             var grid = (DataGrid)dialog.FindName("LocalLibraryGrid");
-            var compact = (Border)dialog.FindName("LibraryDownloadSummaryCard");
-            var full = (Border)dialog.FindName("DownloadActivityCard");
-            var pause = (Button)dialog.FindName("LibraryPauseDownloadsButton");
+            var card = (Border)dialog.FindName("DownloadActivityCard");
+            var pause = (Button)dialog.FindName("PauseDownloadsButton");
+            var tabs = (TabControl)dialog.FindName("RetentionTabs");
             var diagnostics = (Expander)dialog.FindName("LibraryDiagnosticsExpander");
 
             Assert.Equal(120, grid.Items.Count);
             Assert.True(grid.ActualHeight >= minimumGridHeight,
                 $"Local library grid at {width}x{height} was only {grid.ActualHeight:0}px high.");
             AssertInsideWindow(dialog, grid);
-            Assert.True(compact.IsVisible);
-            Assert.False(full.IsVisible);
+            Assert.True(card.IsVisible);
+            Assert.Equal(13d, ((TextBlock)dialog.FindName("DownloadActivityHeading")).FontSize);
+            Assert.Equal(4d, ((ProgressBar)dialog.FindName("DownloadProgress")).ActualHeight);
+            Assert.Equal(32d, pause.ActualHeight);
             Assert.False(diagnostics.IsExpanded);
-            AssertInsideWindow(dialog, compact);
+            AssertInsideWindow(dialog, card);
             AssertInsideWindow(dialog, pause);
             Assert.True(pause.IsVisible);
             Assert.True(pause.IsEnabled);
@@ -74,12 +76,33 @@ public sealed partial class SessionWorkflowTests
             Assert.True(pause.IsEnabled);
             AssertInsideWindow(dialog, pause);
 
-            ((TabItem)dialog.FindName("ScheduleDownloadsTab")).IsSelected = true;
-            await SettleLocalLayout(dialog);
-            Assert.True(full.IsVisible);
-            Assert.False(compact.IsVisible);
-            localTab.IsSelected = true;
-            await SettleLocalLayout(dialog);
+            double headerHeight = card.ActualHeight;
+            double tabHeight = tabs.ActualHeight;
+            Point tabPosition = tabs.TranslatePoint(new Point(), dialog);
+            double libraryGridTop = grid.TranslatePoint(new Point(), dialog).Y;
+            foreach (int tabIndex in new[] { 1, 0, 2 })
+            {
+                tabs.SelectedIndex = tabIndex;
+                await SettleLocalLayout(dialog);
+                Assert.True(card.IsVisible);
+                Assert.True(pause.IsVisible);
+                Assert.True(pause.IsEnabled);
+                Assert.Equal(headerHeight, card.ActualHeight, 5);
+                Assert.Equal(tabHeight, tabs.ActualHeight, 5);
+                Assert.Equal(tabPosition, tabs.TranslatePoint(new Point(), dialog));
+                AssertInsideWindow(dialog, pause);
+                if (tabIndex == 1)
+                {
+                    var downloads = (DataGrid)dialog.FindName("DownloadJobsGrid");
+                    Assert.Equal(libraryGridTop, downloads.TranslatePoint(new Point(), dialog).Y, 5);
+                    AssertInsideWindow(dialog, downloads);
+                    CaptureLocalLayout(dialog, $"schedule-downloads-{width}x{height}-shared-header.png");
+                }
+                else if (tabIndex == 2)
+                {
+                    CaptureLocalLayout(dialog, $"local-library-{width}x{height}-shared-header.png");
+                }
+            }
             Assert.True(grid.ActualHeight >= minimumGridHeight);
             Assert.Same(last, grid.SelectedItem);
         }

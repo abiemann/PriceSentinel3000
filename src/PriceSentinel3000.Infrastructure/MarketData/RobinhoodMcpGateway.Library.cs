@@ -6,7 +6,7 @@ using PriceSentinel3000.Application.MarketDataLibrary;
 namespace PriceSentinel3000.Infrastructure.MarketData;
 
 public sealed partial class RobinhoodMcpGateway :
-    IMarketHistoryProvider, IPersonalWatchlistSource, IEquityCatalogSource
+    IMarketHistoryProvider, IPersonalWatchlistSource, IEquityCatalogSource, IEquityMarketHoursSource
 {
     private static readonly AsyncLocal<bool> LibraryReadOnlyScope = new();
 

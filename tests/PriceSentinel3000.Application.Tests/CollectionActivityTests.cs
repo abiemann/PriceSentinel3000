@@ -41,7 +41,7 @@ public sealed class CollectionActivityTests
         Assert.Null(fixture.Collector.Activity);
         Assert.False(fixture.Collector.IsBusy);
         Assert.True(idleNotified);
-        Assert.Equal(3, fixture.Store.SaveCount); // Queue, downloading and complete only; activity is transient.
+        Assert.Equal(4, fixture.Store.SaveCount); // Queue, saved coverage, downloading and complete; activity is transient.
     }
 
     [Theory]
@@ -118,7 +118,7 @@ public sealed class CollectionActivityTests
         };
         await fixture.Collector.QueueManualAsync(["SOFI"], Day, Day);
         await fixture.Collector.TickAsync(false);
-        Assert.Equal(new[] { "CheckingSchedule" }, phases);
+        Assert.Equal(new[] { "CheckingSchedule" }, phases.Distinct());
         Assert.Null(fixture.Collector.Activity);
         Assert.False(fixture.Collector.IsBusy);
         Assert.Equal(0, fixture.Provider.RequestCount);

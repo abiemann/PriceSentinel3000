@@ -14,6 +14,7 @@ public sealed record CollectionJob
     public DateOnly SessionDate { get; init; }
     public int SourceIntervalSeconds { get; init; } = 15;
     public int? ActualSourceIntervalSeconds { get; init; }
+    public decimal? SavedCoveragePercent { get; init; }
     public int NextSourceIntervalSeconds { get; init; } = 15;
     public string SessionBounds { get; init; } = "regular";
     public string AdjustmentPolicy { get; init; } = "split";

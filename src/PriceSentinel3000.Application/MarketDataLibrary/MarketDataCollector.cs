@@ -8,6 +8,7 @@ public sealed partial class MarketDataCollector
     private readonly ICollectionStateStore _store;
     private readonly IMarketHistoryProvider _provider;
     private readonly Func<string, IMarketDataLibrary> _libraryFactory;
+    private readonly Dictionary<string, IMarketDataLibrary> _libraries = new(StringComparer.OrdinalIgnoreCase);
     private readonly Func<string, ICollectionGapIndex>? _gapIndexFactory;
     private readonly TimeProvider _clock;
     private readonly CollectionRunOptions _options;
@@ -116,12 +117,13 @@ public sealed partial class MarketDataCollector
         try
         {
             SetActivity("CheckingSchedule");
+            LoadSavedCoverage();
             QueueScheduled();
             if (!isConnected) return CollectionBatchResult.Disconnected;
             int remaining = _options.MaximumRequestsPerTick;
             foreach (CollectionJob job in _state.Jobs.Where(j => j.Status == CollectionJobStatus.Pending &&
                 (!j.IsAutomatic || _state.Settings.AutomaticDownloadsEnabled) &&
-                (j.RetryAfterUtc is null || j.RetryAfterUtc <= _clock.GetUtcNow())).OrderByDescending(j => j.SessionDate).ThenBy(j => j.QueuedAtUtc).ToArray())
+                (j.RetryAfterUtc is null || j.RetryAfterUtc <= _clock.GetUtcNow())).OrderByDescending(j => j.SessionDate).ThenBy(j => j.LastAttemptAtUtc).ThenBy(j => j.QueuedAtUtc).ToArray())
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (remaining == 0) break;
@@ -146,6 +148,19 @@ public sealed partial class MarketDataCollector
         }
     }, cancellationToken);
 
+    private IMarketDataLibrary GetCollectionLibrary(string root)
+    {
+        // Keep validated file metadata across requests, including requests in later ticks.
+        // Access is serialized by the collector gate; each folder retains its own library.
+        string path = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
+        if (!_libraries.TryGetValue(path, out IMarketDataLibrary? library))
+        {
+            library = _libraryFactory(path);
+            _libraries.Add(path, library);
+        }
+        return library;
+    }
+
     private void QueueScheduled()
     {
         // A due schedule must not replace an explicit forced run or reset its retry
@@ -161,7 +176,7 @@ public sealed partial class MarketDataCollector
             .Where(m => m.IsIncluded).GroupBy(m => m.Symbol, StringComparer.Ordinal)
             .Select(g => g.FirstOrDefault(m => m.ProviderInstrumentId is not null) ?? g.First()).ToArray();
         SetActivity("CheckingLocalHistory");
-        MarketDataLibraryScan scan = _libraryFactory(_state.Settings.LibraryRootPath).Scan();
+        MarketDataLibraryScan scan = GetCollectionLibrary(_state.Settings.LibraryRootPath).Scan();
         if (scan.Diagnostics.Any(d => d.Code is "scan_limit" or "scan_failed"))
             throw new InvalidDataException("The library must scan completely before checking download continuity.");
         var gaps = _state.ContinuityGaps.Where(g => !SamePath(g.LibraryRootPath, _state.Settings.LibraryRootPath) ||
@@ -230,7 +245,7 @@ public sealed partial class MarketDataCollector
         try
         {
             SetActivity("CheckingLocalHistory", job);
-            IMarketDataLibrary library = _libraryFactory(job.LibraryRootPath);
+            IMarketDataLibrary library = GetCollectionLibrary(job.LibraryRootPath);
             HistoricalDataQueryResult saved = library.Query(new(job.Symbol, window.FromUtc, window.ThroughUtc,
                 15, AdjustmentPolicy: job.AdjustmentPolicy, AdjustmentBasis: job.AdjustmentBasis,
                 SessionBounds: job.SessionBounds, RevisionPolicy: HistoricalRevisionPolicy.LatestFetched,
@@ -239,6 +254,8 @@ public sealed partial class MarketDataCollector
                 throw new InvalidDataException("Saved history could not be validated for gap recovery. Review the local library diagnostics.");
             if (job.ProviderInstrumentId is not null && saved.Datasets.Any(d => d.InstrumentId != job.ProviderInstrumentId))
                 throw new InvalidDataException("Saved history belongs to a different instrument; it cannot be used for gap recovery.");
+            job = job with { SavedCoveragePercent = CollectionDayCoverage.Calculate(job, saved.Datasets) };
+            active = job;
             if (saved.Succeeded && saved.Coverage.Complete && (job.ProviderInstrumentId is null ||
                 saved.Datasets.All(d => d.InstrumentId == job.ProviderInstrumentId)))
             {
@@ -313,6 +330,7 @@ public sealed partial class MarketDataCollector
                 ActualSourceIntervalSeconds = downloaded.SourceIntervalSeconds,
                 AdjustmentBasis = downloaded.AdjustmentBasis,
                 DatasetHashes = datasets.Select(d => d.DatasetHash).ToArray(),
+                SavedCoveragePercent = CollectionDayCoverage.Calculate(job, saved.Datasets.Concat(datasets)),
                 Error = complete ? null : "Saved genuine 15-second history; coverage has gaps. Recent gaps are checked again on the next scheduled run.",
             }, receivedCandles: true);
         }
@@ -328,7 +346,8 @@ public sealed partial class MarketDataCollector
                 Error = "Download interrupted; waiting for the connection and a retry.", RetryAfterUtc = null });
             throw;
         }
-        catch (Exception exception) when (exception is HttpRequestException or TimeoutException)
+        catch (Exception exception) when (exception is HttpRequestException or TimeoutException ||
+            exception is OperationCanceledException && !cancellationToken.IsCancellationRequested)
         {
             bool retry = active.Attempts < _options.MaximumTransientAttempts;
             Update(active with { Status = retry ? CollectionJobStatus.Pending : CollectionJobStatus.Failed,

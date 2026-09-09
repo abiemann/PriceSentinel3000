@@ -166,7 +166,11 @@ public sealed partial class JsonMarketDataLibrary
         {
             string oldPath = Resolve(info.RelativePath);
             EnsureNoReparsePoint(oldPath);
-            if (File.Exists(oldPath) && Load(oldPath).DatasetHash == info.DatasetHash) File.Delete(oldPath);
+            if (File.Exists(oldPath) && Load(oldPath).DatasetHash == info.DatasetHash)
+            {
+                File.Delete(oldPath);
+                InvalidateMetadata(oldPath);
+            }
         }
         return Describe(persisted, relative);
     }

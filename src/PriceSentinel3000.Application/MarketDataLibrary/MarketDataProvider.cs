@@ -52,3 +52,9 @@ public interface IEquityCatalogSource
         IReadOnlyList<string> symbols,
         CancellationToken cancellationToken);
 }
+
+/// <summary>Provider market-hours eligibility; failures mean eligibility is unknown.</summary>
+public interface IEquityMarketHoursSource
+{
+    Task<bool> IsTwentyFourHourEligibleAsync(string symbol, CancellationToken cancellationToken);
+}

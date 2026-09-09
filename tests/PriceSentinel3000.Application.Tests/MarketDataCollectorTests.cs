@@ -209,6 +209,62 @@ public sealed class MarketDataCollectorTests
         Assert.NotEqual(list.Id, imported.Id);
     }
 
+    [Fact]
+    public async Task CollectionReusesLibraryAcrossRequestsAndRunsWithoutMixingFolders()
+    {
+        var store = new MemoryStore();
+        store.Save(new() { Settings = Settings() });
+        var provider = new Provider();
+        var created = new Dictionary<string, Library>(StringComparer.OrdinalIgnoreCase);
+        var collector = new MarketDataCollector(store, provider, root =>
+        {
+            var library = new Library();
+            Assert.True(created.TryAdd(root, library), "Repeated requests discarded the library's validated metadata.");
+            return library;
+        }, new Clock(), Options() with { MaximumRequestsPerTick = 1 });
+        await collector.QueueManualAsync(["SOFI", "NVDA"], Day, Day);
+        await collector.TickAsync(true);
+        await collector.TickAsync(true);
+        Assert.All(collector.State.Jobs, job => Assert.Equal(CollectionJobStatus.Complete, job.Status));
+
+        await collector.QueueManualAsync(["SOFI"], Day, Day, "24_5");
+        for (int tick = 0; tick < 10 && collector.State.Jobs.Any(job => job.Status == CollectionJobStatus.Pending); tick++)
+            await collector.TickAsync(true);
+        Assert.All(collector.State.Jobs, job => Assert.Equal(CollectionJobStatus.Complete, job.Status));
+        Assert.Single(created);
+        Assert.True(provider.Requests.Count > 2);
+
+        string otherRoot = Path.GetFullPath("other-test-library");
+        int priorRequests = provider.Requests.Count;
+        await collector.SaveSettingsAsync(collector.State.Settings with { LibraryRootPath = otherRoot });
+        await collector.QueueManualAsync(["SOFI"], Day, Day);
+        await collector.TickAsync(true);
+
+        Assert.Equal(2, created.Count);
+        Assert.Equal(priorRequests + 1, provider.Requests.Count);
+        Assert.NotEmpty(created[otherRoot].Scan().Datasets);
+        Assert.NotSame(created[otherRoot], created[Settings().LibraryRootPath]);
+    }
+
+    [Fact]
+    public async Task SameDayStocksTakeTurnsBetweenBatches()
+    {
+        var (collector, _, provider, _, clock) = Create(Options() with { MaximumRequestsPerTick = 1 });
+        await collector.QueueManualAsync(["SOFI", "NVDA"], Day, Day, "24_5");
+
+        await collector.TickAsync(true);
+        Assert.Equal("SOFI", Assert.Single(provider.Requests).Symbol);
+        Assert.All(collector.State.Jobs, job => Assert.Equal(CollectionJobStatus.Pending, job.Status));
+        clock.Now = clock.Now.AddSeconds(1);
+        await collector.TickAsync(true);
+        Assert.Equal(new[] { "SOFI", "NVDA" }, provider.Requests.Select(request => request.Symbol));
+
+        clock.Now = clock.Now.AddSeconds(1);
+        await collector.TickAsync(true);
+        Assert.Equal("SOFI", provider.Requests[2].Symbol);
+        Assert.Equal(provider.Requests[0].ThroughUtc, provider.Requests[2].FromUtc);
+    }
+
     private static CollectionSettings Settings() => new()
     {
         LibraryRootPath = Path.GetFullPath("test-library"), TimeZoneId = "America/Los_Angeles",

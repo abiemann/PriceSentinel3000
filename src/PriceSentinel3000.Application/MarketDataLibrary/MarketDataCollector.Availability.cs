@@ -108,7 +108,7 @@ public sealed partial class MarketDataCollector
                         Id = Guid.NewGuid(), SessionDate = previous, RequestedThroughUtc = null,
                         DiscoveryEmptySessions = empty, Status = CollectionJobStatus.Pending,
                         AvailabilityCheckPending = progressive,
-                        ActualSourceIntervalSeconds = null, DatasetHashes = [], Attempts = 0,
+                        ActualSourceIntervalSeconds = null, DatasetHashes = [], Attempts = 0, SavedCoveragePercent = null,
                         NextGapFromUtc = null, ReceivedCandlesThisRun = false,
                         QueuedAtUtc = _clock.GetUtcNow(), LastAttemptAtUtc = null, RetryAfterUtc = null, Error = null,
                     };

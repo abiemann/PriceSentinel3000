@@ -62,6 +62,7 @@ public sealed partial class SessionWorkflowTests
         Assert.True(ReferenceEquals(first, fixture.Provider.DownloadStarted.Task), vm.Status);
         vm.AutomaticDownloadsEnabled = !vm.SavedAutomaticDownloadsEnabled;
         DataRetentionDialog? dialog = null;
+        ToolTip? information = null;
         try
         {
             dialog = new DataRetentionDialog { DataContext = vm, Width = width, Height = height, ShowActivated = false };
@@ -73,7 +74,7 @@ public sealed partial class SessionWorkflowTests
             var card = (Border)dialog.FindName("DownloadActivityCard");
             var grid = (DataGrid)dialog.FindName("DownloadJobsGrid");
             var pause = (Button)dialog.FindName("PauseDownloadsButton");
-            var guidance = (TextBlock)dialog.FindName("DownloadInteractionGuidance");
+            var info = (Button)dialog.FindName("DownloadInfoButton");
             var progress = (ProgressBar)dialog.FindName("DownloadProgress");
             AssertInsideWindow(dialog, card);
             AssertInsideWindow(dialog, grid);
@@ -81,15 +82,32 @@ public sealed partial class SessionWorkflowTests
             Assert.True(grid.ActualHeight >= 125, $"Queue height was only {grid.ActualHeight:0}px.");
             Assert.True(progress.ActualWidth >= 100);
             Assert.True(pause.IsEnabled);
-            Assert.False(string.IsNullOrWhiteSpace(guidance.Text));
+            Assert.Equal(32d, pause.ActualHeight);
+            Assert.Equal(4d, progress.ActualHeight);
+            Assert.Equal(13d, ((TextBlock)dialog.FindName("DownloadActivityHeading")).FontSize);
+            AssertInsideWindow(dialog, info);
+            Assert.True(info.IsEnabled);
+            information = Assert.IsType<ToolTip>(info.ToolTip);
+            Assert.False(information.IsOpen);
+            information.PlacementTarget = info;
+            information.IsOpen = true;
+            await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+            var informationText = FindRetentionVisuals<TextBlock>(information).ToArray();
+            Assert.Contains(informationText, text => text.Text == vm.DownloadDetail);
+            Assert.Contains(informationText, text => text.Name == "DownloadActivityTiming" && !string.IsNullOrWhiteSpace(text.Text));
+            Assert.Contains(informationText, text => text.Name == "DownloadInteractionGuidance" && !string.IsNullOrWhiteSpace(text.Text));
+            Assert.Contains(informationText, text => text.Name == "DownloadCoverageGuidance" && text.Text.Contains("overnight"));
+            Assert.Contains(informationText, text => text.Name == "ScheduleHelpText" && text.Text == vm.ScheduleHelp);
+            Assert.Contains(informationText, text => text.Name == "DownloadAvailableGuidance" && !string.IsNullOrWhiteSpace(text.Text));
+            Assert.DoesNotContain(FindRetentionVisuals<TextBlock>(card), text =>
+                text.Name is "DownloadActivityDetail" or "DownloadActivityTiming" or "DownloadInteractionGuidance");
+            information.IsOpen = false;
             Assert.Equal(Visibility.Visible, ((TextBlock)dialog.FindName("UnsavedScheduleWarning")).Visibility);
             Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting((TextBlock)dialog.FindName("DownloadActivityHeading")));
             Assert.DoesNotContain(FindRetentionVisuals<TextBox>(dialog), field =>
                 AutomationProperties.GetName(field) is "Download from date" or "Download through date");
             Assert.DoesNotContain(FindRetentionVisuals<ComboBox>(dialog), field =>
                 AutomationProperties.GetName(field) == "Download session coverage");
-            Assert.Contains("overnight", ((TextBlock)dialog.FindName("DownloadCoverageGuidance")).Text);
-            Assert.Equal(vm.ScheduleHelp, ((TextBlock)dialog.FindName("ScheduleHelpText")).Text);
             Assert.DoesNotContain(FindRetentionVisuals<Button>(dialog), button => Equals(button.Content, "NOW"));
             Button downloadAvailable = Assert.Single(FindRetentionVisuals<Button>(dialog),
                 button => Equals(button.Content, "DOWNLOAD GAPS NOW"));
@@ -112,7 +130,6 @@ public sealed partial class SessionWorkflowTests
             Assert.Equal(downloadPosition.Y, forcedPosition.Y);
             Assert.Equal(downloadPosition.Y, clearPosition.Y);
             Assert.DoesNotContain(FindRetentionVisuals<Button>(dialog), button => Equals(button.Content, "RETRY MISSING"));
-            AssertInsideWindow(dialog, (TextBlock)dialog.FindName("DownloadAvailableGuidance"));
 
             var tabs = (TabControl)dialog.FindName("RetentionTabs");
             tabs.SelectedIndex = 0;
@@ -124,6 +141,7 @@ public sealed partial class SessionWorkflowTests
         }
         finally
         {
+            if (information is not null) information.IsOpen = false;
             vm.CancelDownloadsCommand.Execute(null);
             await download;
             dialog?.Close();

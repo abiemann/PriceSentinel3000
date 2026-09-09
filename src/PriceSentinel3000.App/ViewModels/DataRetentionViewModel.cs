@@ -187,7 +187,7 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
             CollectionContinuityGap[] gaps = state.ContinuityGaps.Where(g =>
                 string.Equals(g.LibraryRootPath, state.Settings.LibraryRootPath, StringComparison.OrdinalIgnoreCase) &&
                 g.SessionBounds is "regular" or "extended" or "24_5").ToArray();
-            if (gaps.Length == 0) return "Only genuine, completed 15-second candles are downloaded, across all available trading hours. Saved candles are reused when filling missing history.";
+            if (gaps.Length == 0) return "Only genuine, completed 15-second candles are downloaded, across all available trading hours. Saved data is checked first. Available missing candles are downloaded and merged into your daily files.";
             return "Older unresolved gaps remain recorded below. Download gaps now checks how far back 15-second history is still available; expired data cannot be recreated:\n" +
                 string.Join("\n", gaps.Select(g => FormattableString.Invariant($"{g.Symbol}: {g.FromSessionDate:yyyy-MM-dd} through {g.ThroughSessionDate:yyyy-MM-dd}")));
         }

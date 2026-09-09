@@ -296,6 +296,47 @@ public sealed partial class SessionWorkflowTests
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         Assert.Equal(2, fixture.Provider.DownloadCalls);
         Assert.Equal("Complete", vm.DownloadState);
+
+        await vm.ClearDownloadQueueCommand.ExecuteAsync();
+        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+        Assert.Equal(0, vm.DownloadTotal);
+        Assert.Equal(0, vm.DownloadProcessed);
+        Assert.Equal(0d, vm.DownloadProgressPercent);
+        Assert.Equal(0d, progress[^1]);
+        Assert.All(progress, value => Assert.InRange(value, 0d, 100d));
+    });
+
+    [Fact]
+    public Task DownloadProgress_WeightsPartialWorkAndTerminalResultsThenRebalancesWhenTheQueueGrows() => host.RunAsync(async () =>
+    {
+        await using var fixture = new ProgressFixture(
+            new CollectionJob { Symbol = "NFLX", SessionBounds = "24_5", NextGapFromUtc = new(2026, 9, 4, 10, 0, 0, TimeSpan.Zero) },
+            new CollectionJob { Symbol = "SOXL", SessionBounds = "24_5", NextGapFromUtc = new(2026, 9, 3, 10, 0, 0, TimeSpan.Zero) },
+            new CollectionJob { Symbol = "MSFT", SessionBounds = "24_5", NextGapFromUtc = new(2026, 9, 5, 10, 0, 0, TimeSpan.Zero) },
+            new CollectionJob { Symbol = "AAPL", Status = CollectionJobStatus.Complete },
+            new CollectionJob { Symbol = "AMD", Status = CollectionJobStatus.Partial },
+            new CollectionJob { Symbol = "NVDA", Status = CollectionJobStatus.Unavailable, IsAvailabilityProbe = true },
+            new CollectionJob { Symbol = "TSLA", Status = CollectionJobStatus.Failed });
+        DataRetentionViewModel vm = fixture.ViewModel;
+        Assert.Equal(7, vm.DownloadTotal);
+        Assert.Equal(4, vm.DownloadProcessed);
+        Assert.Equal(530d / 7, vm.DownloadProgressPercent);
+        var updates = new List<double>();
+        vm.PropertyChanged += (_, change) =>
+        {
+            if (change.PropertyName == nameof(DataRetentionViewModel.DownloadProgressPercent))
+                updates.Add(vm.DownloadProgressPercent);
+        };
+
+        await vm.Collector.QueueManualAsync(["NEW"], new(2026, 9, 4), new(2026, 9, 4), "24_5");
+        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+
+        Assert.Equal(8, vm.DownloadTotal);
+        Assert.Equal(4, vm.DownloadProcessed);
+        Assert.Equal(66.25d, vm.DownloadProgressPercent);
+        Assert.Contains(66.25d, updates);
+        Assert.All(updates, value => Assert.InRange(value, 0d, 100d));
+        Assert.Equal(0, fixture.Provider.DownloadCalls);
     });
 
     [Fact]
@@ -328,7 +369,7 @@ public sealed partial class SessionWorkflowTests
         Assert.Equal("Available-history check complete", vm.DownloadHeading);
         Assert.Contains("newest to oldest", vm.DownloadDetail);
         Assert.Contains("0 need attention", vm.JobSummary);
-        Assert.Equal("No data", Assert.Single(vm.Jobs).StateText);
+        Assert.Equal("0%", Assert.Single(vm.Jobs).StateText);
     });
 
     [Fact]
@@ -348,7 +389,8 @@ public sealed partial class SessionWorkflowTests
         row.Update(checking with { AvailabilityCheckPending = false });
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
         Assert.Same(row, Assert.Single(vm.VisibleJobs.Cast<DownloadJobViewModel>()));
-        Assert.Equal("Queued", row.StateText);
+        Assert.Equal("--", row.StateText);
+        Assert.StartsWith("Queued.", row.DetailsText);
 
         row.Update(checking with { Status = CollectionJobStatus.Failed, Error = "Connection check failed." });
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
@@ -367,7 +409,8 @@ public sealed partial class SessionWorkflowTests
         });
         DataRetentionViewModel vm = fixture.ViewModel;
         DownloadJobViewModel row = Assert.Single(vm.Jobs);
-        Assert.Equal("Saved so far", row.StateText);
+        Assert.Equal("--", row.StateText);
+        Assert.StartsWith("Saved so far.", row.DetailsText);
         Assert.Contains(cutoff.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"), row.DetailsText);
         Assert.Contains("0 complete", vm.JobSummary);
         Assert.Contains("1 saved so far", vm.JobSummary);

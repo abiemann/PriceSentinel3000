@@ -13,6 +13,7 @@ public partial class DataRetentionDialog : Window
     public DataRetentionDialog()
     {
         InitializeComponent();
+        Deactivated += CoverageWindow_Deactivated;
     }
 
     private void DownloadJobsGrid_Loaded(object sender, RoutedEventArgs e)
@@ -64,7 +65,8 @@ public partial class DataRetentionDialog : Window
         if (e.Key is Key.Escape)
         {
             e.Handled = true;
-            Close();
+            if (LibraryCoverageOverlay.Visibility == Visibility.Visible) CloseLibraryCoverage();
+            else Close();
         }
     }
 }

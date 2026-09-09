@@ -261,8 +261,13 @@ public sealed class CollectionAvailabilityTests
         await fixture.Drain();
         if (!discoveryReachesOldJobs)
         {
-            Assert.All(oldJobs, old => Assert.Equal(JsonSerializer.Serialize(old),
-                JsonSerializer.Serialize(Assert.Single(fixture.Collector.State.Jobs, j => j.Id == old.Id))));
+            Assert.All(oldJobs, old =>
+            {
+                CollectionJob retained = Assert.Single(fixture.Collector.State.Jobs, j => j.Id == old.Id);
+                Assert.NotNull(retained.SavedCoveragePercent);
+                Assert.Equal(JsonSerializer.Serialize(old),
+                    JsonSerializer.Serialize(retained with { SavedCoveragePercent = null }));
+            });
             Assert.DoesNotContain(fixture.Provider.Requests, r => oldJobs.Any(j => j.SessionDate == Date(r)));
             Assert.Equal(prefix.DatasetHash, Assert.Single(fixture.Library.Scan().Datasets,
                 d => d.TradingDate == partialDay).DatasetHash);

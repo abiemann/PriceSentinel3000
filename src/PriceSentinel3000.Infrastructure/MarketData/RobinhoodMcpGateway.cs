@@ -377,7 +377,7 @@ public sealed partial class RobinhoodMcpGateway :
             !RobinhoodBrokerParser.HasExplicitOvernightTradability(
                 root,
                 instrument.Symbol) &&
-            await IsTwentyFourHourEligibleAsync(
+            await IsTwentyFourHourEligibleForTradabilityAsync(
                 instrument.Symbol,
                 cancellationToken).ConfigureAwait(false))
         {
@@ -390,10 +390,13 @@ public sealed partial class RobinhoodMcpGateway :
         return tradability;
     }
 
-    private async Task<bool> IsTwentyFourHourEligibleAsync(
+    public async Task<bool> IsTwentyFourHourEligibleAsync(
         string symbol,
         CancellationToken cancellationToken)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(symbol);
+        cancellationToken.ThrowIfCancellationRequested();
+        symbol = symbol.Trim();
         IReadOnlySet<string>? symbols = _twentyFourHourEligibleSymbols;
         if (symbols is not null)
         {
@@ -408,14 +411,14 @@ public sealed partial class RobinhoodMcpGateway :
             symbols = _twentyFourHourEligibleSymbols;
             if (symbols is null)
             {
-                JsonElement lists = await CallStructuredToolAsync(
+                JsonElement lists = await CallLibraryToolAsync(
                     "get_popular_watchlists",
                     new Dictionary<string, object?>(),
                     cancellationToken).ConfigureAwait(false);
                 string listId = RobinhoodWatchlistParser.ParseListId(
                     lists,
                     TwentyFourHourMarketWatchlistName);
-                JsonElement items = await CallStructuredToolAsync(
+                JsonElement items = await CallLibraryToolAsync(
                     "get_watchlist_items",
                     new Dictionary<string, object?>
                     {
@@ -423,10 +426,26 @@ public sealed partial class RobinhoodMcpGateway :
                     },
                     cancellationToken).ConfigureAwait(false);
                 symbols = RobinhoodWatchlistParser.ParseInstrumentSymbols(items);
+                if (symbols.Count == 0)
+                    throw new InvalidOperationException("Robinhood returned no 24 Hour Market symbols; market-hours eligibility is unknown.");
                 _twentyFourHourEligibleSymbols = symbols;
             }
 
             return symbols.Contains(symbol);
+        }
+        finally
+        {
+            _twentyFourHourEligibilityGate.Release();
+        }
+    }
+
+    private async Task<bool> IsTwentyFourHourEligibleForTradabilityAsync(
+        string symbol,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await IsTwentyFourHourEligibleAsync(symbol, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -439,10 +458,6 @@ public sealed partial class RobinhoodMcpGateway :
                 symbol,
                 exception.Message);
             return false;
-        }
-        finally
-        {
-            _twentyFourHourEligibilityGate.Release();
         }
     }
 

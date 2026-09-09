@@ -207,7 +207,7 @@ public sealed class CollectionGapIndexIntegrationTests
     }
 
     [Fact]
-    public async Task PartialResponsesLeaveHolesForSeparateEmptyChecksWithoutRequestingSavedCandlesAgain()
+    public async Task PartialBatchedResponsesKeepOmittedGapsUnconfirmedAndFinishEachRunOnce()
     {
         using var fixture = new Fixture();
         DateTimeOffset start = Open(Yesterday), through = start.AddMinutes(2);
@@ -223,26 +223,21 @@ public sealed class CollectionGapIndexIntegrationTests
         Assert.Equal(returned, Assert.Single(fixture.Read(Yesterday).Candles));
         Assert.NotEmpty(fixture.Read(Yesterday).Coverage.Gaps);
         AssertRange(Assert.Single(fixture.Provider.Requests), start, through);
+        string savedHash = Assert.Single(fixture.Read(Yesterday).Datasets).DatasetHash;
 
         fixture.Restart();
         fixture.StartOnly(Yesterday, through);
         await fixture.Drain();
 
-        HistoricalDataRequest[] holeChecks = fixture.Provider.Requests.Skip(1).ToArray();
-        Assert.Collection(holeChecks,
-            request => AssertRange(request, start, returned.StartsAtUtc),
-            request => AssertRange(request, returned.EndsAtUtc, through));
-        Assert.All(holeChecks, request => Assert.True(
-            request.ThroughUtc <= returned.StartsAtUtc || request.FromUtc >= returned.EndsAtUtc));
-        Assert.Equal(new[] { new HistoricalGap(start, returned.StartsAtUtc), new HistoricalGap(returned.EndsAtUtc, through) },
-            fixture.Snapshot(Yesterday, through).UnavailableRanges);
-
-        fixture.Restart();
-        fixture.StartOnly(Yesterday, through);
-        await fixture.Drain();
-
-        Assert.Equal(3, fixture.Provider.Requests.Count);
+        // Both holes share one batch; the repeated saved candle is verified and discarded.
+        Assert.Equal(2, fixture.Provider.Requests.Count);
+        AssertRange(fixture.Provider.Requests[1], start, through);
+        Assert.Equal(savedHash, Assert.Single(fixture.Read(Yesterday).Datasets).DatasetHash);
         Assert.Equal(returned, Assert.Single(fixture.Read(Yesterday).Candles));
+        Assert.Empty(fixture.Snapshot(Yesterday, through).UnavailableRanges);
+        fixture.Restart();
+        Assert.Equal(CollectionBatchResult.Idle, await fixture.Collector.TickAsync(true));
+        Assert.Equal(2, fixture.Provider.Requests.Count);
     }
 
     [Theory]
@@ -328,7 +323,7 @@ public sealed class CollectionGapIndexIntegrationTests
     }
 
     [Fact]
-    public async Task ForcedRunFetchesOnlyRealGapsAndPreservesPreviouslySavedCandles()
+    public async Task ForcedRunBatchesNearbyGapsAndPreservesPreviouslySavedCandles()
     {
         using var fixture = new Fixture();
         DateTimeOffset start = Open(Today), through = start.AddMinutes(1);
@@ -339,7 +334,7 @@ public sealed class CollectionGapIndexIntegrationTests
         fixture.RememberEmpty(Today, original.EndsAtUtc, through, through.AddMinutes(15));
         fixture.RememberEmpty(Yesterday, Open(Yesterday), Close(Yesterday));
         HistoricalCandle[] additions = [Candle(start), Candle(start.AddSeconds(30)), Candle(start.AddSeconds(45))];
-        fixture.Provider.Candles.AddRange(additions);
+        fixture.Provider.Candles.AddRange(additions.Append(original));
 
         await fixture.Collector.QueueAvailableAsync();
         await fixture.Drain();
@@ -349,9 +344,7 @@ public sealed class CollectionGapIndexIntegrationTests
         await fixture.Drain();
 
         HistoricalDataRequest[] todayRequests = fixture.Provider.Requests.Where(request => Day(request) == Today).ToArray();
-        Assert.Collection(todayRequests,
-            request => AssertRange(request, start, original.StartsAtUtc),
-            request => AssertRange(request, original.EndsAtUtc, through));
+        AssertRange(Assert.Single(todayRequests), start, through);
         Assert.Equal(additions.Append(original).OrderBy(candle => candle.StartsAtUtc), fixture.Read(Today).Candles);
         Assert.Equal(original, Assert.Single(fixture.Read(Today).Candles, candle => candle.StartsAtUtc == original.StartsAtUtc));
         Assert.Single(fixture.Library.Scan().Datasets, dataset => dataset.TradingDate == Today);
@@ -482,6 +475,159 @@ public sealed class CollectionGapIndexIntegrationTests
         Assert.All(fixture.Collector.State.Jobs, job => Assert.False(job.IgnoreKnownGaps));
     }
 
+    [Fact]
+    public async Task HundredsOfFragmentedHolesUseOneBatchAndPreserveDuplicatesAcrossRestart()
+    {
+        using var fixture = new Fixture();
+        DateTimeOffset start = Open(Yesterday), through = start.AddHours(1);
+        HistoricalCandle[] original = Enumerable.Range(0, 120)
+            .Select(index => Candle(start.AddSeconds(index * 30 + 15))).ToArray();
+        fixture.Seed(Yesterday, original);
+        string originalHash = Assert.Single(fixture.Read(Yesterday).Datasets).DatasetHash;
+        HistoricalCandle[] additions = [Candle(start), Candle(start.AddSeconds(30))];
+        fixture.Provider.Candles.AddRange(original.Concat(additions));
+        fixture.StartOnly(Yesterday, through);
+
+        await fixture.Collector.TickAsync(true);
+
+        HistoricalDataRequest batch = Assert.Single(fixture.Provider.Requests);
+        AssertRange(batch, start, through.AddSeconds(-15));
+        Assert.Equal(batch.ThroughUtc, Assert.Single(fixture.Collector.State.Jobs).NextGapFromUtc);
+        Assert.Equal(original.Concat(additions).OrderBy(candle => candle.StartsAtUtc), fixture.Read(Yesterday).Candles);
+        Assert.Equal(original, fixture.Library.Read(originalHash).Candles);
+        Assert.Empty(fixture.Snapshot(Yesterday, through).UnavailableRanges);
+
+        fixture.Restart();
+        await fixture.Drain();
+
+        Assert.Single(fixture.Provider.Requests);
+        Assert.Single(fixture.Library.Scan().Datasets, dataset => dataset.TradingDate == Yesterday);
+        Assert.Equal(CollectionBatchResult.Idle, await fixture.Collector.TickAsync(true));
+        Assert.Single(fixture.Provider.Requests);
+    }
+
+    [Theory]
+    [InlineData(false, 6, 2)]
+    [InlineData(true, 1, 7)]
+    public async Task BatchesRespectTheRequestSpanAndCollectionCutoff(bool availabilityCheck, int maximumHours, int expectedRequests)
+    {
+        using var fixture = new Fixture();
+        DateTimeOffset start = Open(Yesterday), through = start.AddHours(6.5);
+        HistoricalCandle original = Candle(start.AddHours(3));
+        fixture.Seed(Yesterday, [original]);
+        string originalHash = Assert.Single(fixture.Read(Yesterday).Datasets).DatasetHash;
+        fixture.StartOnly(Yesterday, through, availabilityCheck);
+
+        await fixture.Drain();
+
+        Assert.Equal(expectedRequests, fixture.Provider.Requests.Count);
+        Assert.All(fixture.Provider.Requests, request =>
+        {
+            Assert.True(request.ThroughUtc - request.FromUtc <= TimeSpan.FromHours(maximumHours));
+            Assert.True(request.FromUtc >= start && request.ThroughUtc <= through);
+        });
+        for (int index = 1; index < fixture.Provider.Requests.Count; index++)
+            Assert.True(fixture.Provider.Requests[index - 1].ThroughUtc <= fixture.Provider.Requests[index].FromUtc);
+        Assert.Equal(through, fixture.Provider.Requests[^1].ThroughUtc);
+        Assert.Equal(originalHash, Assert.Single(fixture.Read(Yesterday).Datasets).DatasetHash);
+        Assert.Equal(original, Assert.Single(fixture.Read(Yesterday).Candles));
+    }
+
+    [Theory]
+    [InlineData(300, 1)]
+    [InlineData(315, 2)]
+    public async Task BatchesBridgeNoMoreThanFiveMinutesOfSavedCandles(int savedSeconds, int expectedRequests)
+    {
+        using var fixture = new Fixture();
+        DateTimeOffset start = Open(Yesterday), through = start.AddSeconds(savedSeconds + 30);
+        HistoricalCandle[] original = Enumerable.Range(1, savedSeconds / 15)
+            .Select(index => Candle(start.AddSeconds(index * 15))).ToArray();
+        fixture.Seed(Yesterday, original);
+        fixture.StartOnly(Yesterday, through);
+
+        await fixture.Drain();
+
+        Assert.Equal(expectedRequests, fixture.Provider.Requests.Count);
+        Assert.Equal(start, fixture.Provider.Requests[0].FromUtc);
+        Assert.Equal(through, fixture.Provider.Requests[^1].ThroughUtc);
+        if (expectedRequests == 2)
+        {
+            Assert.Equal(start.AddSeconds(15), fixture.Provider.Requests[0].ThroughUtc);
+            Assert.Equal(through.AddSeconds(-15), fixture.Provider.Requests[1].FromUtc);
+        }
+        Assert.Equal(original, fixture.Read(Yesterday).Candles);
+    }
+
+    [Fact]
+    public async Task SavedDayCoverageCountsStoredCandlesInsteadOfCheckedGaps()
+    {
+        using var fixture = new Fixture();
+        DateTimeOffset start = Open(Today);
+        fixture.Clock.Now = start.AddMinutes(1);
+        fixture.Seed(Today, [Candle(start), Candle(start.AddSeconds(30))]);
+        fixture.StartOnly(Today, start.AddMinutes(1));
+        fixture.Provider.Candles.AddRange([Candle(start), Candle(start.AddSeconds(15)), Candle(start.AddSeconds(30))]);
+
+        await fixture.Collector.TickAsync(true);
+
+        decimal expected = 100m * 45 / (decimal)(Close(Today) - start).TotalSeconds;
+        CollectionJob partial = Assert.Single(fixture.Collector.State.Jobs);
+        Assert.Equal(expected, partial.SavedCoveragePercent);
+        Assert.Equal(CollectionJobStatus.Pending, partial.Status);
+        Assert.Equal(start.AddMinutes(1), partial.NextGapFromUtc);
+        Assert.Equal(3, fixture.Read(Today).Candles.Count);
+
+        await fixture.Collector.TickAsync(true);
+        CollectionJob finished = Assert.Single(fixture.Collector.State.Jobs);
+        Assert.Equal(CollectionJobStatus.Partial, finished.Status);
+        Assert.Equal(expected, finished.SavedCoveragePercent);
+        Assert.Equal(expected, Assert.Single(fixture.Store.Load().Jobs).SavedCoveragePercent);
+    }
+
+    [Fact]
+    public async Task RetainedJobsLoadCoverageOfflineWithoutDownloadingOrChangingOutcome()
+    {
+        using var fixture = new Fixture();
+        DateTimeOffset start = Open(Yesterday);
+        fixture.Seed(Yesterday, [Candle(start), Candle(start.AddSeconds(15))]);
+        fixture.StartOnly(Yesterday, Close(Yesterday));
+        CollectionState state = fixture.Store.Load();
+        fixture.Store.Save(state with { Jobs = state.Jobs.Select(job => job with
+        {
+            Status = CollectionJobStatus.Partial, SavedCoveragePercent = null,
+        }).ToArray() });
+        fixture.Restart();
+
+        await fixture.Collector.TickAsync(false);
+
+        CollectionJob job = Assert.Single(fixture.Collector.State.Jobs);
+        Assert.Equal(CollectionJobStatus.Partial, job.Status);
+        Assert.Equal(100m * 30 / (decimal)(Close(Yesterday) - start).TotalSeconds, job.SavedCoveragePercent);
+        Assert.Equal(job.SavedCoveragePercent, Assert.Single(fixture.Store.Load().Jobs).SavedCoveragePercent);
+        Assert.Empty(fixture.Provider.Requests);
+        Assert.Equal(2, fixture.Read(Yesterday).Candles.Count);
+    }
+
+    [Fact]
+    public async Task FailedAttemptRetainsStoredCoverageAndCandlesForTheNextRun()
+    {
+        using var fixture = new Fixture();
+        DateTimeOffset start = Open(Today);
+        fixture.Seed(Today, [Candle(start)]);
+        fixture.StartOnly(Today, start.AddMinutes(1));
+        fixture.Provider.Failure = "http";
+
+        await fixture.Collector.TickAsync(true);
+
+        CollectionJob failed = Assert.Single(fixture.Collector.State.Jobs);
+        Assert.Equal(CollectionJobStatus.Failed, failed.Status);
+        Assert.Equal(100m * 15 / (decimal)(Close(Today) - start).TotalSeconds, failed.SavedCoveragePercent);
+        Assert.Single(fixture.Read(Today).Candles);
+        Assert.Empty(fixture.Snapshot(Today).UnavailableRanges);
+        await fixture.Collector.RetryMissingAsync();
+        Assert.Equal(failed.SavedCoveragePercent, Assert.Single(fixture.Collector.State.Jobs).SavedCoveragePercent);
+    }
+
     private static void AssertRange(HistoricalDataRequest request, DateTimeOffset from, DateTimeOffset through)
     {
         Assert.Equal(from, request.FromUtc);
@@ -523,13 +669,14 @@ public sealed class CollectionGapIndexIntegrationTests
             MaximumRequestsPerTick = 1, MaximumTransientAttempts = 1,
             MinimumRequestInterval = TimeSpan.Zero, RetryDelay = TimeSpan.Zero,
         }, gapIndexFactory: root => new SqliteCollectionGapIndex(Path.Combine(root, ".collection-gaps.sqlite3")));
-        public void StartOnly(DateOnly day, DateTimeOffset through)
+        public void StartOnly(DateOnly day, DateTimeOffset through, bool availabilityCheck = false)
         {
             Store.Save(Store.Load() with { Jobs = [new()
             {
                 Symbol = "SOFI", ProviderInstrumentId = "SOFI-id", SessionDate = day,
                 SessionBounds = "24_5", LibraryRootPath = Library.RootPath,
                 Status = CollectionJobStatus.Pending, QueuedAtUtc = Clock.Now, RequestedThroughUtc = through,
+                IsAvailabilityProbe = availabilityCheck, AvailabilityCheckPending = availabilityCheck,
             }] });
             Restart();
         }

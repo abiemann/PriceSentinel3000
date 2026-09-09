@@ -42,16 +42,25 @@ public sealed class DownloadJobViewModel(CollectionJob job) : INotifyPropertyCha
     public bool NeedsAttention => Status is CollectionJobStatus.Partial or CollectionJobStatus.Failed ||
         Status == CollectionJobStatus.Unavailable && !IsAvailabilityProbe;
     public DateTimeOffset? RetryAfterUtc => _job.RetryAfterUtc;
-    public string StateText => Status switch
+    public decimal? SavedCoveragePercent => _job.SavedCoveragePercent;
+    public string StateText => Status is CollectionJobStatus.Failed or CollectionJobStatus.Unavailable ? "0%"
+        : SavedCoveragePercent is { } saved ? $"{Math.Clamp(saved, 0m, 100m):0.##}%"
+        : "--";
+    public string StateToolTip => Status == CollectionJobStatus.Failed
+        ? "0% identifies this failed download attempt. Previously saved candles are kept; see Details for the error."
+        : "Genuine 15-second candles saved as a percentage of the full day's available trading hours. Market closures are excluded. Today's remaining hours still count toward the full day. -- means saved coverage has not been verified.";
+    public string StatusText => Status switch
     {
         CollectionJobStatus.Pending => RetryAfterUtc is null ? "Queued" : "Retry waiting",
         CollectionJobStatus.Downloading => "In progress",
         CollectionJobStatus.Complete => RequestedThroughUtc is null ? "Complete" : "Saved so far",
         CollectionJobStatus.Partial => "Saved with gaps",
-        CollectionJobStatus.Unavailable => IsAvailabilityProbe ? "No data" : "Unavailable",
+        CollectionJobStatus.Unavailable => "Data unavailable",
         _ => "Failed",
     };
-    public string DetailsText => Status == CollectionJobStatus.Complete && RequestedThroughUtc is { } through
+    public string DetailsText => $"{StatusText}. {DetailMessage}" + (Status == CollectionJobStatus.Failed
+        ? " Previously saved candles are kept; 0% identifies the failed attempt." : "");
+    private string DetailMessage => Status == CollectionJobStatus.Complete && RequestedThroughUtc is { } through
         ? $"Completed 15-second candles saved through {through.ToLocalTime():yyyy-MM-dd HH:mm:ss}. Download again to collect newer candles."
         : !string.IsNullOrEmpty(Error) ? Error : Status switch
     {
@@ -73,7 +82,7 @@ public sealed class DownloadJobViewModel(CollectionJob job) : INotifyPropertyCha
         bool changed = Status != next.Status || ActualSourceIntervalSeconds != next.ActualSourceIntervalSeconds ||
             Error != next.Error || IsAutomatic != next.IsAutomatic || RetryAfterUtc != next.RetryAfterUtc ||
             IsAvailabilityProbe != next.IsAvailabilityProbe || AvailabilityCheckPending != next.AvailabilityCheckPending ||
-            RequestedThroughUtc != next.RequestedThroughUtc ||
+            RequestedThroughUtc != next.RequestedThroughUtc || SavedCoveragePercent != next.SavedCoveragePercent ||
             NextGapFromUtc != next.NextGapFromUtc;
         _job = next;
         if (changed) PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
@@ -110,7 +119,9 @@ public sealed partial class DataRetentionViewModel
     public string DownloadTiming => _downloadTiming;
     public int DownloadTotal => Jobs.Count;
     public int DownloadProcessed => Jobs.Count(j => j.Status is not (CollectionJobStatus.Pending or CollectionJobStatus.Downloading));
-    public double DownloadProgressPercent => DownloadTotal == 0 ? 0 : 100d * DownloadProcessed / DownloadTotal;
+    public double DownloadProgressPercent => DownloadTotal == 0 ? 0 : Math.Clamp(Jobs.Sum(job =>
+        job.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading
+            ? job.CheckedProgressPercent : 100d) / DownloadTotal, 0d, 100d);
     public string DownloadInteractionHint => _downloadsPaused
         ? "Downloads stay paused until you resume or restart the app. Saved files are kept. You can browse, edit settings, or close this window."
         : "You can switch tabs, scroll, edit drafts, or close this window while downloading. Save actions wait until downloads are idle. Keep PriceSentinel open.";
