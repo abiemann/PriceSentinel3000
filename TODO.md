@@ -36,7 +36,8 @@ See the [user guide](docs/market-data-library.md) and [design](DESIGN.md#local-m
 
 - [x] App-styled Tools entry, saved-state clock, modeless list/schedule/library UI, editable lists, individual equity inclusion, and read-only Robinhood snapshot import/refresh.
 - [x] User-selected daily time and saved time zone, holiday/early-close/DST handling, app-open collection, durable deduplicated jobs, bounded retries, and restart/disconnection recovery.
-- [x] Scheduled runs and one date-free Download now action collect all available regular, premarket, after-hours and overnight 15-second history, reuse saved coverage, collect today's completed candles, discover older sessions until three consecutive collection dates with no broker data, and retry known failures or imported partial days beyond that boundary.
+- [x] Persist confirmed empty 15-second request ranges in an indexed SQLite database, skip them on later runs, retry today's after 15 minutes, and recreate a missing index without changing daily candle files.
+- [x] Scheduled runs and one date-free Download now action collect all available regular, premarket, after-hours and overnight 15-second history, reuse saved coverage, collect today's completed candles, check older gaps in hourly windows before queuing remaining work, skip complete days, and stop each equity at the first older regular trading date whose missing ranges return no data.
 - [x] Group nearby missing candles into bounded requests, validate saved overlaps, avoid redundant files, and show progress within each stock/date.
 - [x] Continue ready download batches without a fixed pause; keep collection running after closing its window, with live progress inside the header button and current status on reopening.
 - [x] Portable symbol-only list transfer and year / numbered English month / ticker / daily JSON history with exact candles, source-close timing, provenance, gaps, nullable volume and archived exact-hash history.

@@ -34,25 +34,40 @@ public sealed partial class MarketDataCollector
                     gap.FromUtc > window.FromUtc ? gap.FromUtc : window.FromUtc,
                     gap.ThroughUtc < window.ThroughUtc ? gap.ThroughUtc : window.ThroughUtc)))
                 .Where(gap => gap.FromUtc < gap.ThroughUtc).OrderBy(gap => gap.FromUtc).ToArray();
-            HistoricalGap? next = missing.FirstOrDefault(gap =>
+            ICollectionGapIndex? gapIndex = GetGapIndex(job.LibraryRootPath);
+            CollectionGapSnapshot known = gapIndex?.Query(GapKey(job), day.FromUtc, through, _clock.GetUtcNow()) ?? new([], false);
+            HistoricalGap[] requestable = job.IgnoreKnownGaps ? missing : ExcludeKnownGaps(missing, known.UnavailableRanges);
+            HistoricalGap? next = requestable.FirstOrDefault(gap =>
                 job.NextGapFromUtc is null || gap.ThroughUtc > job.NextGapFromUtc);
             if (next is null)
             {
+                bool reusedCheck = job.NextGapFromUtc is null && missing.Length > 0 && requestable.Length == 0;
+                // Cached gaps in a previously productive day must not cut off the
+                // older search simply because no broker call was needed this run.
+                bool receivedCandles = job.ReceivedCandlesThisRun || reusedCheck && known.HasReturnedCandles;
                 FinishCollection(job with
                 {
                     Status = missing.Length == 0 ? CollectionJobStatus.Complete :
                         saved.Candles.Count > 0 ? CollectionJobStatus.Partial : CollectionJobStatus.Unavailable,
                     ActualSourceIntervalSeconds = saved.Candles.Count > 0 ? 15 : null,
                     DatasetHashes = saved.Datasets.Select(d => d.DatasetHash).ToArray(),
-                    Error = missing.Length == 0 ? null :
-                        "All missing sections were checked. The broker has no additional 15-second candles for the remaining gaps.",
-                }, emptySession: saved.Candles.Count == 0 && !job.ReceivedCandlesThisRun,
-                    receivedCandles: job.ReceivedCandlesThisRun);
+                    Error = missing.Length == 0 ? null : reusedCheck
+                        ? "Known empty ranges were skipped using the gap index; saved candles were preserved."
+                        : "All missing sections were checked. Confirmed empty ranges are remembered for later downloads.",
+                }, emptySession: saved.Candles.Count == 0 && !receivedCandles,
+                    receivedCandles: receivedCandles);
                 return (0, false);
             }
             if (requestBudget < 1) return (0, false);
             DateTimeOffset from = job.NextGapFromUtc is { } cursor && cursor > next.FromUtc ? cursor : next.FromUtc;
-            DateTimeOffset end = GroupedGapEnd(missing, from, windows);
+            // Cover entire missing hours, rather than sample one candle and miss a
+            // retention boundary or a sparse interval inside the hour.
+            DateTimeOffset limit = from + (job.AvailabilityCheckPending ? TimeSpan.FromHours(1) : AllHoursRequestSpan);
+            // Indexed and forced checks stay inside an actual gap. Bridging saved candles can
+            // repeatedly return only those candles without ever confirming the hole is empty.
+            DateTimeOffset end = job.AvailabilityCheckPending || job.IgnoreKnownGaps || gapIndex is not null
+                ? (limit < next.ThroughUtc ? limit : next.ThroughUtc)
+                : GroupedGapEnd(requestable, from, windows);
             active = job with
             {
                 Status = CollectionJobStatus.Downloading, Attempts = job.Attempts + 1,
@@ -69,9 +84,10 @@ public sealed partial class MarketDataCollector
                 }
             }
             cancellationToken.ThrowIfCancellationRequested();
-            _lastRequestAt = _clock.GetUtcNow();
+            DateTimeOffset requestedAt = _clock.GetUtcNow();
+            _lastRequestAt = requestedAt;
             requests++;
-            SetActivity("Downloading", job, from, end);
+            SetActivity(job.AvailabilityCheckPending ? "CheckingBrokerAvailability" : "Downloading", job, from, end);
             HistoricalDownload downloaded = await _provider.DownloadHistoryAsync(
                 new(job.Symbol, from, end, 15, job.SessionBounds, job.AdjustmentPolicy, job.ProviderInstrumentId),
                 cancellationToken).ConfigureAwait(false);
@@ -100,6 +116,13 @@ public sealed partial class MarketDataCollector
                 else hasNewCandles = true;
             }
             cancellationToken.ThrowIfCancellationRequested();
+            if (job.AvailabilityCheckPending && downloaded.Candles.Count > 0)
+            {
+                // Persist availability before the daily file: a restart must not lose this
+                // evidence when the saved probe candles no longer appear in the gaps.
+                active = active with { ReceivedCandlesThisRun = true, AvailabilityCheckPending = false };
+                Update(active);
+            }
             IReadOnlyList<HistoricalDatasetInfo> added = [];
             if (hasNewCandles)
             {
@@ -108,10 +131,14 @@ public sealed partial class MarketDataCollector
                 // responses containing only already-saved candles do not create redundant revisions.
                 added = library.Save(downloaded);
             }
+            // A durable observation precedes the cursor commit, so a restart can
+            // skip an empty response even if the process closed between these writes.
+            RecordGapObservation(gapIndex, job, downloaded, requestedAt);
             Update(active with
             {
                 Status = CollectionJobStatus.Pending, Attempts = 0, NextGapFromUtc = end,
                 ReceivedCandlesThisRun = job.ReceivedCandlesThisRun || downloaded.Candles.Count > 0,
+                AvailabilityCheckPending = job.AvailabilityCheckPending && downloaded.Candles.Count == 0,
                 ActualSourceIntervalSeconds = saved.Candles.Count > 0 || downloaded.Candles.Count > 0 ? 15 : null,
                 DatasetHashes = saved.Datasets.Concat(added).Select(d => d.DatasetHash).Distinct().ToArray(),
             });

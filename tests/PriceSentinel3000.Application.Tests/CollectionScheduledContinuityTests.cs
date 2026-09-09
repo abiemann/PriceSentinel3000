@@ -105,8 +105,8 @@ public sealed class CollectionScheduledContinuityTests
         CollectionContinuityGap gap = Assert.Single(fixture.Store.Load().ContinuityGaps);
         Assert.Equal(new DateOnly(2026, 8, 4), gap.FromSessionDate);
         Assert.Equal(new DateOnly(2026, 9, 1), gap.ThroughSessionDate);
-        Assert.Equal(new DateOnly(2026, 8, 31), fixture.Provider.Requests.Min(RequestDay));
-        Assert.Equal(3, fixture.Collector.State.Jobs.Count(j => j.Status == CollectionJobStatus.Unavailable));
+        Assert.Equal(new DateOnly(2026, 9, 2), fixture.Provider.Requests.Min(RequestDay));
+        Assert.Equal(1, fixture.Collector.State.Jobs.Count(j => j.Status == CollectionJobStatus.Unavailable));
         Assert.InRange(fixture.Store.Load().Jobs.Count, 1, 20);
         int requests = fixture.Provider.Requests.Count;
 
@@ -179,7 +179,7 @@ public sealed class CollectionScheduledContinuityTests
 
         HistoricalDataRequest[] repaired = fixture.Provider.Requests.Skip(before)
             .Where(r => RequestDay(r) == previous.SessionDate).ToArray();
-        Assert.Equal(4, repaired.Length);
+        Assert.Equal(5, repaired.Length);
         Assert.Equal(Window("2026-09-04").FromUtc, repaired[0].FromUtc);
         Assert.Equal(Window("2026-09-04").ThroughUtc, repaired[^1].ThroughUtc);
         Assert.Equal(previous.Id, fixture.Collector.State.Jobs.Single(j => j.SessionDate == previous.SessionDate).Id);

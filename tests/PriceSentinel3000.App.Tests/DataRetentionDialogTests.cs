@@ -92,8 +92,25 @@ public sealed partial class SessionWorkflowTests
             Assert.Equal(vm.ScheduleHelp, ((TextBlock)dialog.FindName("ScheduleHelpText")).Text);
             Assert.DoesNotContain(FindRetentionVisuals<Button>(dialog), button => Equals(button.Content, "NOW"));
             Button downloadAvailable = Assert.Single(FindRetentionVisuals<Button>(dialog),
-                button => Equals(button.Content, "DOWNLOAD NOW"));
+                button => Equals(button.Content, "DOWNLOAD GAPS NOW"));
             Assert.Same(vm.DownloadNowCommand, downloadAvailable.Command);
+            var forced = (Button)dialog.FindName("ForcedDownloadButton");
+            Assert.Equal("FORCED DOWNLOAD", forced.Content);
+            Assert.Same(vm.ForcedDownloadCommand, forced.Command);
+            Assert.False(forced.IsEnabled);
+            AssertInsideWindow(dialog, forced);
+            var clear = (Button)dialog.FindName("ClearDownloadQueueButton");
+            Assert.Same(vm.ClearDownloadQueueCommand, clear.Command);
+            Assert.False(clear.IsEnabled);
+            AssertInsideWindow(dialog, downloadAvailable);
+            AssertInsideWindow(dialog, clear);
+            Point downloadPosition = downloadAvailable.TranslatePoint(new Point(), dialog);
+            Point clearPosition = clear.TranslatePoint(new Point(), dialog);
+            Point forcedPosition = forced.TranslatePoint(new Point(), dialog);
+            Assert.True(forcedPosition.X >= downloadPosition.X + downloadAvailable.ActualWidth);
+            Assert.True(clearPosition.X >= forcedPosition.X + forced.ActualWidth);
+            Assert.Equal(downloadPosition.Y, forcedPosition.Y);
+            Assert.Equal(downloadPosition.Y, clearPosition.Y);
             Assert.DoesNotContain(FindRetentionVisuals<Button>(dialog), button => Equals(button.Content, "RETRY MISSING"));
             AssertInsideWindow(dialog, (TextBlock)dialog.FindName("DownloadAvailableGuidance"));
 

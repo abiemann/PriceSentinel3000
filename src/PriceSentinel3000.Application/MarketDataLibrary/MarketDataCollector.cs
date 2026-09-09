@@ -8,6 +8,7 @@ public sealed partial class MarketDataCollector
     private readonly ICollectionStateStore _store;
     private readonly IMarketHistoryProvider _provider;
     private readonly Func<string, IMarketDataLibrary> _libraryFactory;
+    private readonly Func<string, ICollectionGapIndex>? _gapIndexFactory;
     private readonly TimeProvider _clock;
     private readonly CollectionRunOptions _options;
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -17,11 +18,13 @@ public sealed partial class MarketDataCollector
     private DateTimeOffset? _lastRequestAt;
 
     public MarketDataCollector(ICollectionStateStore store, IMarketHistoryProvider provider,
-        Func<string, IMarketDataLibrary> libraryFactory, TimeProvider? clock = null, CollectionRunOptions? options = null)
+        Func<string, IMarketDataLibrary> libraryFactory, TimeProvider? clock = null, CollectionRunOptions? options = null,
+        Func<string, ICollectionGapIndex>? gapIndexFactory = null)
     {
         _store = store;
         _provider = provider;
         _libraryFactory = libraryFactory;
+        _gapIndexFactory = gapIndexFactory;
         _clock = clock ?? TimeProvider.System;
         _options = options ?? new();
         if (_options.MaximumRequestsPerTick is < 1 or > 100 || _options.MaximumTransientAttempts is < 1 or > 10 ||
@@ -100,7 +103,8 @@ public sealed partial class MarketDataCollector
             Jobs = _state.Jobs.Select(j => (jobIds is null || jobIds.Contains(j.Id)) &&
                 j.Status is CollectionJobStatus.Partial or CollectionJobStatus.Unavailable or CollectionJobStatus.Failed
                 ? j with { Status = CollectionJobStatus.Pending, Attempts = 0, NextSourceIntervalSeconds = 15,
-                    IsAutomatic = false, RetryAfterUtc = null, Error = null, NextGapFromUtc = null, ReceivedCandlesThisRun = false }
+                    IsAutomatic = false, IsAvailabilityProbe = false, IgnoreKnownGaps = false, RetryAfterUtc = null, Error = null, NextGapFromUtc = null, ReceivedCandlesThisRun = false,
+                    DiscoveryAsOfDate = null, AvailabilityCheckPending = false, DiscoveryEmptySessions = null }
                 : j).ToArray(),
         }), cancellationToken);
 
@@ -117,7 +121,7 @@ public sealed partial class MarketDataCollector
             int remaining = _options.MaximumRequestsPerTick;
             foreach (CollectionJob job in _state.Jobs.Where(j => j.Status == CollectionJobStatus.Pending &&
                 (!j.IsAutomatic || _state.Settings.AutomaticDownloadsEnabled) &&
-                (j.RetryAfterUtc is null || j.RetryAfterUtc <= _clock.GetUtcNow())).OrderBy(j => j.QueuedAtUtc).ToArray())
+                (j.RetryAfterUtc is null || j.RetryAfterUtc <= _clock.GetUtcNow())).OrderByDescending(j => j.SessionDate).ThenBy(j => j.QueuedAtUtc).ToArray())
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (remaining == 0) break;
@@ -144,6 +148,11 @@ public sealed partial class MarketDataCollector
 
     private void QueueScheduled()
     {
+        // A due schedule must not replace an explicit forced run or reset its retry
+        // progress. Leave the occurrence due until that run has finished.
+        if (_state.Jobs.Any(j => j.IgnoreKnownGaps &&
+            j.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading &&
+            SamePath(j.LibraryRootPath, _state.Settings.LibraryRootPath))) return;
         const string bounds = CollectionSettings.AllAvailableSessionBounds;
         IReadOnlyList<DueCollectionSession> due = CollectionSchedule.GetDueSessions(
             _state.Settings with { SessionBounds = bounds }, _state.LastScheduledOccurrenceUtc, _clock.GetUtcNow());
@@ -155,12 +164,11 @@ public sealed partial class MarketDataCollector
         MarketDataLibraryScan scan = _libraryFactory(_state.Settings.LibraryRootPath).Scan();
         if (scan.Diagnostics.Any(d => d.Code is "scan_limit" or "scan_failed"))
             throw new InvalidDataException("The library must scan completely before checking download continuity.");
-        var jobs = _state.Jobs.ToList();
         var gaps = _state.ContinuityGaps.Where(g => !SamePath(g.LibraryRootPath, _state.Settings.LibraryRootPath) ||
             g.SessionBounds != bounds || !members.Any(m => m.Symbol == g.Symbol)).ToList();
         foreach (DownloadListMember member in members)
         {
-            DateOnly? trackedFrom = jobs.Where(j => j.Symbol == member.Symbol &&
+            DateOnly? trackedFrom = _state.Jobs.Where(j => j.Symbol == member.Symbol &&
                 (!j.IsAvailabilityProbe || j.DatasetHashes.Count > 0 || j.Status == CollectionJobStatus.Failed) &&
                 j.SessionBounds == bounds && SamePath(j.LibraryRootPath, _state.Settings.LibraryRootPath))
                 .Select(j => (DateOnly?)j.SessionDate)
@@ -169,12 +177,10 @@ public sealed partial class MarketDataCollector
                     .Select(g => (DateOnly?)g.FromSessionDate)).Min();
             CollectionBackfillPlan plan = CollectionBackfillPlanner.Plan(member, scan.Datasets, due[^1].SessionDate,
                 bounds, _clock.GetUtcNow(), _state.Settings.CatchUpCalendarDays, trackedFrom);
-            foreach (DateOnly day in plan.MissingSessions)
-                AddJobs(jobs, [member], day, bounds, automatic: true);
             gaps.AddRange(plan.ExpiredGaps.Select(g => new CollectionContinuityGap(member.Symbol,
                 g.FromSessionDate, g.ThroughSessionDate, bounds, _state.Settings.LibraryRootPath)));
         }
-        Commit(_state with { Jobs = jobs.ToArray(), ContinuityGaps = gaps.ToArray() });
+        Commit(_state with { ContinuityGaps = gaps.ToArray() });
         QueueAvailable(automatic: true);
         Commit(_state with { LastScheduledOccurrenceUtc = due[^1].OccurrenceUtc });
     }
@@ -202,6 +208,7 @@ public sealed partial class MarketDataCollector
                 jobs[existing] = jobs[existing] with { IsAutomatic = automatic && jobs[existing].IsAutomatic, Status = CollectionJobStatus.Pending,
                     Attempts = 0, NextSourceIntervalSeconds = 15, RetryAfterUtc = null, Error = null,
                     RequestedThroughUtc = null, NextGapFromUtc = null, ReceivedCandlesThisRun = false,
+                    DiscoveryAsOfDate = null, AvailabilityCheckPending = false, IgnoreKnownGaps = false,
                     DiscoveryEmptySessions = automatic ? jobs[existing].DiscoveryEmptySessions : null,
                     IsAvailabilityProbe = automatic && jobs[existing].IsAvailabilityProbe };
         }

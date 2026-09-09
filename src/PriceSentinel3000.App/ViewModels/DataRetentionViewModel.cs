@@ -72,9 +72,10 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
         VisibleJobs = new ListCollectionView(Jobs)
         {
             Filter = item => item is DownloadJobViewModel row &&
-                (row.Status != CollectionJobStatus.Unavailable || !row.IsAvailabilityProbe),
+                (row.Status != CollectionJobStatus.Unavailable || !row.IsAvailabilityProbe) &&
+                (!row.AvailabilityCheckPending || row.Status is CollectionJobStatus.Partial or CollectionJobStatus.Failed),
             IsLiveFiltering = true,
-            LiveFilteringProperties = { nameof(DownloadJobViewModel.Status), nameof(DownloadJobViewModel.IsAvailabilityProbe) },
+            LiveFilteringProperties = { nameof(DownloadJobViewModel.Status), nameof(DownloadJobViewModel.IsAvailabilityProbe), nameof(DownloadJobViewModel.AvailabilityCheckPending) },
             SortDescriptions =
             {
                 new(nameof(DownloadJobViewModel.SessionDate), ListSortDirection.Descending),
@@ -114,6 +115,8 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
         RefreshWatchlistCommand = Command(() => PreviewWatchlistAsync(true));
         SaveScheduleCommand = Command(SaveScheduleAsync);
         DownloadNowCommand = Command(DownloadNowAsync, () => !_downloadsPaused);
+        ForcedDownloadCommand = Command(ForcedDownloadAsync, () => !_downloadsPaused);
+        ClearDownloadQueueCommand = Command(ClearDownloadQueueAsync, () => Jobs.Count > 0 && !HasDownloadWork);
         ScanLibraryCommand = Command(ScanLibraryAsync);
         PinDatasetCommand = new RelayCommand(() => { if (SelectedDataset is { } d) ReplayPinnedHashes = d.DatasetHash; });
         ClearPinsCommand = new RelayCommand(() => ReplayPinnedHashes = "");
@@ -174,7 +177,7 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
         : "Automatic downloads are off. Manual downloads remain available.";
     public string ScheduleHelp => SavedAutomaticDownloadsEnabled
         ? "Runs at your saved daily time while PriceSentinel is open and connected. Each run saves today's completed candles and checks earlier missing history for every included equity. Saved files are reused; older unresolved gaps remain visible."
-        : "Automatic downloads are off. Download now saves today's completed candles and checks earlier missing history. To run daily while PriceSentinel is open and connected, enable automatic downloads and save the schedule.";
+        : "Automatic downloads are off. Download gaps now saves today's completed candles and checks earlier missing history. To run daily while PriceSentinel is open and connected, enable automatic downloads and save the schedule.";
     public string JobSummary => $"Retained queue: {DownloadProcessed}/{DownloadTotal} checked · {Jobs.Count(j => j.Status == CollectionJobStatus.Complete && j.RequestedThroughUtc is null)} complete · {Jobs.Count(j => j.Status == CollectionJobStatus.Complete && j.RequestedThroughUtc is not null)} saved so far · {Jobs.Count(j => j.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading)} remaining · {Jobs.Count(j => j.NeedsAttention)} need attention";
     public string ContinuityWarnings
     {
@@ -185,7 +188,7 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
                 string.Equals(g.LibraryRootPath, state.Settings.LibraryRootPath, StringComparison.OrdinalIgnoreCase) &&
                 g.SessionBounds is "regular" or "extended" or "24_5").ToArray();
             if (gaps.Length == 0) return "Only genuine, completed 15-second candles are downloaded, across all available trading hours. Saved candles are reused when filling missing history.";
-            return "Older unresolved gaps remain recorded below. Download now checks how far back 15-second history is still available; expired data cannot be recreated:\n" +
+            return "Older unresolved gaps remain recorded below. Download gaps now checks how far back 15-second history is still available; expired data cannot be recreated:\n" +
                 string.Join("\n", gaps.Select(g => FormattableString.Invariant($"{g.Symbol}: {g.FromSessionDate:yyyy-MM-dd} through {g.ThroughSessionDate:yyyy-MM-dd}")));
         }
     }
@@ -199,6 +202,8 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
     public AsyncRelayCommand RefreshWatchlistCommand { get; }
     public AsyncRelayCommand SaveScheduleCommand { get; }
     public AsyncRelayCommand DownloadNowCommand { get; }
+    public AsyncRelayCommand ForcedDownloadCommand { get; }
+    public AsyncRelayCommand ClearDownloadQueueCommand { get; }
     public AsyncRelayCommand ScanLibraryCommand { get; }
     public AsyncRelayCommand OpenFolderCommand { get; }
     public RelayCommand PinDatasetCommand { get; }
@@ -318,7 +323,7 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
         }, _lifetime.Token);
         Status = "Schedule and library folder saved. " + (SavedAutomaticDownloadsEnabled
             ? "Automatic downloads collect today's completed candles and earlier missing history at the saved daily time."
-            : "Automatic downloads are off. Download now remains available.");
+            : "Automatic downloads are off. Download gaps now remains available.");
         RefreshState();
     }
 
@@ -326,6 +331,21 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
     {
         await Collector.QueueAvailableAsync(cancellationToken: _lifetime.Token);
         await RunDownloadsAsync();
+    }
+
+    private async Task ForcedDownloadAsync()
+    {
+        await Collector.QueueForcedAvailableAsync(cancellationToken: _lifetime.Token);
+        await RunDownloadsAsync();
+    }
+
+    private async Task ClearDownloadQueueAsync()
+    {
+        await Collector.ClearFinishedJobsAsync(_lifetime.Token);
+        _downloadsPaused = false;
+        _collectionError = null;
+        _lastDownloadProgressAt = null;
+        Status = "Finished queue entries cleared. Saved candles and remembered gaps are kept.";
     }
 
     private async Task RunDownloadsAsync()
@@ -442,7 +462,7 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
 
     private AsyncRelayCommand[] Commands() => [SaveListCommand, DeleteListCommand, AddTickersCommand,
         LoadWatchlistsCommand, ReconnectCommand, ImportWatchlistCommand, RefreshWatchlistCommand, SaveScheduleCommand,
-        DownloadNowCommand, ScanLibraryCommand, OpenFolderCommand, PauseDownloadsCommand];
+        DownloadNowCommand, ForcedDownloadCommand, ClearDownloadQueueCommand, ScanLibraryCommand, OpenFolderCommand, PauseDownloadsCommand];
     private AsyncRelayCommand Command(Func<Task> action, Func<bool>? canExecute = null) =>
         new(() => ExecuteAsync(action), () => !IsBusy && !_disposed && (canExecute?.Invoke() ?? true));
     public async Task ExecuteAsync(Func<Task> action)

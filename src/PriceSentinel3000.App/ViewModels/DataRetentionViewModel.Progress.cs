@@ -17,6 +17,7 @@ public sealed class DownloadJobViewModel(CollectionJob job) : INotifyPropertyCha
     public string? Error => _job.Error;
     public bool IsAutomatic => _job.IsAutomatic;
     public bool IsAvailabilityProbe => _job.IsAvailabilityProbe;
+    public bool AvailabilityCheckPending => _job.AvailabilityCheckPending;
     public DateTimeOffset? RequestedThroughUtc => _job.RequestedThroughUtc;
     public DateTimeOffset? NextGapFromUtc => _job.NextGapFromUtc;
     public double CheckedProgressPercent
@@ -71,7 +72,8 @@ public sealed class DownloadJobViewModel(CollectionJob job) : INotifyPropertyCha
             next.Status is CollectionJobStatus.Complete or CollectionJobStatus.Partial or CollectionJobStatus.Unavailable or CollectionJobStatus.Failed;
         bool changed = Status != next.Status || ActualSourceIntervalSeconds != next.ActualSourceIntervalSeconds ||
             Error != next.Error || IsAutomatic != next.IsAutomatic || RetryAfterUtc != next.RetryAfterUtc ||
-            IsAvailabilityProbe != next.IsAvailabilityProbe || RequestedThroughUtc != next.RequestedThroughUtc ||
+            IsAvailabilityProbe != next.IsAvailabilityProbe || AvailabilityCheckPending != next.AvailabilityCheckPending ||
+            RequestedThroughUtc != next.RequestedThroughUtc ||
             NextGapFromUtc != next.NextGapFromUtc;
         _job = next;
         if (changed) PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null));
@@ -94,7 +96,7 @@ public sealed partial class DataRetentionViewModel
     private string? _collectionError;
     private string _downloadState = "Idle";
     private string _downloadHeading = "Ready to download";
-    private string _downloadDetail = "Save your equity list, then select Download now to collect missing 15-second history.";
+    private string _downloadDetail = "Save your equity list, then select Download gaps now to collect missing 15-second history.";
     private string _downloadTiming = "";
 
     public bool CanEditPlan => !IsBusy && !_disposed;
@@ -251,6 +253,8 @@ public sealed partial class DataRetentionViewModel
                 "CheckingSchedule" => ("Checking saved coverage…", "Finding today's completed candles and earlier missing history for the saved equity lists."),
                 "CheckingLocalHistory" => (activity.Symbol is null ? "Checking local library…" : $"Checking {target}",
                     "Reading saved candles before requesting missing 15-second data."),
+                "CheckingBrokerAvailability" => ($"Checking availability · {target}",
+                    "Checking missing hours for genuine 15-second candles before queuing the rest of this date."),
                 "WaitingForRateLimit" => ($"Waiting briefly · {target}", "Spacing requests to the broker. Downloads will continue automatically."),
                 "Saving" => ($"Saving {target}", "Validating and writing the returned candles to the local library."),
                 _ => ($"Downloading {target}", "Waiting for Robinhood to return 15-second candles. This request is still active."),
@@ -262,7 +266,8 @@ public sealed partial class DataRetentionViewModel
                 string end = localFrom.Date == localThrough.Date ? $"{localThrough:HH:mm:ss}" : $"{localThrough:MM-dd HH:mm:ss}";
                 DownloadJobViewModel? row = Jobs.FirstOrDefault(job => job.Symbol == activity.Symbol &&
                     job.SessionDate == activity.SessionDate && job.Status == CollectionJobStatus.Downloading);
-                detail = $"Request {localFrom:HH:mm:ss}–{end} Eastern. " + (row?.CheckedProgressText ?? detail);
+                detail = $"Request {localFrom:HH:mm:ss}–{end} Eastern. " + (activity.Stage == "CheckingBrokerAvailability"
+                    ? "Checking this missing hour for available 15-second candles." : row?.CheckedProgressText ?? detail);
             }
         }
         else if (_collectionError is not null)
@@ -289,12 +294,12 @@ public sealed partial class DataRetentionViewModel
         else if (pending.Length > 0)
         {
             status = "Paused"; heading = "Automatic queue paused";
-            detail = $"{pending.Length} automatic downloads are queued. Enable and save the automatic schedule, or use Download now for a manual request.";
+            detail = $"{pending.Length} automatic downloads are queued. Enable and save the automatic schedule, or use Download gaps now for a manual request.";
         }
         else if (attention > 0)
         {
             status = "Attention"; heading = "Queue finished with items to review";
-            detail = $"{attention} dates have gaps, unavailable data, or errors. See Details in the table; Download now checks missing coverage again.";
+            detail = $"{attention} dates have gaps, unavailable data, or errors. See Details in the table. Known empty ranges are skipped; today's can be retried after 15 minutes.";
         }
         else if (state.Jobs.Count > 0)
         {
@@ -302,13 +307,13 @@ public sealed partial class DataRetentionViewModel
             bool availabilityChecked = state.Jobs.Any(j => j.IsAvailabilityProbe);
             heading = availabilityChecked ? "Available-history check complete" : "All queued downloads complete";
             detail = availabilityChecked
-                ? "The availability check finished. Earlier dates are checked until three consecutive collection dates return no 15-second data. Download again to collect newer completed candles."
+                ? "The availability check finished. Dates were checked from newest to oldest; earlier discovery stops after a trading day has no available candles in its missing hours. Download again to collect newer completed candles."
                 : "Completed history is saved in the local library. You can replay it or close this window.";
         }
         else
         {
             status = "Idle"; heading = "Ready to download";
-            detail = "Save your equity list, then select Download now. The app finds missing 15-second history and skips coverage already saved.";
+            detail = "Save your equity list, then select Download gaps now. The app finds missing 15-second history and skips coverage already saved.";
         }
         string timing = _lastDownloadProgressAt is { } last
             ? (now - last < TimeSpan.FromSeconds(1) ? $"Last progress just now ({last.ToLocalTime():HH:mm:ss})."

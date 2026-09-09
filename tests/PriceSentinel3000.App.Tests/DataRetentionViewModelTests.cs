@@ -185,7 +185,7 @@ public sealed partial class SessionWorkflowTests
     });
 
     [Fact]
-    public Task DownloadNow_RetriesAnOlderUnavailableJobWithoutASeparateRetryAction() => host.RunAsync(async () =>
+    public Task DownloadNow_LeavesOlderUnavailableHistoryBeyondTheCurrentBrokerBoundary() => host.RunAsync(async () =>
     {
         await using var fixture = new RetentionFixture();
         await fixture.SaveSingleSymbol(queueDate: false);
@@ -195,27 +195,20 @@ public sealed partial class SessionWorkflowTests
         await fixture.ViewModel.CheckDownloadsAsync();
         CollectionJob missing = Assert.Single(fixture.Collector.State.Jobs);
         Assert.Equal(CollectionJobStatus.Unavailable, missing.Status);
-        Assert.False(missing.IsAvailabilityProbe);
+        int previousRequests = fixture.Provider.Requests.Count;
 
         fixture.Provider.AvailableFrom = olderDay;
         fixture.Provider.AvailableDates = [olderDay];
         await fixture.ViewModel.DownloadNowCommand.ExecuteAsync();
 
-        CollectionJob recovered = Assert.Single(fixture.Collector.State.Jobs,
-            job => job.SessionDate == olderDay && job.SessionBounds == "24_5");
-        Assert.Equal(CollectionJobStatus.Complete, recovered.Status);
-        Assert.NotEmpty(recovered.DatasetHashes);
         CollectionJob retained = Assert.Single(fixture.Collector.State.Jobs, job => job.Id == missing.Id);
         Assert.Equal(missing.Status, retained.Status);
-        Assert.Equal(missing.SessionBounds, retained.SessionBounds);
-        Assert.Equal(missing.Attempts, retained.Attempts);
-        Assert.Empty(retained.DatasetHashes);
-        HistoricalDataRequest[] recovery = fixture.Provider.Requests.Where(request =>
-            RetentionSessionDate(request.FromUtc) == olderDay && request.SessionBounds == "24_5").ToArray();
-        Assert.NotEmpty(recovery);
-        CollectionSessionWindow window = CollectionSchedule.GetSessionWindow(olderDay, "24_5");
-        Assert.Equal(window.FromUtc, recovery[0].FromUtc);
-        Assert.Equal(window.ThroughUtc, recovery[^1].ThroughUtc);
+        Assert.Equal(missing.LastAttemptAtUtc, retained.LastAttemptAtUtc);
+        Assert.DoesNotContain(fixture.Provider.Requests.Skip(previousRequests),
+            request => RetentionSessionDate(request.FromUtc) == olderDay);
+        Assert.DoesNotContain(fixture.Collector.State.Jobs,
+            job => job.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading);
+        Assert.Empty(new JsonMarketDataLibrary(fixture.LibraryRoot).Scan().Datasets);
     });
 
     [Fact]

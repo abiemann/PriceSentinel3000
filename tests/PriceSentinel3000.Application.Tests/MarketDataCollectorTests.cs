@@ -36,12 +36,12 @@ public sealed class MarketDataCollectorTests
             HistoricalDataQueryResult saved = library.Query(new(job.Symbol,
                 DateTimeOffset.Parse("2026-08-31T04:00:00Z"), DateTimeOffset.Parse("2026-09-01T04:00:00Z"),
                 SessionBounds: "24_5", RevisionPolicy: HistoricalRevisionPolicy.CompatibleCoverage));
-            Assert.Equal(1440, saved.Candles.Count);
-            Assert.Equal(DateTimeOffset.Parse("2026-08-31T22:00:00Z"), saved.Candles[0].StartsAtUtc);
+            Assert.Equal(960, saved.Candles.Count);
+            Assert.Equal(DateTimeOffset.Parse("2026-09-01T00:00:00Z"), saved.Candles[0].StartsAtUtc);
             Assert.Equal(DateTimeOffset.Parse("2026-09-01T04:00:00Z"), saved.Candles[^1].EndsAtUtc);
             Assert.False(saved.Coverage.Complete);
             Assert.Equal(new HistoricalGap(DateTimeOffset.Parse("2026-08-31T04:00:00Z"),
-                DateTimeOffset.Parse("2026-08-31T22:00:00Z")), Assert.Single(saved.Coverage.Gaps));
+                DateTimeOffset.Parse("2026-09-01T00:00:00Z")), Assert.Single(saved.Coverage.Gaps));
         });
         Assert.All(restarted.State.Jobs.Where(j => j.SessionDate != new DateOnly(2026, 8, 31)),
             j => Assert.True(j.Status is CollectionJobStatus.Complete or CollectionJobStatus.Unavailable));
@@ -251,15 +251,14 @@ public sealed class MarketDataCollectorTests
             cancellationToken.ThrowIfCancellationRequested();
             if (Disconnected) throw new MarketDataConnectionUnavailableException("Connection unavailable");
             if (request.Symbol == FailingSymbol) throw new HttpRequestException("Temporary transport failure");
-            HistoricalCandle[] bars = EmptyIntervals.Contains(request.SourceIntervalSeconds) ||
-                request.ThroughUtc <= DateTimeOffset.Parse("2026-09-01T00:00:00Z") ? [] :
+            HistoricalCandle[] bars = EmptyIntervals.Contains(request.SourceIntervalSeconds) ? [] :
                 Enumerable.Range(0, (int)((request.ThroughUtc - request.FromUtc).TotalSeconds / request.SourceIntervalSeconds))
                     .Select(i =>
                     {
                         DateTimeOffset start = request.FromUtc.AddSeconds(i * request.SourceIntervalSeconds);
                         return new HistoricalCandle(start, start.AddSeconds(request.SourceIntervalSeconds),
                             start.AddSeconds(request.SourceIntervalSeconds), 10, 11, 9, 10, null);
-                    }).ToArray();
+                    }).Where(candle => candle.StartsAtUtc >= DateTimeOffset.Parse("2026-09-01T00:00:00Z")).ToArray();
             return Task.FromResult(new HistoricalDownload("test", "instrument", request.Symbol, request.SourceIntervalSeconds,
                 request.AdjustmentPolicy, "robinhood-split-unversioned", request.SessionBounds, request.ThroughUtc,
                 request.FromUtc, request.ThroughUtc, bars));

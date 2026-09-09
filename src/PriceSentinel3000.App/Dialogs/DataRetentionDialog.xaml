@@ -136,9 +136,13 @@
     </StackPanel></ScrollViewer>
     <Grid Grid.Column="2"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
      <StackPanel><TextBlock Style="{StaticResource SectionLabelStyle}" Text="DOWNLOAD SAVED, INCLUDED EQUITIES" />
-      <TextBlock x:Name="DownloadAvailableGuidance" Margin="0,8,0,10" FontSize="12" Text="Collect missing 15-second history across all available trading hours, including today's completed candles and overnight trading. Saved files are reused and extended. The queue grows as earlier available dates are discovered." />
+      <TextBlock x:Name="DownloadAvailableGuidance" Margin="0,8,0,10" FontSize="12" Text="Fill today's gaps, then check older days in hourly steps. Saved candles and known empty ranges are skipped. Today's empty ranges can be retried after 15 minutes. New candles extend the daily files." />
      </StackPanel>
-     <Button x:Name="DownloadAvailableButton" Grid.Row="1" Height="32" HorizontalAlignment="Left" Style="{StaticResource PrimaryButtonStyle}" Content="DOWNLOAD NOW" Command="{Binding DownloadNowCommand}" Margin="0,0,0,8" />
+     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+      <Button x:Name="DownloadAvailableButton" Height="32" Style="{StaticResource PrimaryButtonStyle}" Content="DOWNLOAD GAPS NOW" Command="{Binding DownloadNowCommand}" />
+      <Button x:Name="ForcedDownloadButton" Height="32" Margin="8,0,0,0" Style="{StaticResource SecondaryButtonStyle}" Content="FORCED DOWNLOAD" Command="{Binding ForcedDownloadCommand}" ToolTip="Retry missing candles with a fresh retry count, including ranges previously reported as unavailable. Saved candles are reused." />
+      <Button x:Name="ClearDownloadQueueButton" Height="32" Margin="8,0,0,0" Style="{StaticResource SecondaryButtonStyle}" Content="CLEAR" Command="{Binding ClearDownloadQueueCommand}" ToolTip="Clear finished queue entries. Saved candles and remembered gaps are kept." AutomationProperties.Name="Clear finished download queue" />
+     </StackPanel>
      <DataGrid x:Name="DownloadJobsGrid" Grid.Row="2" Style="{StaticResource LibraryGrid}" ColumnHeaderStyle="{StaticResource DownloadColumnHeader}" Loaded="DownloadJobsGrid_Loaded" ItemsSource="{Binding VisibleJobs}" EnableRowVirtualization="True" EnableColumnVirtualization="True" AutomationProperties.Name="Download queue">
       <DataGrid.Columns><DataGridTextColumn Header="Equity" Binding="{Binding Symbol}" SortMemberPath="Symbol" Width="100" ElementStyle="{StaticResource DownloadCell}" /><DataGridTextColumn Header="Date" Binding="{Binding SessionDate, StringFormat=yyyy-MM-dd}" SortMemberPath="SessionDate" Width="87" ElementStyle="{StaticResource DownloadCell}" /><DataGridTextColumn Header="State" Binding="{Binding StateText}" CanUserSort="False" Width="92" ElementStyle="{StaticResource DownloadCell}" /><DataGridTextColumn Header="Details" Binding="{Binding DetailsText}" CanUserSort="False" Width="*" MinWidth="100" ElementStyle="{StaticResource DownloadCell}" /></DataGrid.Columns>
      </DataGrid>

@@ -326,9 +326,34 @@ public sealed partial class SessionWorkflowTests
         DataRetentionViewModel vm = fixture.ViewModel;
         Assert.Equal("Complete", vm.DownloadState);
         Assert.Equal("Available-history check complete", vm.DownloadHeading);
-        Assert.Contains("three consecutive", vm.DownloadDetail);
+        Assert.Contains("newest to oldest", vm.DownloadDetail);
         Assert.Contains("0 need attention", vm.JobSummary);
         Assert.Equal("No data", Assert.Single(vm.Jobs).StateText);
+    });
+
+    [Fact]
+    public Task DownloadProgress_UnconfirmedOlderDateAppearsOnlyAfterAvailabilityIsEstablished() => host.RunAsync(async () =>
+    {
+        var checking = new CollectionJob
+        {
+            Symbol = "NFLX", Status = CollectionJobStatus.Pending, IsAvailabilityProbe = true,
+            DiscoveryAsOfDate = new(2026, 9, 8), AvailabilityCheckPending = true,
+        };
+        await using var fixture = new ProgressFixture(checking);
+        DataRetentionViewModel vm = fixture.ViewModel;
+        DownloadJobViewModel row = Assert.Single(vm.Jobs);
+        Assert.Empty(vm.VisibleJobs);
+        Assert.True(vm.HasDownloadWork);
+
+        row.Update(checking with { AvailabilityCheckPending = false });
+        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+        Assert.Same(row, Assert.Single(vm.VisibleJobs.Cast<DownloadJobViewModel>()));
+        Assert.Equal("Queued", row.StateText);
+
+        row.Update(checking with { Status = CollectionJobStatus.Failed, Error = "Connection check failed." });
+        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+        Assert.Same(row, Assert.Single(vm.VisibleJobs.Cast<DownloadJobViewModel>()));
+        Assert.True(row.NeedsAttention);
     });
 
     [Fact]

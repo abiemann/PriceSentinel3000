@@ -126,7 +126,7 @@ public sealed partial class SessionWorkflowTests
         await vm.SaveScheduleAsync();
         Assert.StartsWith("Automatic downloads are off.", vm.ScheduleHelp);
         Assert.Contains("Automatic downloads are off.", vm.Status);
-        Assert.Contains("Download now remains available.", vm.Status);
+        Assert.Contains("Download gaps now remains available.", vm.Status);
         Assert.Equal(0, fixture.Provider.DownloadCalls);
     });
 }

@@ -10,25 +10,30 @@ namespace PriceSentinel3000.App.Tests;
 
 public sealed partial class SessionWorkflowTests
 {
-    [Fact]
-    public Task DownloadPump_OneCommandDrainsDiscoveryAcrossSingleRequestBatches() => host.RunAsync(async () =>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task DownloadPump_OneCommandDrainsDiscoveryAcrossSingleRequestBatches(bool forced) => host.RunAsync(async () =>
     {
         // One completed candle per symbol keeps this pump test independent of full-day JSON throughput.
         // Starting with only today queued requires the same command to discover and drain earlier dates.
         await using var fixture = new DownloadPumpFixture(
             clock: new TestClock { Now = new(2026, 9, 4, 4, 0, 15, TimeSpan.Zero) }, catchUpCalendarDays: 1);
-        await fixture.ViewModel.DownloadNowCommand.ExecuteAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        AsyncRelayCommand command = forced ? fixture.ViewModel.ForcedDownloadCommand : fixture.ViewModel.DownloadNowCommand;
+        Assert.True(command.CanExecute(null));
+        await command.ExecuteAsync().WaitAsync(TimeSpan.FromSeconds(10));
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
 
         foreach (string symbol in new[] { "NFLX", "SOXL" })
         {
             CollectionJob[] jobs = fixture.Collector.State.Jobs.Where(j => j.Symbol == symbol).OrderBy(j => j.SessionDate).ToArray();
-            Assert.Equal(new DateOnly[] { new(2026, 9, 1), new(2026, 9, 2), new(2026, 9, 3), new(2026, 9, 4) },
+            Assert.Equal(new DateOnly[] { new(2026, 9, 3), new(2026, 9, 4) },
                 jobs.Select(j => j.SessionDate));
-            Assert.All(jobs.Take(3), j => Assert.Equal(CollectionJobStatus.Unavailable, j.Status));
-            Assert.Equal(CollectionJobStatus.Complete, jobs[3].Status);
-            Assert.Single(jobs[3].DatasetHashes);
-            Assert.Contains(fixture.Provider.Requests, r => r.Symbol == symbol && RetentionSessionDate(r.FromUtc) == new DateOnly(2026, 9, 1));
+            Assert.Equal(CollectionJobStatus.Unavailable, jobs[0].Status);
+            Assert.Equal(CollectionJobStatus.Complete, jobs[1].Status);
+            Assert.Single(jobs[1].DatasetHashes);
+            Assert.All(jobs, job => Assert.Equal(forced, job.IgnoreKnownGaps));
+            Assert.Contains(fixture.Provider.Requests, r => r.Symbol == symbol && RetentionSessionDate(r.FromUtc) == new DateOnly(2026, 9, 3));
         }
         Assert.True(fixture.Provider.Requests.Count > 2);
         Assert.Equal(1, fixture.Provider.MaximumConcurrentCalls);

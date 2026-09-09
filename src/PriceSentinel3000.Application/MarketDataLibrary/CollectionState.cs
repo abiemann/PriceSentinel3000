@@ -28,7 +28,10 @@ public sealed record CollectionJob
     public IReadOnlyList<string> DatasetHashes { get; init; } = [];
     public bool IsAutomatic { get; init; }
     public bool IsAvailabilityProbe { get; init; }
+    public bool IgnoreKnownGaps { get; init; }
     public DateTimeOffset? RequestedThroughUtc { get; init; }
+    public DateOnly? DiscoveryAsOfDate { get; init; }
+    public bool AvailabilityCheckPending { get; init; }
     public int? DiscoveryEmptySessions { get; init; }
     public DateTimeOffset? NextGapFromUtc { get; init; }
     public bool ReceivedCandlesThisRun { get; init; }
