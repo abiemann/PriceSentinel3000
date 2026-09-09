@@ -13,13 +13,23 @@ public sealed partial class SessionWorkflowTests
     [Fact]
     public Task DownloadPump_OneCommandDrainsDiscoveryAcrossSingleRequestBatches() => host.RunAsync(async () =>
     {
-        await using var fixture = new DownloadPumpFixture(clock: new TestClock { Now = new(2026, 9, 7, 20, 0, 0, TimeSpan.Zero) });
+        // One completed candle per symbol keeps this pump test independent of full-day JSON throughput.
+        // Starting with only today queued requires the same command to discover and drain earlier dates.
+        await using var fixture = new DownloadPumpFixture(
+            clock: new TestClock { Now = new(2026, 9, 4, 4, 0, 15, TimeSpan.Zero) }, catchUpCalendarDays: 1);
         await fixture.ViewModel.DownloadNowCommand.ExecuteAsync().WaitAsync(TimeSpan.FromSeconds(10));
         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
 
-        Assert.DoesNotContain(fixture.Collector.State.Jobs, j => j.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading);
-        Assert.Contains(fixture.Provider.Requests, r => DateOnly.FromDateTime(r.FromUtc.UtcDateTime) < new DateOnly(2026, 9, 1));
-        Assert.Contains(fixture.Collector.State.Jobs, j => j.Status == CollectionJobStatus.Complete);
+        foreach (string symbol in new[] { "NFLX", "SOXL" })
+        {
+            CollectionJob[] jobs = fixture.Collector.State.Jobs.Where(j => j.Symbol == symbol).OrderBy(j => j.SessionDate).ToArray();
+            Assert.Equal(new DateOnly[] { new(2026, 9, 1), new(2026, 9, 2), new(2026, 9, 3), new(2026, 9, 4) },
+                jobs.Select(j => j.SessionDate));
+            Assert.All(jobs.Take(3), j => Assert.Equal(CollectionJobStatus.Unavailable, j.Status));
+            Assert.Equal(CollectionJobStatus.Complete, jobs[3].Status);
+            Assert.Single(jobs[3].DatasetHashes);
+            Assert.Contains(fixture.Provider.Requests, r => r.Symbol == symbol && RetentionSessionDate(r.FromUtc) == new DateOnly(2026, 9, 1));
+        }
         Assert.True(fixture.Provider.Requests.Count > 2);
         Assert.Equal(1, fixture.Provider.MaximumConcurrentCalls);
         Assert.False(fixture.ViewModel.IsBusy);
@@ -158,7 +168,7 @@ public sealed partial class SessionWorkflowTests
     {
         private readonly string _root = Path.Combine(Path.GetTempPath(), "pricesentinel-pump-tests", Guid.NewGuid().ToString("N"));
         public DownloadPumpFixture(CollectionRunOptions? options = null, TimeProvider? clock = null,
-            IReadOnlyList<CollectionJob>? jobs = null)
+            IReadOnlyList<CollectionJob>? jobs = null, int catchUpCalendarDays = 7)
         {
             string libraryRoot = Path.Combine(_root, "library");
             var store = new JsonCollectionStateStore(Path.Combine(_root, "state.json"));
@@ -167,7 +177,7 @@ public sealed partial class SessionWorkflowTests
             {
                 Settings = new()
                 {
-                    LibraryRootPath = libraryRoot,
+                    LibraryRootPath = libraryRoot, CatchUpCalendarDays = catchUpCalendarDays,
                     Lists = [new(Guid.NewGuid(), "Included", true, [new("NFLX"), new("SOXL")])],
                 },
                 Jobs = jobs?.Select(job => job with
