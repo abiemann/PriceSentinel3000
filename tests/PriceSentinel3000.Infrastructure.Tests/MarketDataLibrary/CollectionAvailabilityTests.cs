@@ -74,7 +74,9 @@ public sealed class CollectionAvailabilityTests
         File.Delete(Path.Combine(fixture.Library.RootPath, saved.RelativePath));
         await fixture.Collector.QueueAvailableAsync();
         await fixture.Drain();
-        Assert.Equal(initial + 1, fixture.Provider.Requests.Count(r => Date(r) == day));
+        // Deleting the canonical file removes the whole active day, rather than one request-sized section.
+        Assert.Equal(initial * 2, fixture.Provider.Requests.Count(r => Date(r) == day));
+        Assert.True(Assert.Single(fixture.Library.Scan().Datasets, d => d.TradingDate == day).Coverage.Complete);
     }
 
     [Fact]

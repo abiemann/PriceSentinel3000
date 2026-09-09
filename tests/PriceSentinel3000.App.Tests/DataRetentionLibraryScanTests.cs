@@ -22,7 +22,7 @@ public sealed partial class SessionWorkflowTests
 
         await vm.ScanLibraryAsync();
 
-        Assert.Equal("Found 2 validated datasets. 12 scan notices. Open Library details.", vm.Status);
+        Assert.Equal("Found 2 daily entries from 2 saved files. 12 scan notices. Open Library details.", vm.Status);
         Assert.DoesNotContain(hash, vm.Status);
         Assert.DoesNotContain("2026/", vm.Status);
         Assert.True(vm.HasLibraryDiagnostics);
@@ -56,7 +56,8 @@ public sealed partial class SessionWorkflowTests
         Assert.Equal("", vm.LibraryDiagnostics);
         Assert.False(vm.HasLibraryDiagnostics);
         Assert.Empty(vm.Datasets);
-        Assert.Equal("Found 0 validated datasets. 0 scan notices.", vm.Status);
+        Assert.Empty(vm.LibraryDays);
+        Assert.Equal("Found 0 daily entries from 0 saved files. 0 scan notices.", vm.Status);
         Assert.Contains(nameof(DataRetentionViewModel.LibraryDiagnostics), changed);
         Assert.Contains(nameof(DataRetentionViewModel.HasLibraryDiagnostics), changed);
         Assert.Equal(0, fixture.Provider.Calls);
@@ -81,6 +82,7 @@ public sealed partial class SessionWorkflowTests
         Assert.False(vm.HasLibraryDiagnostics);
         Assert.Equal("Library scan failed.", vm.Status);
         Assert.Same(original, Assert.Single(vm.Datasets));
+        Assert.Equal("NFLX", Assert.Single(vm.LibraryDays).Symbol);
         Assert.Equal(0, fixture.Provider.Calls);
     });
 

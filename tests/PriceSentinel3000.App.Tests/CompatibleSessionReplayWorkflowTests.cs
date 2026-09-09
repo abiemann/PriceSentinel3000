@@ -69,8 +69,13 @@ public sealed partial class SessionWorkflowTests
         Assert.Equal(0, files.Provider.Calls);
         LibraryReplayHistoryResult resolved = workspace.Get<LibraryReplayHistoryResult>("_resolvedReplayHistory");
         Assert.Equal(download.Candles, resolved.Candles);
-        Assert.Equal(new[] { regular, overnight }.Order(), resolved.Datasets.Select(d => d.DatasetHash).Order());
-        Assert.Equal(new[] { "24_5", "regular" }, resolved.Datasets.Select(d => d.SessionBounds).Order());
+        HistoricalDatasetInfo merged = Assert.Single(resolved.Datasets);
+        Assert.Equal(overnight, merged.DatasetHash);
+        Assert.Equal("24_5", merged.SessionBounds);
+        Assert.Equal(overnight, Assert.Single(files.Library.Scan().Datasets).DatasetHash);
+        HistoricalDataset original = files.Library.Read(regular);
+        Assert.Equal("regular", original.SessionBounds);
+        Assert.Equal(download.Candles.Take(5), original.Candles);
     });
 
     [Fact]

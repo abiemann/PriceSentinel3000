@@ -83,20 +83,18 @@ public sealed class ReplayHistoryAvailabilityServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task LocalStart_PinsCheckedRevision_EvenWhenNewerRevisionAppears()
+    public async Task LocalStart_PinsCheckedSnapshot_EvenWhenDailyFileGainsCandles()
     {
-        string checkedHash = Assert.Single(Library.Save(Download(15))).DatasetHash;
-        ReplayHistoryAvailability prepared = await Service.CheckAsync(Query, false, default);
-        Library.Save(Download(15) with
-        {
-            FetchedAtUtc = Start.AddDays(2),
-            Candles = Download(15).Candles.Select(item => item with { Close = 100.5m }).ToArray(),
-        });
+        HistoricalCandle[] prefix = Download(15).Candles.Take(4).ToArray();
+        string checkedHash = Assert.Single(Library.Save(Download(15) with { Candles = prefix })).DatasetHash;
+        ReplayHistoryAvailability prepared = await Service.CheckAsync(Query, true, default);
+        Library.Save(Download(15));
 
         LibraryReplayHistoryResult loaded = await Service.LoadPreparedAsync(prepared, default);
 
         Assert.Equal(checkedHash, Assert.Single(loaded.Datasets).DatasetHash);
-        Assert.All(loaded.Candles, item => Assert.Equal(100m, item.Close));
+        Assert.Equal(prefix, loaded.Candles);
+        Assert.DoesNotContain(Library.Scan().Datasets, item => item.DatasetHash == checkedHash);
         Assert.Empty(_provider.Requests);
     }
 
@@ -234,11 +232,11 @@ public sealed class ReplayHistoryAvailabilityServiceTests : IDisposable
     [Fact]
     public async Task ConflictingRevisions_RequireExplicitPolicyInsteadOfBrokerSubstitution()
     {
-        Library.Save(Download(15));
-        string newer = Assert.Single(Library.Save(Download(15) with
+        Library.Save(Download(30));
+        string newer = Assert.Single(Library.Save(Download(30) with
         {
             FetchedAtUtc = Start.AddDays(2),
-            Candles = Download(15).Candles.Select(item => item with { Close = 100.5m }).ToArray(),
+            Candles = Download(30).Candles.Select(item => item with { Close = 100.5m }).ToArray(),
         })).DatasetHash;
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => Service.CheckAsync(Query, false, default));
@@ -449,6 +447,60 @@ public sealed class ReplayHistoryAvailabilityServiceTests : IDisposable
         Assert.DoesNotContain(Library.Scan().Datasets, item => item.SourceIntervalSeconds == 60);
         Assert.Equal(removeFile ? 0 : 1, Library.Scan().Datasets.Count);
         Assert.Equal(3, _provider.Requests.Count);
+    }
+
+    [Fact]
+    public async Task PendingGapFill_MergedDailySupersetPreservesExactlyTheCheckedComposition()
+    {
+        HistoricalCandle[] all = Download(15).Candles.ToArray();
+        HistoricalCandle[] local = [all[2], all[5]];
+        string localHash = Assert.Single(Library.Save(Download(15) with { Candles = local })).DatasetHash;
+        _provider.Downloads[15] = Download(15) with
+        {
+            Candles = all.Where(item => !local.Contains(item)).ToArray(),
+        };
+        ReplayHistoryAvailability prepared = await Service.CheckAsync(Query, false, default);
+        Assert.Equal(all, prepared.Candles);
+        Assert.Equal(Start, Assert.Single(_provider.Requests).FromUtc);
+        Assert.Equal(Start.AddMinutes(2), _provider.Requests[0].ThroughUtc);
+
+        LibraryReplayHistoryResult loaded = await Service.LoadPreparedAsync(prepared, default);
+        LibraryReplayHistoryResult repeated = await Service.LoadPreparedAsync(prepared, default);
+
+        Assert.Equal(prepared.Candles, loaded.Candles);
+        Assert.Equal(loaded.Candles, repeated.Candles);
+        Assert.Equal(all, Library.Read(Assert.Single(Library.Scan().Datasets).DatasetHash).Candles);
+        Assert.Equal(local, Library.Read(localHash).Candles);
+        Assert.Single(_provider.Requests);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PendingDownload_MissingOrChangedPromisedCandleFailsPreparedStart(bool removeCandle)
+    {
+        _provider.Downloads[15] = Download(15);
+        var service = new ReplayHistoryAvailabilityService(new ChangedSaveLibrary(Library, removeCandle), _provider);
+        ReplayHistoryAvailability prepared = await service.CheckAsync(Query, false, default);
+
+        InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.LoadPreparedAsync(prepared, default));
+
+        Assert.Contains("checked Replay data changed", error.Message);
+        Assert.Single(_provider.Requests);
+    }
+
+    private sealed class ChangedSaveLibrary(IMarketDataLibrary inner, bool removeCandle) : IMarketDataLibrary
+    {
+        public string RootPath => inner.RootPath;
+        public MarketDataLibraryScan Scan() => inner.Scan();
+        public HistoricalDataset Read(string datasetHash) => inner.Read(datasetHash);
+        public HistoricalDataQueryResult Query(HistoricalDataQuery query) => inner.Query(query);
+        public IReadOnlyList<HistoricalDatasetInfo> Save(HistoricalDownload download) => inner.Save(download with
+        {
+            Candles = removeCandle ? download.Candles.Skip(1).ToArray() : download.Candles
+                .Select((item, index) => index == 0 ? item with { Close = 100.5m } : item).ToArray(),
+        });
     }
 
     private static HistoricalDownload Download(int interval) => new("Robinhood", "test-msft", "MSFT", interval,

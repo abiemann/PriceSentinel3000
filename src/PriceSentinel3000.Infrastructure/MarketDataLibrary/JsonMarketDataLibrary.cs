@@ -7,7 +7,7 @@ using PriceSentinel3000.Application.MarketDataLibrary;
 
 namespace PriceSentinel3000.Infrastructure.MarketDataLibrary;
 
-/// <summary>Immutable daily documents; every index can be rebuilt from the files alone.</summary>
+/// <summary>Consolidated daily documents with archived exact-hash history.</summary>
 public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
 {
     private const int SchemaVersion = 1;
@@ -15,7 +15,6 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
     private const long MaximumFileBytes = 8 * 1024 * 1024;
     private static readonly TimeZoneInfo Eastern = TimeZoneInfo.FindSystemTimeZoneById(GroupingZone);
     private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
-    private readonly object _saveLock = new();
 
     public JsonMarketDataLibrary(string rootPath)
     {
@@ -26,7 +25,9 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
 
     public string RootPath { get; }
 
-    public MarketDataLibraryScan Scan()
+    public MarketDataLibraryScan Scan() => Scan(includeDuplicates: false);
+
+    private MarketDataLibraryScan Scan(bool includeDuplicates)
     {
         var datasets = new List<HistoricalDatasetInfo>();
         var hashes = new HashSet<string>(StringComparer.Ordinal);
@@ -35,11 +36,7 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
         EnsureNoReparsePoint(RootPath);
         try
         {
-            foreach (string path in Directory.EnumerateFiles(RootPath, "*", new EnumerationOptions
-                     {
-                         RecurseSubdirectories = true, MaxRecursionDepth = 6,
-                         AttributesToSkip = FileAttributes.ReparsePoint, IgnoreInaccessible = false,
-                     }))
+            foreach (string path in ActiveFiles())
             {
                 string relative = Path.GetRelativePath(RootPath, path);
                 if (Path.GetFileName(path).Contains(".tmp-", StringComparison.Ordinal))
@@ -53,7 +50,7 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
                     long length = new FileInfo(path).Length;
                     if (length > MaximumFileBytes) throw new InvalidDataException("The candle file exceeds the 8 MiB limit.");
                     HistoricalDataset dataset = Load(path);
-                    if (hashes.Add(dataset.DatasetHash))
+                    if (hashes.Add(dataset.DatasetHash) || includeDuplicates)
                         datasets.Add(Describe(dataset, relative));
                 }
                 catch (Exception exception) when (IsFileError(exception))
@@ -77,12 +74,13 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
     {
         ArgumentNullException.ThrowIfNull(download);
         ValidateDownload(download);
-        lock (_saveLock)
+        return WithLibraryWriteLock(() =>
         {
-            MarketDataLibraryScan scan = Scan();
+            MarketDataLibraryScan scan = Scan(includeDuplicates: true);
             if (scan.Diagnostics.Any(item => item.Code == "scan_failed"))
                 throw new InvalidDataException("The library must scan completely before saving another dataset.");
             var saved = new List<HistoricalDatasetInfo>();
+            var plans = new List<(HistoricalDataset Dataset, HistoricalDatasetInfo[] Parts)>();
             foreach (DateOnly day in Dates(download.RequestedFromUtc, download.RequestedThroughUtc))
             {
                 DateTimeOffset from = Max(download.RequestedFromUtc, DayStart(day));
@@ -95,6 +93,23 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
                     download.FetchedAtUtc, Coverage(from, through, download.SourceIntervalSeconds, candles), candles);
                 dataset = dataset with { DatasetHash = Hash(dataset) };
                 ValidateDataset(dataset);
+                if (dataset.SourceIntervalSeconds == 15)
+                {
+                    HistoricalDatasetInfo[] parts = scan.Datasets.Where(item => item.Symbol == dataset.Symbol &&
+                        item.TradingDate == day && item.SourceIntervalSeconds == 15).ToArray();
+                    plans.Add((MergeDaily(parts.Select(LoadExact).Append(dataset).ToArray()), parts));
+                    continue;
+                }
+                plans.Add((dataset, []));
+            }
+            // Validate every day's union before changing any day in a multi-day download.
+            foreach (var (dataset, parts) in plans)
+            {
+                if (dataset.SourceIntervalSeconds == 15)
+                {
+                    saved.Add(PersistDaily(dataset, parts));
+                    continue;
+                }
                 string semanticHash = SemanticHash(dataset);
                 HistoricalDatasetInfo? duplicate = scan.Datasets.Concat(saved)
                     .Where(item => RevisionKey(item) == RevisionKey(Describe(dataset, "")))
@@ -111,18 +126,16 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
             }
             EnsureReadme();
             return saved;
-        }
+        });
     }
 
     public HistoricalDataset Read(string datasetHash)
     {
         ValidateHash(datasetHash);
         MarketDataLibraryScan scan = Scan();
-        HistoricalDatasetInfo info = scan.Datasets.FirstOrDefault(item => item.DatasetHash == datasetHash)
+        HistoricalDatasetInfo? info = scan.Datasets.FirstOrDefault(item => item.DatasetHash == datasetHash);
+        return info is not null ? LoadExact(info) : ArchivedDataset(datasetHash)
             ?? throw new InvalidDataException("The pinned dataset is missing or failed validation; no revision was substituted.");
-        HistoricalDataset dataset = Load(Resolve(info.RelativePath));
-        if (dataset.DatasetHash != datasetHash) throw new InvalidDataException("The pinned dataset changed during the read.");
-        return dataset;
     }
 
     public HistoricalDataQueryResult Query(HistoricalDataQuery query)
@@ -154,7 +167,17 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
             if (pins.Count > 366 || pins.Distinct(StringComparer.Ordinal).Count() != pins.Count)
                 return Failed("invalid_pins", "Supply at most one unique dataset hash per requested day.");
             foreach (string hash in pins) ValidateHash(hash);
-            candidates = scan.Datasets.Where(item => pins.Contains(item.DatasetHash, StringComparer.Ordinal)).ToArray();
+            var pinned = scan.Datasets.Where(item => pins.Contains(item.DatasetHash, StringComparer.Ordinal)).ToList();
+            try
+            {
+                foreach (string hash in pins.Where(hash => pinned.All(item => item.DatasetHash != hash)))
+                    if (ArchivedDataset(hash) is { } archived) pinned.Add(Describe(archived, ArchivePath(hash)));
+            }
+            catch (Exception exception) when (IsFileError(exception))
+            {
+                return Failed("pinned_dataset_unavailable", exception.Message);
+            }
+            candidates = pinned.ToArray();
             if (candidates.Length != pins.Count || candidates.Any(item => !Matches(item)))
                 return Failed("pinned_dataset_unavailable", "A pinned dataset is missing, invalid, or incompatible with the requested data. No replacement was selected.");
         }
@@ -182,7 +205,7 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
         {
             HistoricalCandle[] candles = selected.OrderBy(item => item.TradingDate).SelectMany(item =>
             {
-                HistoricalDataset dataset = Load(Resolve(item.RelativePath));
+                HistoricalDataset dataset = LoadExact(item);
                 if (dataset.DatasetHash != item.DatasetHash) throw new InvalidDataException("A dataset changed during the query.");
                 return dataset.Candles;
             }).Where(item => item.StartsAtUtc >= query.FromUtc && item.EndsAtUtc <= query.ThroughUtc)
@@ -206,7 +229,7 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
     {
         path = Resolve(Path.GetRelativePath(RootPath, path));
         EnsureNoReparsePoint(path);
-        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
         if (stream.Length is <= 0 or > MaximumFileBytes) throw new InvalidDataException("Invalid candle file size.");
         HistoricalDataset dataset = JsonSerializer.Deserialize<HistoricalDataset>(stream, JsonOptions)
             ?? throw new InvalidDataException("The candle document is empty.");
@@ -281,7 +304,7 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
             if ((File.Exists(current) || Directory.Exists(current)) && (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
                 throw new InvalidDataException("Library paths must not traverse symbolic links or junctions.");
     }
-    private static void WriteAtomic(string path, byte[] content)
+    private static void WriteAtomic(string path, byte[] content, bool overwrite = false)
     {
         string temporary = path + ".tmp-" + Guid.NewGuid().ToString("N");
         try
@@ -291,14 +314,27 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
                 stream.Write(content);
                 stream.Flush(flushToDisk: true);
             }
-            File.Move(temporary, path, overwrite: false);
+            File.Move(temporary, path, overwrite);
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
     private void EnsureReadme()
     {
         string path = Resolve("README.md");
-        if (File.Exists(path)) return;
+        if (File.Exists(path))
+        {
+            EnsureNoReparsePoint(path);
+            string original = File.ReadAllText(path);
+            const string oldRule = "provenance or coverage creates a .rev-<full-hash>.json revision without replacing old files.";
+            if (original.Contains(oldRule, StringComparison.Ordinal) &&
+                !original.Contains("15-second daily consolidation:", StringComparison.Ordinal))
+                WriteAtomic(path, Encoding.UTF8.GetBytes(original + Environment.NewLine + Environment.NewLine +
+                    "15-second daily consolidation: compatible sections now merge atomically into one date.15s.json file per stock. " +
+                    "Superseded exact-hash files are kept in .archive and excluded from normal scans. Overlapping candles count once; " +
+                    "conflicting prices or provenance are never overwritten. Days use Eastern start dates, including midnight, month and year boundaries." +
+                    Environment.NewLine), overwrite: true);
+            return;
+        }
         const string readme = """
             # PriceSentinel portable market data (schema 1)
 
@@ -312,8 +348,10 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
 
             datasetHash is SHA-256 over the canonical schema document with datasetHash replaced by an empty string.
             PriceSentinel validates schema, timestamps, prices, derived coverage and the full hash when scanning/reading.
-            Identical data fetched again retains the first file and its original fetchedAtUtc/hash. Changed content,
-            provenance or coverage creates a .rev-<full-hash>.json revision without replacing old files.
+            Compatible 15-second sections merge into one date.15s.json file per stock and Eastern calendar date.
+            Overlaps count once; conflicting candles or provenance are never overwritten. Replacement is atomic.
+            Superseded files live in .archive by exact hash for prior Replay records; normal scans exclude them.
+            Other native resolutions keep their separate files. Identical saves retain the original hash.
             Competing revisions require explicit hashes or the LatestFetched policy (ties use lexicographically lowest hash).
             Pin dataset hashes for repeatable experiments. Providers, instrument identities and adjustment bases never merge implicitly.
             Interrupted .tmp-* files are ignored and diagnosed. No credentials, private watchlist IDs or journal database are needed.

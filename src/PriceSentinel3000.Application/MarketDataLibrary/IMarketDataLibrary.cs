@@ -102,11 +102,12 @@ public sealed record HistoricalDataQueryResult(
     HistoricalCoverage Coverage,
     IReadOnlyList<MarketDataLibraryDiagnostic> Diagnostics);
 
-/// <summary>Portable, immutable daily candle files. Call disk operations off the UI thread.</summary>
+/// <summary>Portable daily candle files with exact-hash history. Call disk operations off the UI thread.</summary>
 public interface IMarketDataLibrary
 {
     string RootPath { get; }
     MarketDataLibraryScan Scan();
+    MarketDataLibraryScan ConsolidateDailyFiles() => Scan();
     IReadOnlyList<HistoricalDatasetInfo> Save(HistoricalDownload download);
     HistoricalDataset Read(string datasetHash);
     HistoricalDataQueryResult Query(HistoricalDataQuery query);

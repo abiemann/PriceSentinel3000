@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Globalization;
+using System.IO;
 using System.Text.Json;
 using PriceSentinel3000.Application.MarketDataLibrary;
 using PriceSentinel3000.Core.Configuration;
@@ -116,7 +117,30 @@ public sealed partial class MainViewModel
             ReplayCheckContext[] contexts = Enumerable.Range(0, 42)
                 .Select(i => CreateReplayCheckContext(gridFirst.AddDays(i).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))).ToArray();
             IMarketDataLibrary library = DataRetention.CreateLibrary();
-            MarketDataLibraryScan scan = await Task.Run(library.Scan, cancellation.Token);
+            MarketDataLibraryScan scan = await Task.Run(() =>
+            {
+                MarketDataLibraryScan current = library.Scan();
+                IReadOnlyList<string>? pins = contexts[0].Query.PinnedHashes;
+                if (pins is not { Count: > 0 and <= 366 }) return current;
+                var datasets = current.Datasets.ToList();
+                foreach (string hash in pins.Distinct(StringComparer.Ordinal))
+                {
+                    cancellation.Token.ThrowIfCancellationRequested();
+                    if (datasets.Any(item => item.DatasetHash == hash)) continue;
+                    try
+                    {
+                        HistoricalDataset dataset = library.Read(hash);
+                        datasets.Add(new(dataset.DatasetHash, "", dataset.Provider, dataset.InstrumentId,
+                            dataset.Symbol, dataset.TradingDate, dataset.SourceIntervalSeconds, dataset.AdjustmentPolicy,
+                            dataset.AdjustmentBasis, dataset.SessionBounds, dataset.FetchedAtUtc, dataset.Coverage));
+                    }
+                    catch (Exception exception) when (exception is InvalidDataException or ArgumentException)
+                    {
+                        // An unresolved pin leaves its date unverified; never substitute the active daily file.
+                    }
+                }
+                return current with { Datasets = datasets };
+            }, cancellation.Token);
             cancellation.Token.ThrowIfCancellationRequested();
             if (_disposed || scope != ReplayCalendarScope()) return;
             var days = new Dictionary<DateOnly, ReplayCalendarDay>();

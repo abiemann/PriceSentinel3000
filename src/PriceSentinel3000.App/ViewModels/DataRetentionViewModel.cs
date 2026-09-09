@@ -75,6 +75,11 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
                 (row.Status != CollectionJobStatus.Unavailable || !row.IsAvailabilityProbe),
             IsLiveFiltering = true,
             LiveFilteringProperties = { nameof(DownloadJobViewModel.Status), nameof(DownloadJobViewModel.IsAvailabilityProbe) },
+            SortDescriptions =
+            {
+                new(nameof(DownloadJobViewModel.SessionDate), ListSortDirection.Descending),
+                new(nameof(DownloadJobViewModel.Symbol), ListSortDirection.Ascending),
+            },
         };
         CollectionSettings settings = collector.State.Settings;
         _libraryRoot = settings.LibraryRootPath;
@@ -128,6 +133,8 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
     public ObservableCollection<DownloadJobViewModel> Jobs { get; } = [];
     public ListCollectionView VisibleJobs { get; }
     public ObservableCollection<HistoricalDatasetInfo> Datasets { get; } = [];
+    public ObservableCollection<LibraryDaySummary> LibraryDays { get; } = [];
+    public LibraryDaySummary? SelectedLibraryDay { get; set; }
     public IReadOnlyList<TimeZoneInfo> TimeZones { get; } = TimeZoneInfo.GetSystemTimeZones();
     public PersonalWatchlist? SelectedRobinhoodList { get; set; }
     public HistoricalDatasetInfo? SelectedDataset { get; set; }
@@ -325,11 +332,20 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
     {
         LibraryDiagnostics = "";
         IMarketDataLibrary library = CreateLibrary();
-        MarketDataLibraryScan scan = await Task.Run(library.Scan, _lifetime.Token);
+        var (scan, days) = await Task.Run(() =>
+        {
+            MarketDataLibraryScan result = library.ConsolidateDailyFiles();
+            return (result, LibraryDaySummary.Create(result.Datasets));
+        }, _lifetime.Token);
+        LibraryDaySummary? selected = SelectedLibraryDay;
+        LibraryDays.Clear();
+        foreach (LibraryDaySummary day in days) LibraryDays.Add(day);
+        SelectedLibraryDay = LibraryDays.FirstOrDefault(day => selected is not null && day.Symbol == selected.Symbol && day.TradingDate == selected.TradingDate);
+        Changed(nameof(SelectedLibraryDay));
         Datasets.Clear();
         foreach (HistoricalDatasetInfo dataset in scan.Datasets.OrderByDescending(d => d.TradingDate).ThenBy(d => d.Symbol)) Datasets.Add(dataset);
         LibraryDiagnostics = string.Join("\n\n", scan.Diagnostics.Select(d => $"{d.RelativePath} [{d.Code}]\n{d.Message}"));
-        Status = $"Found {scan.Datasets.Count} validated datasets. {scan.Diagnostics.Count} scan notices." +
+        Status = $"Found {days.Count} daily entries from {scan.Datasets.Count} saved files. {scan.Diagnostics.Count} scan notices." +
             (HasLibraryDiagnostics ? " Open Library details." : "");
     }
 

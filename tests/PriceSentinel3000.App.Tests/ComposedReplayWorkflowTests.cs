@@ -114,10 +114,11 @@ public sealed partial class SessionWorkflowTests
         await Automate(vm, "start", new { fast = true });
         await WaitForAutomation(vm, state => state.GetProperty("operationState").GetString() is "completed" or "failed");
         Assert.Contains("Replay completed", vm.StatusMessage);
-        HistoricalDatasetInfo[] saved = files.Library.Scan().Datasets.ToArray();
-        Assert.Equal(2, saved.Length);
-        Assert.Contains(saved, dataset => dataset.DatasetHash == originalHash);
-        Assert.All(saved, dataset => Assert.Equal(15, dataset.SourceIntervalSeconds));
+        HistoricalDatasetInfo saved = Assert.Single(files.Library.Scan().Datasets);
+        Assert.NotEqual(originalHash, saved.DatasetHash);
+        Assert.Equal(15, saved.SourceIntervalSeconds);
+        Assert.Equal(8, files.Library.Read(saved.DatasetHash).Candles.Count);
+        Assert.Equal(fine.Candles.Take(4), files.Library.Read(originalHash).Candles);
 
         files.Provider.Error = new IOException("Saved coverage must be reusable without fetching it again.");
         await vm.CheckReplayAvailabilityAsync();
@@ -131,7 +132,7 @@ public sealed partial class SessionWorkflowTests
         JsonElement provenance = results.GetProperty("replayHistory");
         Assert.Equal("local-library", provenance.GetProperty("Source").GetString());
         Assert.Equal(15, provenance.GetProperty("ReplayIntervalSeconds").GetInt32());
-        Assert.Equal(2, provenance.GetProperty("DatasetHashes").GetArrayLength());
+        Assert.Equal(saved.DatasetHash, Assert.Single(provenance.GetProperty("DatasetHashes").EnumerateArray()).GetString());
         Assert.Equal(8, results.GetProperty("summary").GetProperty("quoteCount").GetInt32());
         Assert.Equal(1, files.Provider.Calls);
         Assert.Equal(0, files.Connections);

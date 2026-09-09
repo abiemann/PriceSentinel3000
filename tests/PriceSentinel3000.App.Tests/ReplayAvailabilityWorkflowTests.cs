@@ -208,6 +208,39 @@ public sealed partial class SessionWorkflowTests
         Assert.False(Directory.Exists(files.Root));
     });
 
+    [Theory]
+    [InlineData(false, "Disk15")]
+    [InlineData(true, "Unknown")]
+    public Task ReplayCalendar_ArchivedPinResolvesExactSnapshotAndRespectsSymbol(bool otherSymbol, string expectedStatus) => host.RunAsync(async () =>
+    {
+        using var files = new AvailabilityFiles();
+        await using var workspace = new TestWorkspace();
+        DateTimeOffset start = AvailabilityStart(workspace);
+        HistoricalDownload download = LibraryDownload(start, 15);
+        string hash = Assert.Single(files.Library.Save(download)).DatasetHash;
+        files.Library.Save(download with
+        {
+            RequestedThroughUtc = download.RequestedThroughUtc.AddSeconds(15),
+            Candles = download.Candles.Append(download.Candles[^1] with
+            {
+                StartsAtUtc = download.RequestedThroughUtc,
+                EndsAtUtc = download.RequestedThroughUtc.AddSeconds(15),
+                AvailableAtUtc = download.RequestedThroughUtc.AddSeconds(15),
+            }).ToArray(),
+        });
+        Assert.DoesNotContain(files.Library.Scan().Datasets, item => item.DatasetHash == hash);
+        MainViewModel vm = workspace.ViewModel;
+        vm.DataRetention = files.CreateRetention();
+        await ConfigureLibraryReplay(vm, start, 60, "builtin");
+        vm.DataRetention.ReplayPinnedHashes = hash;
+        if (otherSymbol) vm.Symbol = "MSFT";
+
+        await vm.LoadReplayCalendarMonthAsync(start.LocalDateTime);
+
+        Assert.Equal(expectedStatus, vm.ReplayCalendarDays[DateOnly.FromDateTime(start.LocalDateTime)].Status);
+        Assert.Equal(0, files.Provider.Calls);
+    });
+
     [Fact]
     public Task ReplayCalendar_MonthScanUsesDiskOnly_AndPreservesCheckedDayWhenDateChanges() => host.RunAsync(async () =>
     {
@@ -336,11 +369,14 @@ public sealed partial class SessionWorkflowTests
         await using var workspace = new TestWorkspace();
         DateTimeOffset start = AvailabilityStart(workspace);
         string first = Assert.Single(files.Library.Save(LibraryDownload(start, 15))).DatasetHash;
-        string revised = Assert.Single(files.Library.Save(LibraryDownload(start, 15) with
+        using var legacySource = new AvailabilityFiles();
+        HistoricalDatasetInfo revision = Assert.Single(legacySource.Library.Save(LibraryDownload(start, 15) with
         {
             FetchedAtUtc = start.AddDays(2),
             Candles = LibraryDownload(start, 15).Candles.Select(item => item with { Close = item.Close + 0.1m }).ToArray(),
-        })).DatasetHash;
+        }));
+        string revised = revision.DatasetHash;
+        File.Copy(Path.Combine(legacySource.Root, revision.RelativePath), Path.Combine(files.Root, $"legacy-{revised}.json"));
         files.Library.Save(LibraryDownload(start, 60));
         MainViewModel vm = workspace.ViewModel;
         vm.DataRetention = files.CreateRetention();

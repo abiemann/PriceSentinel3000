@@ -181,12 +181,26 @@ public sealed class LibraryReplayHistoryResolverTests : IDisposable
             FetchedAtUtc = Start.AddDays(2),
             Candles = Download(15).Candles.Select(item => item with { Close = 100.5m }).ToArray(),
         };
-        string latest = Assert.Single(Library.Save(revised)).DatasetHash;
+        string sourceRoot = _root + "-legacy-source";
+        string latest;
+        try
+        {
+            var source = new JsonMarketDataLibrary(sourceRoot);
+            HistoricalDatasetInfo revision = Assert.Single(source.Save(revised));
+            latest = revision.DatasetHash;
+            File.Copy(Path.Combine(sourceRoot, revision.RelativePath), Path.Combine(_root, $"legacy-{latest}.json"));
+        }
+        finally
+        {
+            if (Directory.Exists(sourceRoot)) Directory.Delete(sourceRoot, recursive: true);
+        }
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => Resolver.ResolveAsync(Query, false, default));
         LibraryReplayHistoryResult newest = await Resolver.ResolveAsync(Query with { RevisionPolicy = HistoricalRevisionPolicy.LatestFetched }, false, default);
         Assert.Equal(latest, Assert.Single(newest.Datasets).DatasetHash);
+        Assert.Equal(revised.Candles, newest.Candles);
         LibraryReplayHistoryResult pinned = await Resolver.ResolveAsync(Query with { PinnedHashes = [old] }, false, default);
+        Assert.Equal(old, Assert.Single(pinned.Datasets).DatasetHash);
         Assert.All(pinned.Candles, item => Assert.Equal(100m, item.Close));
         AssertNoNetwork();
     }

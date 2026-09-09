@@ -226,7 +226,8 @@ public sealed partial class MarketDataCollector
             IMarketDataLibrary library = _libraryFactory(job.LibraryRootPath);
             HistoricalDataQueryResult saved = library.Query(new(job.Symbol, window.FromUtc, window.ThroughUtc,
                 15, AdjustmentPolicy: job.AdjustmentPolicy, AdjustmentBasis: job.AdjustmentBasis,
-                SessionBounds: job.SessionBounds, RevisionPolicy: HistoricalRevisionPolicy.LatestFetched));
+                SessionBounds: job.SessionBounds, RevisionPolicy: HistoricalRevisionPolicy.LatestFetched,
+                IncludeCompatibleSessions: true));
             if (!saved.Succeeded)
                 throw new InvalidDataException("Saved history could not be validated for gap recovery. Review the local library diagnostics.");
             if (job.ProviderInstrumentId is not null && saved.Datasets.Any(d => d.InstrumentId != job.ProviderInstrumentId))

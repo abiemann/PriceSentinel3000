@@ -42,7 +42,11 @@ public sealed class AllHoursCollectionTests
         Assert.True(saved.Succeeded);
         Assert.True(saved.Coverage.Complete);
         Assert.Equal(expectedCandles, saved.Candles.Count);
-        Assert.All(saved.Datasets, dataset => Assert.Equal(day, dataset.TradingDate));
+        HistoricalDatasetInfo daily = Assert.Single(saved.Datasets);
+        Assert.Equal(day, daily.TradingDate);
+        Assert.Equal("24_5", daily.SessionBounds);
+        Assert.EndsWith(".15s.json", daily.RelativePath);
+        Assert.Equal(daily.DatasetHash, Assert.Single(fixture.Library.Scan().Datasets).DatasetHash);
         Assert.All(saved.Candles, candle => Assert.True(candle.EndsAtUtc <= end));
     }
 
@@ -81,9 +85,12 @@ public sealed class AllHoursCollectionTests
         Assert.True(saved.Succeeded);
         Assert.True(saved.Coverage.Complete);
         Assert.Equal(5760, saved.Candles.Count);
-        Assert.Contains(saved.Datasets, dataset => dataset.DatasetHash == original.DatasetHash && dataset.SessionBounds == bounds);
-        Assert.Equal(originalBytes, fixture.Bytes(original));
-        Assert.Equal(bounds, fixture.Library.Read(original.DatasetHash).SessionBounds);
+        HistoricalDatasetInfo daily = Assert.Single(saved.Datasets);
+        Assert.Equal("24_5", daily.SessionBounds);
+        Assert.Equal(original.RelativePath, daily.RelativePath);
+        Assert.NotEqual(original.DatasetHash, daily.DatasetHash);
+        Assert.Equal(daily.DatasetHash, Assert.Single(fixture.Library.Scan().Datasets).DatasetHash);
+        fixture.AssertArchived(original, originalBytes);
     }
 
     [Fact]
@@ -105,8 +112,11 @@ public sealed class AllHoursCollectionTests
         Assert.Equal(holes.Select(hole => (hole.FromUtc, hole.ThroughUtc)),
             fixture.Provider.Requests.Select(request => (request.FromUtc, request.ThroughUtc)));
         Assert.Equal(CollectionJobStatus.Complete, Assert.Single(fixture.Collector.State.Jobs).Status);
-        Assert.True(fixture.Read(DayStart, DayEnd).Coverage.Complete);
-        Assert.Equal(originalBytes, fixture.Bytes(original));
+        HistoricalDataQueryResult saved = fixture.Read(DayStart, DayEnd);
+        Assert.True(saved.Coverage.Complete);
+        Assert.Equal(5760, saved.Candles.Count);
+        Assert.Equal(Assert.Single(saved.Datasets).DatasetHash, Assert.Single(fixture.Library.Scan().Datasets).DatasetHash);
+        fixture.AssertArchived(original, originalBytes);
     }
 
     [Theory]
@@ -141,6 +151,7 @@ public sealed class AllHoursCollectionTests
         });
         HistoricalDataQueryResult saved = fixture.Read(DayStart, cutoff);
         Assert.True(saved.Coverage.Complete);
+        Assert.Equal("24_5", Assert.Single(saved.Datasets).SessionBounds);
         Assert.Equal(cutoff, saved.Candles[^1].EndsAtUtc);
         Assert.All(saved.Candles, candle => Assert.True(candle.AvailableAtUtc <= cutoff));
         Assert.Empty(fixture.Read(cutoff, cutoff.AddSeconds(15)).Candles);
@@ -167,7 +178,10 @@ public sealed class AllHoursCollectionTests
         await fixture.Drain();
         Assert.Equal(4, fixture.Provider.Requests.Count);
         Assert.Equal(CollectionJobStatus.Complete, Assert.Single(fixture.Collector.State.Jobs).Status);
-        Assert.Equal(originalBytes, fixture.Bytes(original));
+        fixture.AssertArchived(original, originalBytes);
+        HistoricalDataQueryResult saved = fixture.Read(DayStart, DayEnd);
+        Assert.True(saved.Coverage.Complete);
+        Assert.Equal(Assert.Single(saved.Datasets).DatasetHash, Assert.Single(fixture.Library.Scan().Datasets).DatasetHash);
         string[] hashes = fixture.Library.Scan().Datasets.Select(dataset => dataset.DatasetHash).Order().ToArray();
 
         fixture.Restart();
@@ -201,6 +215,7 @@ public sealed class AllHoursCollectionTests
         HistoricalDataQueryResult saved = fixture.Read(DayStart, DayEnd);
         Assert.False(saved.Coverage.Complete);
         Assert.Equal(4320, saved.Candles.Count);
+        Assert.Equal(Assert.Single(saved.Datasets).DatasetHash, Assert.Single(fixture.Library.Scan().Datasets).DatasetHash);
         Assert.Equal(DayEnd, saved.Candles[^1].EndsAtUtc);
         Assert.Equal(new HistoricalGap(DayStart, DayStart.AddHours(6)), Assert.Single(saved.Coverage.Gaps));
         for (int i = 0; i < 3; i++) Assert.Equal(CollectionBatchResult.Idle, await fixture.Collector.TickAsync(true));
@@ -219,7 +234,8 @@ public sealed class AllHoursCollectionTests
         CollectionJob partial = Assert.Single(fixture.Collector.State.Jobs);
         Assert.Equal(CollectionJobStatus.Partial, partial.Status);
         Assert.Equal(DayEnd, partial.NextGapFromUtc);
-        Dictionary<string, byte[]> originals = fixture.Library.Scan().Datasets.ToDictionary(dataset => dataset.RelativePath, fixture.Bytes);
+        HistoricalDatasetInfo original = Assert.Single(fixture.Library.Scan().Datasets);
+        byte[] originalBytes = fixture.Bytes(original);
         fixture.Provider.EmptyBefore = null;
         fixture.Provider.Requests.Clear();
 
@@ -235,9 +251,10 @@ public sealed class AllHoursCollectionTests
         Assert.Equal(DayStart, request.FromUtc);
         Assert.Equal(DayStart.AddHours(6), request.ThroughUtc);
         Assert.Equal(CollectionJobStatus.Complete, Assert.Single(fixture.Collector.State.Jobs).Status);
-        Assert.True(fixture.Read(DayStart, DayEnd).Coverage.Complete);
-        foreach ((string path, byte[] bytes) in originals)
-            Assert.Equal(bytes, File.ReadAllBytes(Path.Combine(fixture.Library.RootPath, path)));
+        HistoricalDataQueryResult saved = fixture.Read(DayStart, DayEnd);
+        Assert.True(saved.Coverage.Complete);
+        Assert.Equal(Assert.Single(saved.Datasets).DatasetHash, Assert.Single(fixture.Library.Scan().Datasets).DatasetHash);
+        fixture.AssertArchived(original, originalBytes);
     }
 
     [Theory]
@@ -339,6 +356,20 @@ public sealed class AllHoursCollectionTests
                 new("test", "SOFI-id", "SOFI", 15, "split", "robinhood-split-unversioned", bounds,
                     Clock.Now, from, through, candles ?? Candles(from, through))));
         public byte[] Bytes(HistoricalDatasetInfo dataset) => File.ReadAllBytes(Path.Combine(Library.RootPath, dataset.RelativePath));
+        public void AssertArchived(HistoricalDatasetInfo original, byte[] originalBytes)
+        {
+            string archivePath = Path.Combine(Library.RootPath, ".archive", original.DatasetHash + ".json");
+            Assert.Equal(originalBytes, File.ReadAllBytes(archivePath));
+            HistoricalDataset archived = Library.Read(original.DatasetHash);
+            Assert.Equal(original.DatasetHash, archived.DatasetHash);
+            Assert.Equal(original.SessionBounds, archived.SessionBounds);
+            Assert.Equal(original.Coverage.ActualCandleCount, archived.Candles.Count);
+            HistoricalDataQueryResult pinned = Library.Query(new("SOFI", original.Coverage.RequestedFromUtc,
+                original.Coverage.RequestedThroughUtc, SessionBounds: original.SessionBounds, PinnedHashes: [original.DatasetHash]));
+            Assert.True(pinned.Succeeded);
+            Assert.Equal(original.DatasetHash, Assert.Single(pinned.Datasets).DatasetHash);
+            Assert.Equal(archived.Candles, pinned.Candles);
+        }
         public async Task Drain()
         {
             for (int i = 0; i < 100 && Collector.State.Jobs.Any(job => job.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading); i++)

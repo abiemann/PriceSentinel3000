@@ -140,7 +140,8 @@ public sealed partial class SessionWorkflowTests
             Assert.True(request.ThroughUtc - request.FromUtc <= TimeSpan.FromHours(6));
         });
         await vm.ScanLibraryAsync();
-        Assert.Equal(requests.Length, vm.Datasets.Count);
+        Assert.Equal(day, Assert.Single(vm.Datasets).TradingDate);
+        Assert.Single(vm.LibraryDays);
         Assert.All(vm.Datasets, dataset => Assert.True(dataset.Coverage.Complete));
         CollectionSessionWindow window = CollectionSchedule.GetSessionWindow(day, "24_5");
         HistoricalDataQueryResult saved = new JsonMarketDataLibrary(fixture.LibraryRoot).Query(new("NFLX", window.FromUtc, window.ThroughUtc,

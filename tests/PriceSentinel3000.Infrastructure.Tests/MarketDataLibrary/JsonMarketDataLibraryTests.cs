@@ -64,41 +64,68 @@ public sealed class JsonMarketDataLibraryTests : IDisposable
     }
 
     [Fact]
-    public async Task ConcurrentCorrections_PreserveBothImmutableVersions()
+    public async Task ConcurrentCorrections_AreRejectedWithoutChangingSavedFile()
     {
         HistoricalDownload download = Download();
-        await Task.WhenAll(Task.Run(() => Library.Save(download)),
-            Task.Run(() => Library.Save(download with { Candles = [Candle(Start, 81m)] })));
+        HistoricalDatasetInfo original = Assert.Single(Library.Save(download));
+        byte[] originalBytes = File.ReadAllBytes(Path.Combine(_directory, original.RelativePath));
+        Exception?[] failures = await Task.WhenAll(
+            Task.Run(() => Record.Exception(() => Library.Save(download with { Candles = [Candle(Start, 81m)] }))),
+            Task.Run(() => Record.Exception(() => Library.Save(download with { Candles = [Candle(Start, 82m)] }))));
 
-        Assert.Equal(2, Library.Scan().Datasets.Count);
-        Assert.Equal(new[] { 80m, 81m }, Library.Scan().Datasets.Select(info => Library.Read(info.DatasetHash).Candles[0].Open).Order());
+        Assert.All(failures, failure => Assert.IsType<InvalidDataException>(failure));
+        Assert.Equal(original.DatasetHash, Assert.Single(Library.Scan().Datasets).DatasetHash);
+        Assert.Equal(originalBytes, File.ReadAllBytes(Path.Combine(_directory, original.RelativePath)));
+        Assert.Single(Directory.EnumerateFiles(_directory, "*.json", SearchOption.AllDirectories));
+        Assert.Equal(80m, Assert.Single(Library.Read(original.DatasetHash).Candles).Open);
     }
 
     [Fact]
-    public void CorruptCanonicalDailyFile_IsPreservedWhileValidRevisionIsSaved()
+    public void CorruptCanonicalDailyFile_RejectsSaveAndPreservesOriginal()
     {
         string relative = "2026/09 - September/NFLX/2026-09-04.15s.json";
         string path = Path.Combine(_directory, relative);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, "broken original");
 
-        HistoricalDatasetInfo saved = Assert.Single(Library.Save(Download()));
+        Exception failure = Assert.ThrowsAny<Exception>(() => Library.Save(Download()));
 
-        Assert.Contains(".rev-", saved.RelativePath);
+        Assert.True(failure is InvalidDataException or JsonException);
         Assert.Equal("broken original", File.ReadAllText(path));
-        Assert.Equal(80m, Library.Read(saved.DatasetHash).Candles[0].Open);
+        Assert.Empty(Library.Scan().Datasets);
+        Assert.Single(Directory.EnumerateFiles(_directory, "*.json", SearchOption.AllDirectories));
         Assert.Contains(Library.Scan().Diagnostics, item => item.Code == "invalid_dataset");
     }
 
     [Fact]
-    public void CorrectedData_PreservesRevisionsAndRequiresExplicitSelection()
+    public void CorrectedDailyData_IsRejectedWithoutChangingSavedFile()
     {
         HistoricalDownload original = Download();
         HistoricalDatasetInfo first = Assert.Single(Library.Save(original));
-        HistoricalDatasetInfo corrected = Assert.Single(Library.Save(original with
+        byte[] originalBytes = File.ReadAllBytes(Path.Combine(_directory, first.RelativePath));
+
+        Assert.Throws<InvalidDataException>(() => Library.Save(original with
         {
             FetchedAtUtc = original.FetchedAtUtc.AddDays(1), Candles = [Candle(Start, 81m)],
         }));
+
+        Assert.Equal(originalBytes, File.ReadAllBytes(Path.Combine(_directory, first.RelativePath)));
+        Assert.Equal(first.DatasetHash, Assert.Single(Library.Scan().Datasets).DatasetHash);
+        Assert.Single(Directory.EnumerateFiles(_directory, "*.json", SearchOption.AllDirectories));
+        HistoricalDataQueryResult result = Library.Query(Query());
+        Assert.True(result.Succeeded);
+        Assert.Equal(80m, Assert.Single(result.Candles).Open);
+    }
+
+    [Fact]
+    public void LegacyCorrectedData_PreservesRevisionsAndRequiresExplicitSelection()
+    {
+        HistoricalDownload original = Download();
+        HistoricalDatasetInfo first = Assert.Single(Library.Save(original));
+        HistoricalDatasetInfo corrected = SaveLegacy(original with
+        {
+            FetchedAtUtc = original.FetchedAtUtc.AddDays(1), Candles = [Candle(Start, 81m)],
+        });
 
         Assert.Contains($".rev-{corrected.DatasetHash}.json", corrected.RelativePath);
         Assert.Equal(80m, Assert.Single(Library.Read(first.DatasetHash).Candles).Open);
@@ -213,7 +240,7 @@ public sealed class JsonMarketDataLibraryTests : IDisposable
     {
         HistoricalDownload original = Download();
         HistoricalDatasetInfo pinned = Assert.Single(Library.Save(original));
-        Library.Save(original with { Candles = [Candle(Start, 81m)], FetchedAtUtc = original.FetchedAtUtc.AddDays(1) });
+        SaveLegacy(original with { Candles = [Candle(Start, 81m)], FetchedAtUtc = original.FetchedAtUtc.AddDays(1) });
         string path = Path.Combine(_directory, pinned.RelativePath);
         JsonNode data = JsonNode.Parse(File.ReadAllText(path))!;
         if (field == "candles") data["candles"]![0]!["open"] = "80.1";
@@ -310,7 +337,7 @@ public sealed class JsonMarketDataLibraryTests : IDisposable
     {
         HistoricalDownload download = Download();
         Library.Save(download);
-        Library.Save(download with { Provider = "Other", AdjustmentBasis = "another-split-vintage" });
+        SaveLegacy(download with { Provider = "Other", AdjustmentBasis = "another-split-vintage" });
 
         Assert.False(Library.Query(Query() with { RevisionPolicy = HistoricalRevisionPolicy.LatestFetched }).Succeeded);
         Assert.True(Library.Query(Query() with { Provider = "Robinhood", AdjustmentBasis = "split" }).Succeeded);
@@ -357,6 +384,24 @@ public sealed class JsonMarketDataLibraryTests : IDisposable
         Assert.EndsWith($".{seconds}s.json", info.RelativePath);
         Assert.Empty(Library.Query(Query()).Candles);
         Assert.True(Library.Query(Query() with { SourceIntervalSeconds = seconds, ThroughUtc = Start.AddSeconds(seconds) }).Coverage.Complete);
+    }
+
+    private HistoricalDatasetInfo SaveLegacy(HistoricalDownload download)
+    {
+        string sourceRoot = _directory + "-legacy-" + Guid.NewGuid().ToString("N");
+        try
+        {
+            HistoricalDatasetInfo saved = Assert.Single(new JsonMarketDataLibrary(sourceRoot).Save(download));
+            string relative = Path.ChangeExtension(saved.RelativePath, $"rev-{saved.DatasetHash}.json");
+            string destination = Path.Combine(_directory, relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(Path.Combine(sourceRoot, saved.RelativePath), destination);
+            return saved with { RelativePath = relative };
+        }
+        finally
+        {
+            if (Directory.Exists(sourceRoot)) Directory.Delete(sourceRoot, recursive: true);
+        }
     }
 
     private static HistoricalDownload Download() => new("Robinhood", "instrument-nflx", "NFLX", 15,

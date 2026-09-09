@@ -55,7 +55,7 @@ public sealed partial class SessionWorkflowTests
             AssertLocalFooterBounded(dialog);
             CaptureLocalLayout(dialog, $"local-library-{width}x{height}-default.png");
 
-            HistoricalDatasetInfo last = vm.Datasets[^1];
+            LibraryDaySummary last = vm.LibraryDays[^1];
             grid.ScrollIntoView(last);
             await SettleLocalLayout(dialog);
             DataGridRow row = Assert.IsType<DataGridRow>(grid.ItemContainerGenerator.ContainerFromItem(last));
@@ -63,7 +63,7 @@ public sealed partial class SessionWorkflowTests
             AssertInsideWindow(dialog, row);
             grid.SelectedItem = last;
             await SettleLocalLayout(dialog);
-            Assert.Same(last, vm.SelectedDataset);
+            Assert.Same(last, vm.SelectedLibraryDay);
             ScrollViewer tableScroll = Assert.Single(FindRetentionVisuals<ScrollViewer>(grid));
             Assert.True(tableScroll.ScrollableHeight > 0);
             Assert.True(tableScroll.VerticalOffset > 0);
@@ -107,7 +107,7 @@ public sealed partial class SessionWorkflowTests
             var grid = (DataGrid)dialog.FindName("LocalLibraryGrid");
             var expander = (Expander)dialog.FindName("LibraryDiagnosticsExpander");
             double collapsedHeight = grid.ActualHeight;
-            HistoricalDatasetInfo selected = vm.Datasets[70];
+            LibraryDaySummary selected = vm.LibraryDays[70];
             grid.SelectedItem = selected;
             grid.ScrollIntoView(selected);
             expander.IsExpanded = true;
@@ -120,7 +120,7 @@ public sealed partial class SessionWorkflowTests
             Assert.True(grid.ActualHeight >= 150, $"Expanded diagnostics left only {grid.ActualHeight:0}px for datasets.");
             Assert.True(grid.ActualHeight < collapsedHeight);
             Assert.Contains(FindRetentionVisuals<ScrollViewer>(expander), scroll => scroll.ScrollableHeight > 0);
-            Assert.Same(selected, vm.SelectedDataset);
+            Assert.Same(selected, vm.SelectedLibraryDay);
             Assert.Same(selected, grid.SelectedItem);
             AssertLocalRevisionControlsAbsent(dialog, vm);
             AssertLocalFooterBounded(dialog);
@@ -183,6 +183,7 @@ public sealed partial class SessionWorkflowTests
                 $"EQ{index:000}", day, 15, "split", "robinhood-split-unversioned", "24_5", through.AddMinutes(15),
                 new(from, through, from, through, candles, candles, true, true, [])));
         }
+        foreach (LibraryDaySummary daySummary in LibraryDaySummary.Create(vm.Datasets)) vm.LibraryDays.Add(daySummary);
     }
 
     private static void CaptureLocalLayout(Window dialog, string name)

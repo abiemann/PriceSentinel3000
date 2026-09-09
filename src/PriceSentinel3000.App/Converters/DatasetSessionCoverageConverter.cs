@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows.Data;
 using PriceSentinel3000.Application.MarketDataLibrary;
+using PriceSentinel3000.App.ViewModels;
 
 namespace PriceSentinel3000.App.Converters;
 
@@ -9,6 +10,9 @@ public sealed class DatasetSessionCoverageConverter : IValueConverter
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         bool details = parameter is "Details";
+        if (value is LibraryDaySummary day)
+            return details ? day.CoverageDetails : day.CoveragePercent is { } dailyPercent
+                ? dailyPercent.ToString("0.##", culture) + "%" : "--";
         if (value is not HistoricalDatasetInfo dataset ||
             dataset.SessionBounds is not ("regular" or "extended" or "24_5") ||
             dataset.SourceIntervalSeconds is not (15 or 30 or 60 or 120) ||

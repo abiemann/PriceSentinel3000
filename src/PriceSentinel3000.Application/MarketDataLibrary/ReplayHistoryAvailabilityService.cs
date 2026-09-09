@@ -174,7 +174,7 @@ public sealed class ReplayHistoryAvailabilityService(IMarketDataLibrary library,
                     { FromUtc = from, ThroughUtc = through, SourceIntervalSeconds = source.SourceIntervalSeconds }, download);
                 retained = source with { Datasets = library.Save(download), PendingDownload = null };
             }
-            loaded.Add(retained with { Candles = Reload(retained, from, through) });
+            loaded.Add(retained with { Candles = Reload(retained, from, through, source.PendingDownload is not null) });
         }
         ReplayHistoryComposition result = ReplayHistoryComposer.Compose(availability.Query, loaded);
         token.ThrowIfCancellationRequested();
@@ -190,7 +190,8 @@ public sealed class ReplayHistoryAvailabilityService(IMarketDataLibrary library,
             result.Sources.SelectMany(item => item.Datasets).DistinctBy(item => item.DatasetHash).ToArray(),
             result.Candles, result.Coverage, availability.Diagnostics);
 
-        IReadOnlyList<HistoricalCandle> Reload(ReplayHistorySource source, DateTimeOffset from, DateTimeOffset through)
+        IReadOnlyList<HistoricalCandle> Reload(ReplayHistorySource source, DateTimeOffset from, DateTimeOffset through,
+            bool allowAdditionalCandles = false)
         {
             token.ThrowIfCancellationRequested();
             HistoricalCandle[] candles;
@@ -203,6 +204,13 @@ public sealed class ReplayHistoryAvailabilityService(IMarketDataLibrary library,
             catch (InvalidDataException exception)
             {
                 throw new InvalidOperationException("The checked Replay file is missing or changed. Check the date again before starting.", exception);
+            }
+            if (allowAdditionalCandles)
+            {
+                // A daily merge can retain other candles inside the broker's requested window.
+                // Validate and replay only the exact candles promised by this source's check.
+                HashSet<DateTimeOffset> promised = source.Candles.Select(item => item.StartsAtUtc).ToHashSet();
+                candles = candles.Where(item => promised.Contains(item.StartsAtUtc)).ToArray();
             }
             if (!candles.SequenceEqual(source.Candles))
                 throw new InvalidOperationException("The checked Replay data changed. Check the date again before starting.");

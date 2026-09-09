@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using PriceSentinel3000.App.Dialogs;
+using PriceSentinel3000.App.ViewModels;
 using PriceSentinel3000.Application.MarketDataLibrary;
 
 namespace PriceSentinel3000.App.Tests;
@@ -22,6 +23,8 @@ public sealed partial class SessionWorkflowTests
             date, 15, "split", "unversioned", "regular", through,
             new(from, through, from, through, 780, 780, true, true, []));
         vm.Datasets.Add(dataset);
+        LibraryDaySummary day = Assert.Single(LibraryDaySummary.Create([dataset]));
+        vm.LibraryDays.Add(day);
         var dialog = new DataRetentionDialog { DataContext = vm, ShowActivated = false };
         try
         {
@@ -33,13 +36,13 @@ public sealed partial class SessionWorkflowTests
                 Equals(checkbox.Content, "Replay from local files only"));
             var coverage = Assert.IsType<DataGridTextColumn>(Assert.Single(grid.Columns,
                 column => Equals(column.Header, "Day coverage")));
-            var cell = Assert.IsType<TextBlock>(coverage.GetCellContent(dataset));
+            var cell = Assert.IsType<TextBlock>(coverage.GetCellContent(day));
             Assert.Equal("50%", cell.Text);
             Assert.Contains("780", Assert.IsType<string>(cell.ToolTip));
             Assert.Contains("1,560", Assert.IsType<string>(cell.ToolTip));
             Assert.DoesNotContain(grid.Columns, column => Equals(column.Header, "Revision hash") || Equals(column.Header, "Complete"));
-            grid.SelectedItem = dataset;
-            Assert.Same(dataset, vm.SelectedDataset);
+            grid.SelectedItem = day;
+            Assert.Same(day, vm.SelectedLibraryDay);
         }
         finally { dialog.Close(); }
     });

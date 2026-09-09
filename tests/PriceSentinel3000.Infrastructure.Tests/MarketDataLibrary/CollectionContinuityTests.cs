@@ -41,7 +41,8 @@ public sealed class CollectionContinuityTests : IDisposable
         Assert.Equal(FullDay, completed.Candles);
         Assert.True(completed.Coverage.Complete);
         Assert.Equal(Window.FromUtc, completed.Coverage.RequestedFromUtc);
-        Assert.Equal(originalBytes, File.ReadAllBytes(Path.Combine(_directory, original.RelativePath)));
+        Assert.Equal(originalBytes, File.ReadAllBytes(Path.Combine(_directory, ".archive", original.DatasetHash + ".json")));
+        Assert.Single(Library.Scan().Datasets);
         Assert.Equal(10, Library.Read(original.DatasetHash).Candles.Count);
     }
 

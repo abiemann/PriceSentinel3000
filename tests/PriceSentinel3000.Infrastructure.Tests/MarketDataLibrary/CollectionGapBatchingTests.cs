@@ -7,7 +7,7 @@ namespace PriceSentinel3000.Infrastructure.Tests.MarketDataLibrary;
 public sealed class CollectionGapBatchingTests
 {
     [Fact]
-    public async Task HundredsOfSparseHolesUseFewQueriesAndMergeExactCandlesWithoutChangingExistingFiles()
+    public async Task HundredsOfSparseHolesUseFewQueriesAndMergeExactCandlesPreservingArchivedSnapshot()
     {
         using var fixture = new Fixture();
         HistoricalDatasetInfo original = fixture.Seed(index => index % 9 != 4);
@@ -31,7 +31,7 @@ public sealed class CollectionGapBatchingTests
         Assert.Equal(5760, saved.Candles.Count);
         Assert.Equal(fixture.AllCandles, saved.Candles);
         Assert.Equal(saved.Candles.Count, saved.Candles.Select(candle => candle.StartsAtUtc).Distinct().Count());
-        Assert.Equal(originalBytes, fixture.Bytes(original));
+        Assert.Equal(originalBytes, fixture.Bytes(original with { RelativePath = Path.Combine(".archive", original.DatasetHash + ".json") }));
         Assert.Equal(fixture.Provider.Requests.Count, fixture.CountedLibrary.SaveCalls);
     }
 

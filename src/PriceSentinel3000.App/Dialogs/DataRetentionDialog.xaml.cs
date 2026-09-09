@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Windows.Controls;
 using System.Windows;
 using System.Windows.Input;
 using System.IO;
@@ -11,6 +13,15 @@ public partial class DataRetentionDialog : Window
     public DataRetentionDialog()
     {
         InitializeComponent();
+    }
+
+    private void DownloadJobsGrid_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not DataRetentionViewModel viewModel) return;
+        SortDescription? primary = viewModel.VisibleJobs.SortDescriptions.Count > 0
+            ? viewModel.VisibleJobs.SortDescriptions[0] : null;
+        foreach (DataGridColumn column in DownloadJobsGrid.Columns)
+            column.SortDirection = column.SortMemberPath == primary?.PropertyName ? primary?.Direction : null;
     }
 
     private void BrowseLibraryFolder_Click(object sender, RoutedEventArgs e)
