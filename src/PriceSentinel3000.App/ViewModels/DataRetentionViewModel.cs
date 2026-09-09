@@ -81,6 +81,14 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
                 new(nameof(DownloadJobViewModel.Symbol), ListSortDirection.Ascending),
             },
         };
+        VisibleLibraryDays = new ListCollectionView(LibraryDays)
+        {
+            SortDescriptions =
+            {
+                new(nameof(LibraryDaySummary.TradingDate), ListSortDirection.Descending),
+                new(nameof(LibraryDaySummary.Symbol), ListSortDirection.Ascending),
+            },
+        };
         CollectionSettings settings = collector.State.Settings;
         _libraryRoot = settings.LibraryRootPath;
         _automatic = settings.AutomaticDownloadsEnabled;
@@ -134,6 +142,7 @@ public sealed partial class DataRetentionViewModel : INotifyPropertyChanged, IAs
     public ListCollectionView VisibleJobs { get; }
     public ObservableCollection<HistoricalDatasetInfo> Datasets { get; } = [];
     public ObservableCollection<LibraryDaySummary> LibraryDays { get; } = [];
+    public ListCollectionView VisibleLibraryDays { get; }
     public LibraryDaySummary? SelectedLibraryDay { get; set; }
     public IReadOnlyList<TimeZoneInfo> TimeZones { get; } = TimeZoneInfo.GetSystemTimeZones();
     public PersonalWatchlist? SelectedRobinhoodList { get; set; }
