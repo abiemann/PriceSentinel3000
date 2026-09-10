@@ -21,9 +21,17 @@ pause/step boundaries and fast playback.
 
 ## Retain high-resolution history
 
-Open **Tools > Retain Hi-Res Data** to create download lists, import individual equities from Robinhood lists, and choose a daily collection time and time zone. Scheduled runs and **Download now** automatically find missing 15-second history across all available regular, premarket, after-hours and overnight trading, including today's completed candles. They search older sessions per equity and retry known gaps without date or market-session fields. Compatible candles are merged with saved history, including existing regular/extended files and partial files copied into the library. Expected coverage excludes closed-market periods. The app stores portable daily candles under year / numbered English month / ticker folders, then reuses them for Replay and read-only MCP analysis. Automatic collection requires the app to stay open and connected; copied history can be replayed offline. See the [market-data library guide](docs/market-data-library.md).
+Open **Tools > Retain Hi-Res Data** to create download lists, import individual equities from Robinhood lists, and choose a daily collection time and time zone. New lists show **SAVE LIST**; existing lists show **UPDATE LIST** only while edits are unsaved. **EXPORT LISTS** backs up saved list names, symbols, and inclusion choices to JSON; it does not export candles or unsaved edits.
 
-Replay checks disk first and fills missing coverage from supported broker history. Complete finer candles can be aggregated alongside coarser gap fills to one Replay interval, with the native resolutions shown and preserved in the files. Choose **Replay from local files only** in the dashboard before START to prevent broker requests.
+**DOWNLOAD GAPS NOW** and scheduled runs check today's completed 15-second candles first, then search older dates per equity, continuing past complete days. Older availability checks advance through missing ranges in hourly steps. Compatible saved candles are checked first and merged with newly available history across regular, premarket, after-hours, and overnight trading. Nearby gaps are batched to reduce broker calls. See the [market-data library guide](docs/market-data-library.md) for the discovery stopping rule and request limits.
+
+A persistent SQLite index remembers successful responses with no data. Ordinary downloads skip those ranges; today's empty ranges can be retried after 15 minutes. Connection failures are kept separate from unavailable data and receive bounded automatic retries. A later normal download can retry failed work when discovery reaches it. **FORCED DOWNLOAD** also retries remembered empty ranges with a fresh retry count. **CLEAR** removes finished queue entries only when the queue is idle, preserving saved candles and remembered gaps.
+
+The library stores one current 15-second file per equity and **Eastern market date** under year / numbered English month / ticker folders. Candle timestamps are UTC; daily grouping remains Eastern for consistent sharing. Compatible imported history participates in coverage checks and Replay. Automatic collection requires the app to stay open and connected; copied history can be replayed offline.
+
+In **LOCAL LIBRARY**, **RESCAN LIBRARY** shows processing progress and the total size of active candle files in MB. Library rows and the download table support primary sorting and Shift-click secondary sorting. Local-library coverage excludes market closures and future candles, so today's denominator stops at the latest completed candle. Click a library row for a timeline in the computer's local time zone, combining adjacent Eastern daily files when needed. Click a 15-minute block for details; a selected black **Missing** block offers **DOWNLOAD** for that block and its connected missing neighbors. Green means complete, light green partial, striped gray market closed, and blue future time.
+
+Replay checks disk first and fills missing coverage from supported broker history. Complete finer candles can be aggregated alongside coarser gap fills to one Replay interval, with the native resolutions shown and preserved in the files. Choose **Replay from local files only (offline)** in the dashboard before START to prevent broker requests.
 
 In Replay, press **Enter** after entering a date or time, click **CHECK**, or choose a calendar date to check coverage before starting. Dark green means complete local 15-second data, light green means verified broker 15-second data, orange means 30–60-second data, and red means two-minute data. Neutral dates have details explaining unchecked, partial, or unavailable coverage.
 
@@ -56,6 +64,7 @@ credentials. For a quick code review:
 
 Download the `PriceSentinel3000-<version>-win-x64-setup.exe` asset from the
 [latest GitHub release](https://github.com/abiemann/PriceSentinel3000/releases/latest).
+The current release is [1.3](https://github.com/abiemann/PriceSentinel3000/releases/tag/1.3).
 The installer is self-contained for Windows x64, so it does not require a
 separate .NET installation. It installs for the current Windows user without an
 administrator prompt and creates a Start menu shortcut; a desktop shortcut is
@@ -67,15 +76,15 @@ or Microsoft Defender SmartScreen warning. The checksum verifies that a download
 matches the GitHub release asset, but it is not a substitute for a trusted
 publisher signature.
 
-Upgrades and uninstalling preserve the journal, preferences, and encrypted
-Robinhood session under `%LOCALAPPDATA%\PriceSentinel3000`. Delete that folder
+Upgrades and uninstalling preserve the journal, preferences, local strategies,
+default candle library, and encrypted Robinhood session under `%LOCALAPPDATA%\PriceSentinel3000`. Delete that folder
 manually only when you intentionally want to remove local PriceSentinel data and
 saved authorization.
 
 ## Status
 
-The current development build adds an auditable, explicitly armed LIVE equity
-execution path to the authenticated Robinhood data foundation:
+Release **1.3** includes single-symbol Replay, Paper Trader, guarded LIVE execution,
+folder strategies, the local candle library, and optional MCP/CLI app control:
 
 - OFF / Replay / Paper Trader / LIVE rotary mode selection, with OFF at startup
 - Paper Trader polls real Robinhood quotes at the configured interval, evaluates
@@ -152,8 +161,12 @@ execution path to the authenticated Robinhood data foundation:
   because cancellation is asynchronous; closing the app with unresolved order
   state requires an explicit exit confirmation after a Robinhood warning
 - Startup silently restores a saved Robinhood session when possible; otherwise
-  the welcome dialog offers EXIT or LOGIN before opening safely in OFF mode
-- The first LIVE selection still shows the loss warning before entering disarmed LIVE
+  the welcome dialog offers **LOGIN**, **USE OFFLINE**, or **EXIT**. The workspace
+  always starts in OFF mode
+- Accepting the LIVE loss warning is remembered in local preferences across
+  restarts. Every LIVE session still requires **Start Live Trader** to arm
+- A light-gray window edge and rounded corners separate the dark workspace from
+  surrounding windows
 - Friendly status guidance distinguishes REAL TIME, MARKET CLOSED, REPLAY,
   AUTHORIZING, and OFFLINE states
 
@@ -248,8 +261,10 @@ is unavailable, the session stops and reports the failure.
 1. Resolve any existing open order for the selected symbol; an open order blocks
    startup. An existing long position instead opens a confirmation dialog showing
    Robinhood quantity, average cost, and the current estimated sell-side price.
-2. Select **LIVE**, read the loss warning, and choose **I AGREE**. This enters LIVE
-   mode but does not arm execution or submit an order.
+2. On the first **LIVE** selection, read the loss warning and choose **I AGREE**.
+   Acceptance is saved in local preferences, so later selections skip this dialog.
+   Canceling or closing it does not record acceptance. Entering LIVE always leaves
+   execution disarmed; accepting the warning does not submit an order.
 3. Configure conservative risk limits, then choose **Start Live Trader**. The app
    fetches the account from Robinhood instead of using the paper starting balance.
 4. For an existing position, choose **Sell Now**, **Wait for the next profitable
@@ -326,7 +341,9 @@ them later; they are not a promise that the labeled regions can be captured live
    Partial results are explicitly marked. START reuses the checked snapshot;
    starting without a check uses the existing local-first lookup. Offline mode
    uses saved files only. Null/interpolated bars are excluded and invalid prices
-   remain errors. Replay never mixes resolutions or fills strategy gaps.
+   remain errors. Compatible saved candles and broker gap fills can use different
+   native resolutions; complete finer spans aggregate to one uniform Replay
+   interval. Coarse candles are never split, and unresolved gaps remain visible.
 3. The returned observations are replayed in source-time order. Each historical
    candle becomes available at its actual close, with delays compressed by the
    selected speed. Session Status labels the source duration, and the chart
@@ -360,7 +377,7 @@ Paper Trader session.
 
 The shared **Strategy** selector applies to Paper Trader, LIVE, and Replay.
 **Built-In** remains selected by default and uses the existing compiled strategy.
-One original, experimental example, **OriginalConfirmation**, is packaged with the app.
+One original example, **Original Confirmation - experimental**, is packaged with the app.
 
 1. Click **SCRIPTS FOLDER** to open `%LOCALAPPDATA%\PriceSentinel3000\Strategies`.
 2. Copy a thinkScript strategy into that folder as `.thinkscript`, `.ts`, or `.txt`.
@@ -369,6 +386,10 @@ One original, experimental example, **OriginalConfirmation**, is packaged with t
 4. Select a script and candle interval, then test in Paper or Replay. The interval
    is independent of the chart display. Inputs use the defaults in the script;
    edit its `input` declarations before starting to change them.
+
+Strategy diagnostics wrap inside a scrollable panel. Right-click the diagnostics
+and choose **Copy** to copy the full text, including offscreen lines, or **Cancel**
+to dismiss the menu. Diagnostics remain readable while session inputs are locked.
 
 This release interprets a documented subset of thinkScript. It accepts explicit
 long-only `AddOrder` strategies; chart studies do not acquire invented trading
@@ -414,7 +435,8 @@ At startup, a cached access token and dynamic client registration are tried with
 permitting an interactive browser redirect. When present, a cached refresh token
 can assist that reconnection. A verified cached connection opens the main window
 directly. If the cache is missing, invalid, revoked, corrupt, or cannot be verified,
-the welcome dialog appears and offers LOGIN or EXIT.
+the welcome dialog offers **LOGIN**, **USE OFFLINE**, or **EXIT**. Offline access
+supports saved-history Replay and local-library inspection without authorization.
 
 The OAuth client cache format was updated with the MCP C# SDK 2.0 migration. The
 first run after upgrading re-registers PriceSentinel once; this does not modify
@@ -440,8 +462,8 @@ Editable Paper Account, risk, timing, and Replay inputs are restored from:
 %LOCALAPPDATA%\PriceSentinel3000\preferences.json
 ~~~
 
-The preferences file contains ordinary UI values only. Robinhood credentials and
-tokens are never written to it.
+The preferences file contains UI settings and the saved LIVE-warning acknowledgment.
+Robinhood credentials and tokens are never written to it.
 
 The journal uses normalized tables, indexed symbol/timestamp lookups, prepared
 inserts, short transactions, and write-ahead logging. Broker passwords are never
@@ -454,6 +476,7 @@ PriceSentinel3000.sln
 src/
   PriceSentinel3000.App/             WPF presentation, composition, and workspace coordination
   PriceSentinel3000.Application/     Session timing, LIVE order workflow, and app-facing ports
+  PriceSentinel3000.Control/         Optional MCP/CLI companion for local app control
   PriceSentinel3000.Core/            Market, paper-account, strategy, and risk models
   PriceSentinel3000.Infrastructure/  Robinhood MCP OAuth/data and SQLite adapters
 tests/
@@ -461,6 +484,7 @@ tests/
   PriceSentinel3000.Application.Tests/     Session and LIVE order workflow tests
   PriceSentinel3000.Infrastructure.Tests/  Robinhood, OAuth, preferences, and SQLite tests
   PriceSentinel3000.App.Tests/             WPF workflows with fake broker ports
+  PriceSentinel3000.Control.Tests/         Companion CLI and MCP protocol tests
 ~~~
 
 Dependencies point inward: App composes Application with Infrastructure,
@@ -477,7 +501,8 @@ Requirements:
 - Visual Studio 2026 with the .NET desktop development workload
 - .NET SDK 10.0.302 or a newer .NET 10 feature band; `global.json` rolls forward
   within .NET 10 while excluding prerelease SDKs
-- A Robinhood account eligible for Agentic Trading access
+- A Robinhood account eligible for Agentic Trading access for connected workflows;
+  building, deterministic tests, and saved-history offline Replay need no credentials
 
 Open `PriceSentinel3000.sln` in Visual Studio, or use:
 
@@ -490,27 +515,35 @@ dotnet test PriceSentinel3000.sln --configuration Release --no-build
 The Windows CI workflow runs the same Release build with warnings promoted to
 errors and executes the complete test suite on every pull request and push to
 `main`.
+Release 1.3 passed all **1,404 tests**, with zero build warnings or errors. Its
+[Windows CI](https://github.com/abiemann/PriceSentinel3000/actions/runs/34422818384)
+and [release packaging](https://github.com/abiemann/PriceSentinel3000/actions/runs/34422844466)
+workflows succeeded, and the published checksums and source provenance were verified.
+Open-market Paper testing and interactive packaged-app smoke checks remain tracked
+in [TODO](TODO.md).
 
 The app footer and MCP companion use the version embedded at build time.
 GitHub release builds display their release tag without a leading `v`, including
-any prerelease suffix (for example, `1.2` or `1.3.0-beta.1`). Local builds derive
+any prerelease suffix (for example, `1.3` or `1.4.0-beta.1`). Local builds derive
 their version from the nearest numeric Git tag; commits after that tag are
 marked as development builds. Fetch new tags with `git fetch origin --tags`
 before building locally. The installed app keeps its own build version when a
 new release is published; installing that release updates the footer.
 
-Publishing a numeric GitHub release tag such as `1.1` or `v1.1.0` starts the
+Publishing a GitHub release for a numeric tag such as `1.3` or `v1.3.0` starts the
 Windows release workflow. It builds and tests the exact tagged source, creates a
 self-contained x64 publish, compiles the Inno Setup installer, and attaches the
-installer, SHA-256 checksums, and provenance to the release. The existing `1.0`
-release can be packaged once through the workflow's manual `tag` input.
+installer, SHA-256 checksums, and provenance to the release. An existing release
+can also be packaged through the workflow's manual `tag` input; replacing assets
+with the same names requires the explicit replacement option.
 
 For an older tag that predates the packaging files, the workflow uses the exact
 workflow commit for the installer definition and artwork while compiling only
 the tagged application source. Both commits are recorded in the provenance
 asset; the tag itself is never moved or rewritten.
 
-The workspace always starts OFF after the required Robinhood connection succeeds.
+The workspace always starts OFF, whether a Robinhood connection is restored,
+login succeeds, or **USE OFFLINE** is selected.
 Accepting the LIVE warning makes LIVE the effective mode while broker execution
 remains disarmed. **Start Live Trader** performs the broker preflight and arms the
 session only when every check succeeds; confirmed signals can then submit real

@@ -1,25 +1,26 @@
 # External strategy design
 
-This specification incorporates decisions through September 7, 2026. Implementation
-has been delivered in validated milestones. The [compatibility guide](docs/strategy-scripting.md)
+This specification describes the implementation shipped in [release 1.3](https://github.com/abiemann/PriceSentinel3000/releases/tag/1.3),
+reviewed September 9, 2026. Future work is labeled separately. The [compatibility guide](docs/strategy-scripting.md)
 identifies the implemented subset and resource limits; [source research](archive/research/strategy-sources-and-compatibility.md)
 records the unchanged-source checks and original example fixtures. The existing compiled price-action strategy
 remains enabled by default and appears as **Built-In**. Converting it to an
 external script is future work.
 
-V1 includes folder discovery, the shared selector, completed-candle interpretation,
+Release 1.3 includes folder discovery, the shared selector, completed-candle interpretation,
 session source/parameter provenance, per-session LIVE version approval, and one
 original experimental example. Tests cover parser restrictions, indicator values,
 host position/risk safeguards, history availability, immutable artifacts, WPF
 selection, and sample seeding. Windows publication includes the original source.
 Local MCP control, research telemetry, and source-duration-aware Replay fallback
-are also implemented. Remaining release checks and follow-ups are tracked in
+are also implemented. Outstanding runtime checks and follow-ups are tracked in
 [TODO.md](TODO.md). The local market-data library, automatic collection, and
 Replay availability calendar described below are also implemented.
 
 ## Product scope
 
-- One shared strategy selector for Paper Trader, LIVE, and Replay.
+- One selected symbol per session, with a shared strategy selector for Paper Trader,
+  LIVE, and Replay. Concurrent portfolio trading remains proposed in [TODO](TODO.md).
 - Built-In first, followed by compatible files in
   `%LOCALAPPDATA%\PriceSentinel3000\Strategies`.
 - Users copy a text script into that folder and refresh the list. No project,
@@ -32,6 +33,14 @@ Replay availability calendar described below are also implemented.
 - A running session pins one exact strategy artifact and its timing settings.
   Folder edits take effect only on a later session.
 - Script proposals remain subject to every host-owned risk and execution gate.
+
+## Desktop presentation
+
+The main window has a one-pixel light-gray edge and rounded restored corners;
+maximized corners are square. The border does not intercept input or change
+window dragging and resizing. Selected table rows use a green background without
+cell focus outlines. Compact download status uses the same layout across the
+retention window's tabs, keeping tab positions stable as status text changes.
 
 ## Language and compatibility decision
 
@@ -47,6 +56,13 @@ There is no arbitrary CLR execution, package loading, native interop, reflection
 filesystem, network, UI, process creation, clock access, or uncontrolled randomness.
 Unknown syntax and functions are errors. Source size, syntax depth, node count,
 history size, and evaluation work are bounded.
+
+The documented `CountSince(condition, reset)` extension retains bounded counter
+state across successive evaluations and rolling history windows in one session.
+Reset takes priority; missing inputs and data gaps clear the count. Checkpoints
+are invalidated by changed programs or inputs, corrected history, or rewinds, and
+failed evaluations do not advance them. This extension does not enable arbitrary
+recursive definitions or shared state between sessions.
 
 This constrained language is the execution boundary. A future arbitrary C#
 plugin system would still require the separate restricted worker, OS-enforced
@@ -86,6 +102,14 @@ interval. The initial choices are 15, 30, 60, 120, and 300 seconds, defaulting t
 completed bar. A new quote can complete the preceding bar; it remains the
 executable quote for current bid/ask risk and execution checks.
 
+Optional `# PriceSentinel: tested-candle-seconds=60` metadata records the author's
+reference interval. Selecting a different annotated script applies that interval;
+a deliberate override shows mismatch guidance. Refresh and app restart preserve
+saved overrides. Missing or malformed metadata leaves the tested interval
+unspecified rather than excluding a compatible script. Declared and actual
+intervals are retained in session provenance; the annotation does not change
+active sessions or prove compatibility with a particular history source.
+
 Warm-start history initializes indicators. Live bars are constructed from the
 quotes actually observed, so OHLC is sampled at the poll interval rather than
 being an exchange tick-complete record. Quote polling must be no slower than the
@@ -93,15 +117,20 @@ selected strategy interval. Volume-dependent programs are unavailable until the
 feed can supply authoritative volume consistently. A missed period stays a gap;
 chart-only synthetic flat candles never become strategy data.
 
-Replay first requests 15-second history for the exact selected range. If there
-are no usable, complete observations in that range, it retries at 30 seconds,
-then one minute. These are the Robinhood MCP intervals currently supported within
-the two-minute source limit: the provider does not accept two-minute requests,
-and its next interval, five minutes, exceeds the limit. Null, interpolated,
-incomplete, and out-of-range bars do not satisfy a request. Invalid prices,
-authentication, transport, and malformed responses remain errors. Fallback
-selects the first usable resolution for the entire run; it never widens the range, combines resolutions,
-or fills gaps in strategy history.
+Replay checks compatible saved 15-, 30-, 60-, and 120-second history first for the
+exact selected range. Remaining gaps can be requested from Robinhood at 15 seconds,
+then 30 seconds and one minute. The provider has no two-minute request; imported
+two-minute history is supported, while five-minute sources exceed the limit.
+Null, interpolated, incomplete, and out-of-range bars do not satisfy a request.
+Invalid prices, authentication, transport, and malformed responses remain errors.
+
+Compatible saved pieces and broker gap fills can contain different native
+resolutions. Complete finer spans aggregate to a uniform Replay interval;
+coarse candles are never split, overlaps never count twice, and unresolved gaps
+remain visible. Files retain their native candles and exact source provenance.
+Availability checks and START share this composition. The local-only option
+skips broker requests. See [Replay lookup](#replay-lookup-and-script-analysis-access)
+for source selection and prepared-snapshot reuse.
 
 Historical bars retain their actual duration and start timestamp. Their OHLC
 becomes available at the source candle's close for both Built-In and scripts.
@@ -133,19 +162,27 @@ visible warming-up HOLD. It does not silently use the Built-In strategy.
 
 ## Local market-data library
 
-Implemented September 7, 2026. The [user guide](docs/market-data-library.md) covers setup, scheduling, portable files, offline Replay and MCP access. History is separate from the SQLite journal, credentials and repository research. Sampled quote rows are not treated as finalized historical candles.
+Implemented in release 1.3. The [user guide](docs/market-data-library.md) covers setup, scheduling, portable files, offline Replay and MCP access. History is separate from the SQLite journal, credentials and repository research. Sampled quote rows are not treated as finalized historical candles.
 
 ### Download lists and daily collection UI
 
-**Tools > Retain Hi-Res Data** opens a reusable modeless window; main trading controls stay available. Its clock reflects saved automatic-download state, not unsaved edits. The three tabs contain editable named equity lists, a global daily schedule and download queue, and local library inspection/Replay selection.
+**Tools > Retain Hi-Res Data** opens a reusable modeless window; main trading controls stay available. Its clock reflects saved automatic-download state, not unsaved edits. The three tabs contain named equity lists, a global daily schedule and download queue, and local-library inspection.
 
-Manual lists accept pasted symbols. Connected resolution validates equities and resolves company names; offline entries remain visibly unresolved until download. Per-member and per-list inclusion control the collection union independently of strategy selection and trade eligibility. Robinhood import retrieves personal lists, validates response completeness, previews individual equity checkboxes, and creates an editable local snapshot. Explicit refresh preserves exclusions and previews membership changes before Save. Portable list exports omit private remote IDs. Removing lists never deletes candles.
+Manual lists accept pasted symbols. Connected resolution validates equities and resolves company names; offline identities are checked when downloading. Per-member and per-list inclusion control the collection union independently of strategy selection and trade eligibility. Robinhood imports validate response completeness and preview an editable local snapshot. Refresh preserves exclusions and previews membership changes before saving. New lists show **SAVE LIST**; existing lists show **UPDATE LIST** only for unsaved changes. The button animates into view while respecting Windows animation preferences. **EXPORT LISTS** is hidden without saved lists and exports saved names, symbols, and inclusion choices, excluding private remote IDs, candles, and unsaved edits. Removing lists never deletes candles.
 
-The collector persists settings, queued membership, progress and older unresolved gap ranges atomically in `collection-state.json`. At the user's chosen time and saved zone, it runs the same available-history discovery as Download now, including today's completed candles and earlier missing history. It requests only genuine, completed 15-second candles across all available regular, premarket, after-hours and overnight trading, skips complete coverage and retries missing/partial sessions within seven calendar days before discovering older history, independently of when collection was enabled. This retry horizon is not a provider retention guarantee; older gaps remain visible. Partial days group gaps separated by at most five minutes of saved coverage into requests of at most six hours, bounded by actual trading windows and the captured cutoff. This reduces broker calls and full library scans for sparse candles. Overlapping responses must agree with saved candles before writing; responses with no new candles advance the durable cursor without another file. Native responses that add candles remain immutable; differing provenance or changed overlapping candles cannot be blended. Requests are serialized with bounded transient retry. Skipped clock times run at the first valid minute; repeated times run once at the earlier occurrence. Retention uses the provider's `24_5` scope without a user-selectable market-session field. Actual trading windows determine expected candles, excluding weekend, holiday and early-close closures. Existing regular and extended files supply compatible saved candles when expanding coverage. The app must be open and connected. Background calls cannot initiate interactive authorization. Running while the app is closed remains separate future work.
+The collector persists settings, queue membership, progress, and discovery cursors atomically in `collection-state.json`. Scheduled runs and **DOWNLOAD GAPS NOW** use the saved included equities and folder, starting with today's completed candles through a captured 15-second boundary. They reuse compatible local files, including imported partial days, then check older dates. Complete days avoid broker requests and do not end discovery. There is no fixed retry horizon or assumed provider retention age. A fresh run replaces unfinished speculative discovery; explicit manual work and saved history are preserved. Older failures and partial imported days are revisited when discovery reaches them.
 
-Scheduled collection and Download now derive their dates from saved coverage and the current clock. It includes completed candles from the current session using a captured 15-second cutoff, then checks older trading sessions for each saved, included equity. Backward discovery is durable and stops after three consecutive collection dates with no broker data, not at a fixed data age. Errors remain retryable and do not prove exhaustion; locally complete sessions avoid broker requests and do not reset the broker-empty streak. Both entry points requeue known older failures and incomplete requests scoped to the currently included equities and folder, and discovers partial imported files without relying on a local job record. These repairs are independent of the empty-check stopping rule; empty boundary probes alone do not become permanent retries. The UI identifies current-day snapshots and expected empty discovery results, with no From/Through inputs or separate retry button. A later request extends partial-day coverage while preserving immutable earlier revisions.
+For each older date, the oldest missing range is checked in windows of up to one hour. Empty results advance through that date's gaps. Returned candles are saved immediately; once availability is established, remaining gaps use batches of up to six hours. Nearby gaps can be grouped when the intervening saved coverage is at most five minutes. Requests stay inside actual trading windows and the captured cutoff; normal downloads also exclude indexed empty ranges. Overlapping candles must agree before merging; responses with no new candles advance progress without redundant files. There is no coarse-candle fallback in the retention downloader.
 
-The app-owned retention view model drains ready batches continuously, yielding to the UI dispatcher between them and retaining the collector's request spacing. Batch results distinguish ready work, retry deadlines, and lost connections so neither normal batches nor short retries inherit the idle scheduler's 30-second check. Closing the modeless tool window keeps the same collector and view model alive. Header progress follows that shared state, and reopening active work selects the downloads tab. App shutdown cancels and awaits collection, preserving pending jobs.
+Current progressive discovery stops an equity at the first earlier regular trading date whose missing ranges have all been checked with no returned candles. Today, complete local days, and overnight-only dates do not establish this boundary. Connection failures and request errors never count as empty history. This is a stopping rule rather than proof that every earlier date is unavailable. Saved positive availability evidence allows discovery to continue through a previously productive date when all remaining gaps are already indexed. Fresh empty checks can still establish the stopping boundary.
+
+The separate `.collection-gaps.sqlite3` index consolidates confirmed-empty ranges by broker, symbol, instrument, date, session, adjustment identity, and native interval. Only validated, completely empty successful responses create negative observations; holes inside partial responses, errors, and cancellations do not. For the current Eastern date at request time, empty ranges become eligible again 15 minutes after the completed check; older ranges have no automatic expiry. Normal downloads subtract indexed ranges, and a run does not loop on expired entries. If the index is missing, **DOWNLOAD GAPS NOW** recreates it and learns from actual responses while reusing saved files. **FORCED DOWNLOAD** also retries remembered empty ranges with a fresh retry count for that run, preserving ordinary pacing and retry limits. The forced run survives pause or restart; later normal and scheduled runs use the index again.
+
+Transport failures and timeouts receive up to three total attempts per batch, separated by five seconds. Exhausted jobs remain failed for that run and can be retried by a later normal or scheduled run if discovery reaches them. Lost connections leave pending work; expired authorization may require explicit reconnecting. **CLEAR** removes finished queue entries only while no download or queued work remains, preserving candles, the gap index, continuity, and the schedule. **PAUSE DOWNLOADS** cancels the current request and preserves queued work until resumed or the app restarts.
+
+Collection requests only genuine completed 15-second candles in the provider's `24_5` scope. Expected windows exclude weekends, holidays, and early-close closures. The saved schedule zone follows daylight saving time; skipped times run at the first valid minute and repeated times run once at the earlier occurrence. The app must stay open and connected; background calls cannot initiate interactive authorization. Collection while the app is closed remains future work.
+
+The app-owned view model drains ready batches continuously, yielding between them while preserving serial request spacing. Retry deadlines and connection waits are distinct from the idle scheduler's check interval. Closing the modeless window leaves collection running; app shutdown cancels and awaits it, preserving pending jobs. Updates preserve table selection and scrolling. The progress bar includes partly checked days; saved coverage remains separate from request progress. Queue counts distinguish partials, unavailable data, and failures. **Equity**, **Date**, and numeric **State** support primary and Shift-click secondary sorting. A stable **[i]** at the start of the status line opens an information popup that remains open while scrolling, with outside-click, Escape, and close-button dismissal.
 
 ### Portable folder layout
 
@@ -165,11 +202,25 @@ MarketData/
 
 Create only needed folders. Month names are invariant English; daily grouping uses America/New_York while candles preserve exact UTC starts, ends and source-close availability. Schema 1 stores self-contained UTF-8 JSON with invariant decimal strings, nullable unknown volume, source/instrument identity, actual interval, adjustment metadata, fetched time, requested/covered ranges, gaps and a canonical full SHA-256 hash. The generated root README documents the schema. Unknown volume does not imply complete OHLCV.
 
-Copies of files or whole folders work without the original journal, sidecars, private list IDs or credentials. Rescans validate content, metadata and full hashes. Atomic writes deduplicate identical data and preserve corrections as `.rev-<hash>.json` revisions. Conflicting revisions require explicit pins or LatestFetched selection. Different providers/instruments/adjustment identities cannot merge implicitly. Robinhood's unversioned split-adjustment basis is disclosed; fetched timestamps are not invented adjustment epochs.
+Copies of files or whole folders work without the original journal, sidecars, private list IDs or credentials. Each equity/Eastern date has one current `YYYY-MM-DD.15s.json` file. Compatible 15-second sections are atomically consolidated into it, including imported regular/extended files. Identical overlaps are deduplicated; changed prices, volume, timing, or incompatible provenance are not silently blended. Superseded snapshots and original hashes remain in `.archive/<hash>.json` for exact-hash access. Coarser native files can still retain `.rev-<hash>.json` revisions. Conflicting revisions require explicit source selection through Replay's revision policy or pins; the library table has no pin editor. Different providers/instruments/adjustment identities cannot merge implicitly. Robinhood's unversioned split-adjustment basis is disclosed; fetched timestamps are not invented adjustment epochs.
+
+Library scans cache bounded validated metadata and revalidate new or changed files. Reads and merges still validate selected candle contents and hashes. The queue state and unavailable-range index are local support files; portable candles remain usable without either.
+
+### Local-library coverage and timeline
+
+**RESCAN LIBRARY** reports **Processing** and percentage complete, then displays the size of active candle files in decimal MB, right-aligned with the table. Archived snapshots and supporting files are excluded. Full scan notices live in a bounded details panel. The library supports primary and Shift-click secondary sorting, preserving the chosen order across rescans and reopening within the app session.
+
+Library rows use Eastern dates. Day coverage counts unique saved eligible native candles against expected completed trading slots at that native interval, excluding market closures and future candles. Today's denominator advances with the clock; the **Candles** column still counts saved coverage for the whole date. Mixed intervals or incompatible identities show unavailable totals rather than misleading combined counts.
+
+Download-table **State** has separate semantics: daily discovery jobs measure saved 15-second coverage over the full trading day, including today's future hours; targeted timeline jobs measure only their requested span. A failed attempt displays **0%** while existing files remain intact, and unknown coverage displays **--**. Request progress measures checked work separately.
+
+Clicking a library row opens a local-time timeline, joining adjacent Eastern daily files as needed. Confirmed 24-hour equities show the full local day; other confirmed equities show 06:00–17:00. Unknown eligibility uses the full day with an explanation. Each 15-minute block is green for complete, light green for partial, black for missing, striped gray for market closed, or blue for future time. Future and closed slots do not count as missing. Local-day timeline counts can differ from the Eastern-date library row. Click outside, press Escape, or use the close button to dismiss the dialog.
+
+A selected block shows counts and times in a fixed selected-block panel. Selecting **Missing** offers **DOWNLOAD** at its top right for the block and touching missing neighbors, stopping at partial, complete, closed, or future blocks. The action retries remembered empty ranges only within that completed span and splits local time into the appropriate Eastern daily files. It does not start older-day discovery. The button is disabled while other queued or downloading work remains. Completion refreshes coverage while retaining selection; status stays inside the panel at bottom left and clears on a different selection, including a late result from the previous block.
 
 ### Replay lookup and script-analysis access
 
-Explicit hashes take precedence and never permit silent substitution. Otherwise Replay checks all local 15/30/60/120-second sources first. The default CompatibleCoverage policy combines same-identity revisions when overlapping candles agree; conflicting prices or volume still require a revision choice. Remaining gaps trigger a bounded request spanning the missing coverage at supported broker intervals 15, 30 and 60 seconds. The adapter has no native 120-second request. Availability and START share this composer and preserve exact checked source hashes; native downloads are archived only at START. Composition backtracks within each target bar to choose a complete partition of genuine whole candles, preferring finer data and local sources on ties. It aggregates complete partitions to one uniform Replay interval, maximizes covered duration, and uses the finest interval on coverage ties. Missing constituents remain gaps; coarse candles are never split or double-counted. Native files stay unchanged and provenance identifies native versus Replay intervals. The local-only checkbox is in dashboard Replay settings before START; it defaults off, invalidates prepared availability when changed, and skips all broker requests. The welcome screen also permits local use without authentication.
+Explicit hashes take precedence and never permit silent substitution. Otherwise Replay checks all local 15/30/60/120-second sources first. The default CompatibleCoverage policy combines same-identity revisions when overlapping candles agree; conflicting prices or volume still require a revision choice. Remaining gaps trigger a bounded request spanning the missing coverage at supported broker intervals 15, 30 and 60 seconds. The adapter has no native 120-second request. Availability and START share this composer and preserve exact checked source hashes; native downloads are archived only at START. Composition backtracks within each target bar to choose a complete partition of genuine whole candles, preferring finer data and local sources on ties. It aggregates complete partitions to one uniform Replay interval, maximizes covered duration, and uses the finest interval on coverage ties. Missing constituents remain gaps; coarse candles are never split or double-counted. Native files stay unchanged and provenance identifies native versus Replay intervals. The **Replay from local files only (offline)** checkbox is in dashboard Replay settings before START; it defaults off, invalidates prepared availability when changed, and skips all broker requests. The welcome screen's **USE OFFLINE** action opens saved-history Replay and local inspection without authentication.
 
 Before START, Enter in the date/start/end fields, CHECK, or selecting a calendar date checks the exact dashboard range. Complete local 15-second coverage is dark green; verified broker 15-second coverage is light green; 30/60-second coverage is orange; actual 120-second coverage is red. Partial, unchecked, unavailable, and conflicting data remain neutral with details. Opening a month scans local metadata without broker requests for every day. Selected-date checks use the existing connection, preserve the checked provider candles in memory, and prefer complete coverage before partial results. START archives that exact prepared snapshot or rereads the pinned local files. Ticker, range, library, and selection-policy changes invalidate preparation. Broker calendar results expire after five minutes; source availability is verified rather than inferred from a fixed retention age. Starting without a check retains the direct lookup behavior above.
 
@@ -179,8 +230,8 @@ Deterministic tests cover copying data, UTC/Eastern boundaries, non-Gregorian di
 
 ## Strategy and host contract
 
-The current `IPriceActionSignalEngine` seam can adapt the interpreter to both
-execution engines without rewriting the built-in detector. Strategy input contains
+The `ThinkScriptSignalEngine` adapter implements `IPriceActionSignalEngine` for
+both execution engines while preserving the built-in detector. Strategy input contains
 only immutable completed price bars and a read-only long-position snapshot.
 An external result requests BUY, SELL, or HOLD and supplies an explanatory state
 and reason. Host-owned risk decisions remain evaluated independently on fresh
@@ -207,9 +258,12 @@ The catalog scans only the top level of the strategy folder, with bounded file
 counts and per-file size. It accepts `.thinkscript`, `.ts`, and `.txt` text files.
 Invalid UTF-8, unreadable files, unsupported programs, and incompatible source
 formats receive filename and line diagnostics. Only compatible programs join
-Built-In in the selector; diagnostics remain visible nearby.
+Built-In in the selector. Diagnostics wrap inside a bounded scrollable panel,
+without a hover tooltip. Right-click **Copy** copies the complete diagnostic text,
+including offscreen lines; **Cancel** closes the menu. The panel remains usable
+while session inputs are locked.
 
-Provide **Open Scripts Folder** and **Refresh** actions. Refresh when the selector
+The UI provides **SCRIPTS FOLDER** and **REFRESH** actions. Refresh when the selector
 is opened and revalidate the exact selected file before session start. An absent
 or incompatible selection blocks startup with guidance. It must not silently
 fall back to Built-In. First launch and old preferences select Built-In.
@@ -236,7 +290,7 @@ orders, and fills already reference:
 - Strategy ID and display name
 - Source SHA-256 (or built-in application version identity)
 - Interpreter/runtime version
-- Input defaults and selected candle interval
+- Input defaults, selected candle interval, and optional declared tested interval
 - Data/simulation model version
 
 Replay session settings also pin `ReplayHistory`: `SourceIntervalSeconds`,
@@ -246,11 +300,18 @@ schema migration 4 stores each observation's source duration; existing rows
 retain their original 15-second default. These metadata changes do not alter
 Paper/LIVE data ingestion or introduce execution costs.
 
-LIVE retains its existing explicit warning, arming, broker reconciliation, and
-review flow. Before arming an external source, show the strategy name and exact
-artifact identity and require review of that artifact. Editing a script invalidates
-any remembered approval. Approval does not establish profitability; source execution
-is still limited by the interpreter and every accepted action by the host.
+The general LIVE loss warning records acceptance in local `preferences.json`
+through `LiveRiskAcknowledged`; subsequent selections skip that dialog. Cancel or
+close does not record acceptance. The flag survives restarts while those
+preferences remain, and automation cannot set it. Every app launch still starts
+OFF, and entering LIVE leaves execution disarmed until an explicit **Start Live
+Trader** completes broker reconciliation and the existing arming checks.
+
+External scripts separately require approval of the exact pinned source and
+candle interval at every LIVE session start. The saved general warning acceptance
+does not replace this review. Source edits take effect only through a new pinned
+artifact and review. Approval does not establish profitability; the interpreter
+and every host risk, broker review, and execution gate remain in force.
 
 ## Failure behavior
 
@@ -263,8 +324,12 @@ reviewed. No automatic substitution of another strategy is allowed.
 
 ## Original packaged strategy
 
-Research popular public approaches such as Confirmation Candles for high-level
-ideas. Develop original source with independently specified rules and parameters;
+The single packaged `OriginalConfirmation.thinkscript` displays as **Original
+Confirmation - experimental**. Other local work-in-progress scripts remain outside
+release packaging unless explicitly included.
+
+Public approaches such as Confirmation Candles can inform high-level ideas.
+Develop original source with independently specified rules and parameters;
 do not copy a forum script into the packaged example. Begin with a small set of
 complementary price-only trend/momentum conditions, explicit long entry and exit,
 and a manageable lookback. Document its assumptions and test both positive and
@@ -277,22 +342,26 @@ with decision-equivalence tests.
 
 ## Implementation milestones and verification
 
-1. **Design:** document the compatibility subset, shared selector, original-source
-   policy, data timing, and milestone acceptance criteria; commit and push.
-2. **Runtime and host contract:** implement bounded parsing/evaluation, indicator
-   semantics, compatibility diagnostics, and repeated-entry protection. Validate
-   unchanged external examples locally plus original deterministic fixtures,
-   future-data rejection, limits, and host risk tests; commit and push.
-3. **Catalog and application:** add folder discovery, packaged sample seeding,
-   Built-In default, shared selector, pinned artifacts, completed-bar ingestion,
-   session provenance, and LIVE source review. Test actual WPF binding behavior,
-   missing/edited files, locked settings, quote freshness, bar boundaries, history
-   corrections, gap behavior, and simulated/broker-fake action paths; commit and push.
-4. **Original example and delivery:** validate the example with deterministic
-   positive/negative price sequences and compare repeated runs; document exact
-   limitations and user workflow. Run the complete Release build/tests and a
-   Windows publish check, independently review the final integration, then commit
-   and push. No real broker order is part of automated validation.
+The runtime, catalog, host integration, original example, local history library,
+and MCP companion are shipped in 1.3. Their validation covers:
+
+1. **Runtime:** bounded parsing and evaluation, indicator semantics, explicit
+   compatibility diagnostics, completed-bar timing, gap resets, counter state,
+   repeated-entry protection, and host risk gates.
+2. **Application integration:** folder discovery and one-time sample seeding,
+   Built-In defaults, tested intervals, pinned artifacts, provenance, per-start
+   LIVE script review, saved general warning acceptance, and scrollable diagnostics.
+3. **Data and automation:** portable files, revisions, queues, empty-range indexing,
+   recovery and retries, local-time coverage, offline Replay, native-resolution
+   composition, exact stepping, bounded telemetry, and fake-broker isolation.
+4. **Delivery:** release 1.3 passed all 1,404 tests and a Release build with zero
+   warnings or errors. Windows CI and release packaging succeeded; the published
+   installer checksums and source provenance were verified. No real broker order
+   is part of automated validation.
+
+Open-market Paper Trader testing and an interactive packaged-1.3 smoke check
+remain outstanding in [TODO](TODO.md#release-13-validation-and-remaining-runtime-checks).
+Automated builds, tests, and published artifacts do not complete those checks.
 
 Future work includes arbitrary C# plugins, secondary timeframes and external data,
 volume-aware authoritative bars, richer indicator studies, and strategy pipelines.
@@ -300,10 +369,10 @@ Those capabilities must not be implied by a successful v1 compatibility check.
 
 ## Local automation and MCP control
 
-Expose the running desktop application's Replay and Paper workflows through a
-local control interface. This allows an assistant to reproduce the manual test
+The implemented local control interface exposes the running desktop application's
+Replay and Paper workflows. This allows an assistant to reproduce the manual test
 sequence without relying on timely mouse clicks. The existing Robinhood MCP
-client remains the market-data/broker adapter; the new interface makes
+client remains the market-data/broker adapter; the companion makes
 PriceSentinel itself an MCP server through a small companion executable.
 
 Launch the desktop app with `--automation` to opt in. A current-Windows-user-only
@@ -363,8 +432,8 @@ the connected visible app separately for the final control smoke test.
 
 ## MCP strategy research observability
 
-Provide read-only `candles`, `indicators`, `events`, and `capture_chart` tools
-against the same Replay/Paper session and app visual. Observations must describe
+The implemented read-only `candles`, `indicators`, `events`, and `capture_chart`
+tools inspect the same Replay/Paper session and app visual. Observations must describe
 what the strategy could know at that point in market time. Never return future
 loaded Replay history, synthesize missing indicator values, or reevaluate a
 script solely to satisfy an inspection request.

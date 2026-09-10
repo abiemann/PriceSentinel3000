@@ -1,11 +1,18 @@
 # TODO — roadmap
 
-Reviewed September 7, 2026. PriceSentinel already provides broker-isolated Paper Trader and Replay modes, real Robinhood market data, documented bid/ask and replay-close fills, risk controls, SQLite WAL journaling, optional immediate or weekday T+1 settlement, external strategies, and MCP control with candle/indicator/event telemetry. Historical Replay preserves the actual source duration when falling back from 15-second to 30-second or one-minute data. The roadmap below tracks remaining work and release verification.
+Reviewed September 9, 2026. [Release 1.3](https://github.com/abiemann/PriceSentinel3000/releases/tag/1.3) is published. PriceSentinel provides broker-isolated Paper Trader and Replay modes, real Robinhood market data, documented bid/ask and replay-close fills, risk controls, SQLite WAL journaling, optional immediate or weekday T+1 settlement, external strategies, and MCP control with candle/indicator/event telemetry. Historical Replay preserves the actual source duration when falling back from 15-second to 30-second or one-minute data. The roadmap below separates completed release validation from remaining supervised runtime checks and future work.
 
-## Next release verification
+## Release 1.3 validation and remaining runtime checks
 
-- [ ] Complete real-time Paper Trader testing during an open market; the planned next session is Tuesday, September 8. Verify quote freshness, completed-candle timing and warmup, script signals, host risk overrides, simulated bid/ask fills, and journal/MCP agreement. Historical Replay checks do not complete this item.
-- [ ] After that session, review failures, run the release build/tests and packaged-app smoke checks, and cut the next release only when those checks pass. Verify the footer identifies the built release tag.
+- [x] Initial publication of release 1.3 from commit `1bea13a24d9ed3a07012acbdfe0c4c3e8ac459e0` on September 9, 2026 Pacific time (September 10 UTC), with installer, checksums, and provenance attached and verified.
+- [x] Validate the local Release build with zero warnings/errors and all 1,404 tests passing; complete [Windows CI](https://github.com/abiemann/PriceSentinel3000/actions/runs/34422818384) and the [Release workflow](https://github.com/abiemann/PriceSentinel3000/actions/runs/34422844466) successfully.
+- [ ] Complete and record real-time Paper Trader testing during an open market. Verify quote freshness, completed-candle timing and warmup, script signals, host risk overrides, simulated bid/ask fills, and journal/MCP agreement. Historical Replay checks do not complete this item.
+- [ ] Complete and record an interactive smoke check of the packaged 1.3 installer/app, including launch, basic controls, and a footer identifying release 1.3. Successful builds, automated tests, and published artifacts do not complete this item.
+
+## Desktop controls — implemented
+
+- [x] Save the LIVE loss-warning acknowledgement once in local preferences across restarts. LIVE execution remains off by default and each LIVE session requires an explicit start.
+- [x] Use a gray rounded outer window border, with square corners when maximized.
 
 ## Concurrent multi-symbol trading — proposed, not implemented
 
@@ -37,13 +44,17 @@ See the [user guide](docs/market-data-library.md) and [design](DESIGN.md#local-m
 - [x] App-styled Tools entry, saved-state clock, modeless list/schedule/library UI, editable lists, individual equity inclusion, and read-only Robinhood snapshot import/refresh.
 - [x] User-selected daily time and saved time zone, holiday/early-close/DST handling, app-open collection, durable deduplicated jobs, bounded retries, and restart/disconnection recovery.
 - [x] Persist confirmed empty 15-second request ranges in an indexed SQLite database, skip them on later runs, retry today's after 15 minutes, and recreate a missing index without changing daily candle files.
-- [x] Scheduled runs and one date-free Download now action collect all available regular, premarket, after-hours and overnight 15-second history, reuse saved coverage, collect today's completed candles, check older gaps in hourly windows before queuing remaining work, skip complete days, and stop each equity at the first older regular trading date whose missing ranges return no data.
+- [x] Scheduled runs and the date-free **Download gaps now** action collect all available regular, premarket, after-hours and overnight 15-second history, reuse saved coverage, collect today's completed candles, check older gaps in hourly windows before queuing remaining work, skip complete days, and stop each equity at the first older regular trading date whose missing ranges return no data.
+- [x] **Forced download** rechecks remembered empty ranges for that run while preserving saved candles; **Clear** removes finished queue entries when all downloads and queued work are idle, preserving files, remembered gaps, continuity, and the schedule.
 - [x] Group nearby missing candles into bounded requests, validate saved overlaps, avoid redundant files, and show progress within each stock/date.
 - [x] Continue ready download batches without a fixed pause; keep collection running after closing its window, with live progress inside the header button and current status on reopening.
 - [x] Portable symbol-only list transfer and year / numbered English month / ticker / daily JSON history with exact candles, source-close timing, provenance, gaps, nullable volume and archived exact-hash history.
 - [x] Merge compatible 15-second sections into one current file per stock/Eastern date; preserve every unique candle across midnight/month/year boundaries, archive superseded snapshots, and retain exact-hash Replay.
 - [x] Local-first and offline Replay, explicit revision selection and dataset pins, actual-resolution enforcement, and read-only paginated MCP library discovery/candle access without an active session.
 - [x] Per-equity continuity from saved coverage, genuine completed 15-second-only collection, reuse of existing regular/extended files when expanding coverage, partial-day repair, expected candle counts excluding market closures, and persistent reporting of older unresolved gaps.
+- [x] Sort both download and library tables by multiple columns, show local scan progress and active saved-file size in MB, and keep full library notices in a bounded, scrollable details panel.
+- [x] Open a saved-coverage timeline in local time while retaining Eastern-dated daily files; distinguish saved, partial, missing, closed, and future intervals, and calculate today's coverage only through completed candles at the current time.
+- [x] Download a selected missing timeline block and its touching missing blocks through the connected broker, retrying remembered empty ranges for that span, merging candles into the appropriate Eastern daily files, and refreshing the selected timeline without starting older-day discovery.
 - [x] Replay preflight on Enter/CHECK/date selection, a colored availability calendar, exact-range coverage checks, and reuse of checked data at START without another broker download.
 - [x] Dashboard local-only Replay option; default disk-first reuse of agreeing saved pieces and broker gap fills at genuine supported intervals, with uniform Replay aggregation and native-source provenance.
 - [x] Automated storage, scheduler, import, Replay, MCP and UI integration checks; authenticated read-only list/candle provider smoke checks.
@@ -52,9 +63,10 @@ See the [user guide](docs/market-data-library.md) and [design](DESIGN.md#local-m
 
 ## Strategy scripting follow-ups
 
-The current development build offers **Built-In** and compatible folder-based thinkScript strategies in one selector for Paper, LIVE, and Replay. It pins source and parameters per session, enforces bounded interpretation, preserves host risk controls, and packages one original example. See [DESIGN.md](DESIGN.md) and the [compatibility guide](docs/strategy-scripting.md).
+Release 1.3 offers **Built-In** and compatible folder-based thinkScript strategies in one selector for Paper, LIVE, and Replay. It pins source and parameters per session, enforces bounded interpretation, preserves host risk controls, and packages one original example. See [DESIGN.md](DESIGN.md) and the [compatibility guide](docs/strategy-scripting.md).
 
 - [x] Read optional tested-interval comments, select the declared interval when choosing a script, show unspecified/mismatch guidance, and retain declared and actual intervals in session/MCP provenance. Refresh and app startup preserve saved overrides; active sessions keep their pinned configuration.
+- [x] Keep script diagnostics in a bounded, scrollable panel with a right-click **Copy** action for the complete diagnostic text.
 
 - Eventually port the existing compiled strategy to the script interface while preserving its behavior through recorded regression fixtures. Keep **Built-In** available until that parity is demonstrated.
 - Extend thinkScript compatibility only with documented semantics and unchanged-source fixtures. Prioritize features needed by a small number of useful strategies; do not silently approximate unsupported trading rules.
