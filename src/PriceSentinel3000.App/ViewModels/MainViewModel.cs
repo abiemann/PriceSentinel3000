@@ -433,6 +433,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
 
             if (SetPreferenceField(ref _symbol, normalized))
             {
+                ClearCapturedDisplayForSymbol();
                 OnPropertyChanged(nameof(SymbolDisplay));
                 ScheduleSymbolTradabilityRefresh();
             }
@@ -587,7 +588,14 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
     public decimal ReplaySpeed
     {
         get => _replaySpeed;
-        set => SetPreferenceField(ref _replaySpeed, value);
+        set
+        {
+            decimal speed = Math.Clamp(value, 1m, 500m);
+            if (!SetPreferenceField(ref _replaySpeed, speed) && value != speed)
+            {
+                OnPropertyChanged();
+            }
+        }
     }
 
     public bool IsSessionRunning

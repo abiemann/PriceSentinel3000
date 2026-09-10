@@ -28,6 +28,7 @@ public sealed class ReplaySessionRunnerTests
     [InlineData(5, 3)]
     [InlineData(10, 1.5)]
     [InlineData(100, 0.15)]
+    [InlineData(500, 0.03)]
     public void CalculateDelay_PreservesHistoricalBarSpeed(int speed, double seconds)
     {
         Assert.Equal(
@@ -44,16 +45,18 @@ public sealed class ReplaySessionRunnerTests
             ReplaySessionRunner.CalculateDelay(Start, Start.AddSeconds(15), speed));
     }
 
-    [Fact]
-    public async Task RunAsync_ReportsIndexTotalAndQuoteInOrder()
+    [Theory]
+    [InlineData(100)]
+    [InlineData(500)]
+    public async Task RunAsync_ReportsIndexTotalAndQuoteInOrder(int speed)
     {
         var runner = new ReplaySessionRunner();
-        MarketQuote[] quotes = [Quote(10m), Quote(11m)];
+        MarketQuote[] quotes = [Quote(10m), Quote(11m) with { SourceTimestampUtc = Start.AddSeconds(15) }];
         var updates = new List<ReplaySessionUpdate>();
 
         await foreach (ReplaySessionUpdate update in runner.RunAsync(
                            quotes,
-                           speed: 100m,
+                           speed,
                            CancellationToken.None))
         {
             updates.Add(update);

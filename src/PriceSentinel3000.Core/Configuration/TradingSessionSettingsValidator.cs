@@ -148,9 +148,9 @@ public static class TradingSessionSettingsValidator
             }
         }
 
-        if (settings.ReplaySpeed is < 1 or > 100)
+        if (settings.ReplaySpeed is < 1 or > 500)
         {
-            errors.Add("Replay speed must be between 1x and 100x.");
+            errors.Add("Replay speed must be between 1x and 500x.");
         }
 
         return errors;

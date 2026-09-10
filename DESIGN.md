@@ -38,7 +38,18 @@ Replay availability calendar described below are also implemented.
 
 The main window has a one-pixel light-gray edge and rounded restored corners;
 maximized corners are square. The border does not intercept input or change
-window dragging and resizing. Selected table rows use a green background without
+window dragging and resizing. Current source supports paced Replay from 1x to
+500x, clamping entered speeds to that range when committed. **MAX** beside
+the speed input selects 500x and follows the existing session
+configuration lock. **CHECK** sits to the left of the Replay availability guidance.
+These controls are changes after the published 1.3 rebuild. Local Replay now also
+preserves an existing Robinhood connection for autocomplete instead of treating
+local history as a disconnect. Disconnected local playback requires no login;
+selecting OFF opens no connection and leaves shared background downloads available.
+Changing the symbol while idle clears the retained chart, prices, source display,
+and simulated account totals. The header follows the selected symbol immediately;
+completed journal records and structured Replay results retain their original symbol.
+Selected table rows use a green background without
 cell focus outlines. Compact download status uses the same layout across the
 retention window's tabs, keeping tab positions stable as status text changes.
 
@@ -220,7 +231,7 @@ A selected block shows counts and times in a fixed selected-block panel. Selecti
 
 ### Replay lookup and script-analysis access
 
-Explicit hashes take precedence and never permit silent substitution. Otherwise Replay checks all local 15/30/60/120-second sources first. The default CompatibleCoverage policy combines same-identity revisions when overlapping candles agree; conflicting prices or volume still require a revision choice. Remaining gaps trigger a bounded request spanning the missing coverage at supported broker intervals 15, 30 and 60 seconds. The adapter has no native 120-second request. Availability and START share this composer and preserve exact checked source hashes; native downloads are archived only at START. Composition backtracks within each target bar to choose a complete partition of genuine whole candles, preferring finer data and local sources on ties. It aggregates complete partitions to one uniform Replay interval, maximizes covered duration, and uses the finest interval on coverage ties. Missing constituents remain gaps; coarse candles are never split or double-counted. Native files stay unchanged and provenance identifies native versus Replay intervals. The **Replay from local files only (offline)** checkbox is in dashboard Replay settings before START; it defaults off, invalidates prepared availability when changed, and skips all broker requests. The welcome screen's **USE OFFLINE** action opens saved-history Replay and local inspection without authentication.
+Explicit hashes take precedence and never permit silent substitution. Otherwise Replay checks all local 15/30/60/120-second sources first. The default CompatibleCoverage policy combines same-identity revisions when overlapping candles agree; conflicting prices or volume still require a revision choice. Remaining gaps trigger a bounded request spanning the missing coverage at supported broker intervals 15, 30 and 60 seconds. The adapter has no native 120-second request. Availability and START share this composer and preserve exact checked source hashes; native downloads are archived only at START. Composition backtracks within each target bar to choose a complete partition of genuine whole candles, preferring finer data and local sources on ties. It aggregates complete partitions to one uniform Replay interval, maximizes covered duration, and uses the finest interval on coverage ties. Missing constituents remain gaps; coarse candles are never split or double-counted. Native files stay unchanged and provenance identifies native versus Replay intervals. The **Replay from local files only (offline)** checkbox is in dashboard Replay settings before START; it defaults off, invalidates prepared availability when changed, and skips broker history requests. The welcome screen's **USE OFFLINE** action opens saved-history Replay and local inspection without authentication.
 
 Before START, Enter in the date/start/end fields, CHECK, or selecting a calendar date checks the exact dashboard range. Complete local 15-second coverage is dark green; verified broker 15-second coverage is light green; 30/60-second coverage is orange; actual 120-second coverage is red. Partial, unchecked, unavailable, and conflicting data remain neutral with details. Opening a month scans local metadata without broker requests for every day. Selected-date checks use the existing connection, preserve the checked provider candles in memory, and prefer complete coverage before partial results. START archives that exact prepared snapshot or rereads the pinned local files. Ticker, range, library, and selection-policy changes invalidate preparation. Broker calendar results expire after five minutes; source availability is verified rather than inferred from a fixed retention age. Starting without a check retains the direct lookup behavior above.
 

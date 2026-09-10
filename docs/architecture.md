@@ -131,6 +131,11 @@ Paper Trader and LIVE share the real-time ingestion path, but not execution:
 - Replay reads a bounded historical window and always uses simulated fills.
 
 Symbol entry uses the `IInstrumentSearchSource` port for autocomplete suggestions.
+Local Replay source labels preserve the existing Robinhood connection state through
+loading, playback, completion, stopping, and local-file failures. Reading saved
+history does not disconnect symbol search or open a new broker connection. Mode
+selection, including OFF, does not open or dispose the shared connection; background
+collection can continue using it.
 Robinhood tradability capabilities and the Core `EquityMarketSessionEvaluator`
 feed the `24HR` eligibility badge and the current `Tradable now` projection. Those
 presentation states do not expand the broker-execution window described below.

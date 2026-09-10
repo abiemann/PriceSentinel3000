@@ -249,6 +249,10 @@ selected candle interval and RSI panel, rather than surrounding account panels
 or desktop windows. Metadata identifies the capture time, session, symbol,
 visible time range, chart interval, RSI period/value, and dimensions.
 
+Changing the configured symbol while idle clears the visible chart; `capture_chart`
+then returns `chart_unavailable` until a new session supplies chart data. Completed
+`results`, `candles`, `indicators`, and `events` remain tied to their original session.
+
 MCP returns a native image content block and separate structured metadata; it
 does not duplicate the base64 image in its text or structured response. The JSON
 CLI returns the PNG as base64 in `result.data` with `result.mimeType`. Chart RSI

@@ -79,6 +79,15 @@ public partial class DataTimingView : UserControl
         }
     }
 
+    private void OnReplayMaxSpeed(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainViewModel { IsSessionConfigurationEditable: true } viewModel)
+        {
+            viewModel.ReplaySpeed = 500m;
+            ReplaySpeedInput.GetBindingExpression(TextBox.TextProperty)?.UpdateTarget();
+        }
+    }
+
     private async void OnCheckReplayAvailability(object sender, RoutedEventArgs e) =>
         await CheckReplayAvailabilityAsync();
 

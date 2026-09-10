@@ -209,22 +209,37 @@
                 <StackPanel Grid.Column="2">
                     <TextBlock Style="{StaticResource FieldLabelStyle}"
                                Text="Replay speed (x)" />
-                    <TextBox Style="{StaticResource InputTextBoxStyle}"
-                             Text="{Binding ReplaySpeed, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True, NotifyOnValidationError=True}" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="48" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="ReplaySpeedInput" Style="{StaticResource InputTextBoxStyle}"
+                                 ToolTip="Replay playback speed, from 1x to 500x. Values outside this range are set to the nearest limit."
+                                 Text="{Binding ReplaySpeed, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True, NotifyOnValidationError=True}" />
+                        <Button x:Name="ReplayMaxSpeedButton" Grid.Column="1"
+                                Style="{StaticResource SecondaryButtonStyle}" Content="MAX"
+                                Height="36" Margin="4,0,0,0" Padding="3,4"
+                                IsEnabled="{Binding IsSessionConfigurationEditable}"
+                                Click="OnReplayMaxSpeed"
+                                AutomationProperties.Name="Set replay speed to 500x"
+                                ToolTip="Set Replay speed to 500x." />
+                    </Grid>
                 </StackPanel>
             </Grid>
             <Grid Margin="0,8,0,0" Style="{StaticResource ReplayOnlyGridStyle}">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="72" />
+                    <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Margin="0,0,8,0" Foreground="{StaticResource SecondaryTextBrush}" FontSize="11"
-                           TextWrapping="Wrap" VerticalAlignment="Center" Text="{Binding ReplayAvailabilityText}"
-                           AutomationProperties.LiveSetting="Polite" />
-                <Button Grid.Column="1" Style="{StaticResource SecondaryButtonStyle}" Content="CHECK"
+                <Button x:Name="ReplayCheckButton" Style="{StaticResource SecondaryButtonStyle}" Content="CHECK"
                         Padding="5,4" Height="30" Click="OnCheckReplayAvailability"
                         AutomationProperties.Name="Check replay data availability"
                         ToolTip="Check the current symbol, date, and local start/end times without starting Replay." />
+                <TextBlock x:Name="ReplayAvailabilityText" Grid.Column="1" Margin="8,0,0,0"
+                           Foreground="{StaticResource SecondaryTextBrush}" FontSize="11"
+                           TextWrapping="Wrap" VerticalAlignment="Center" Text="{Binding ReplayAvailabilityText}"
+                           AutomationProperties.LiveSetting="Polite" />
             </Grid>
             <Grid Margin="0,12,0,0">
                 <Grid.Style>
@@ -264,7 +279,7 @@
                           IsChecked="{Binding DataRetention.ReplayOfflineOnly, Mode=TwoWay}"
                           IsEnabled="{Binding IsSessionConfigurationEditable}"
                           AutomationProperties.Name="Replay from local files only (offline)"
-                          ToolTip="Use saved data without contacting the broker. Leave unchecked to use saved data first and request missing history from Robinhood."
+                          ToolTip="Use saved history without requesting candles from the broker. Leave unchecked to use saved data first and request missing history from Robinhood."
                           ToolTipService.ShowOnDisabled="True" />
             </Grid>
         </StackPanel>

@@ -72,6 +72,8 @@ internal sealed class FakeBroker : IMarketDataSource, ICachedAuthenticationMarke
     public bool HoldConnection { get; set; }
     public IReadOnlyList<MarketQuote> History { get; set; } = [];
     public IReadOnlyList<MarketQuote> ReplayHistory { get; set; } = [];
+    public IReadOnlyList<InstrumentSearchResult> SearchResults { get; set; } = [];
+    public List<string> SearchQueries { get; } = [];
     public int Connections { get; private set; }
     public BrokerAccount Account { get; } = new("test-account", true, true, "individual");
     public BrokerPortfolio Portfolio { get; set; } = new(10_000m, 0m, 10_000m, 10_000m, "USD");
@@ -89,7 +91,12 @@ internal sealed class FakeBroker : IMarketDataSource, ICachedAuthenticationMarke
     public Task<IReadOnlyList<MarketQuote>> GetHistoryAsync(MarketDataRequest request, DateTimeOffset fromUtc, DateTimeOffset throughUtc, DateTimeOffset observedAtUtc, CancellationToken cancellationToken) => Task.FromResult(History);
     public Task<MarketQuote> GetQuoteAsync(MarketDataRequest request, DateTimeOffset observedAtUtc, CancellationToken cancellationToken) => Task.FromResult(new MarketQuote(request.Instrument, observedAtUtc, observedAtUtc, 9.99m, 10.01m, 10m, 0m));
     public Task<IReadOnlyList<MarketQuote>> GetReplayHistoryAsync(Instrument instrument, DateTimeOffset fromUtc, DateTimeOffset throughUtc, DateTimeOffset observedAtUtc, CancellationToken cancellationToken) => Task.FromResult(ReplayHistory);
-    public Task<IReadOnlyList<InstrumentSearchResult>> SearchAsync(string query, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<InstrumentSearchResult>>([]);
+    public Task<IReadOnlyList<InstrumentSearchResult>> SearchAsync(string query, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        SearchQueries.Add(query);
+        return Task.FromResult(SearchResults);
+    }
     public Task<BrokerAccount> GetAgenticAccountAsync(CancellationToken cancellationToken) => Task.FromResult(Account);
     public Task<BrokerPortfolio> GetPortfolioAsync(string accountNumber, CancellationToken cancellationToken) => Task.FromResult(Portfolio);
     public Task<BrokerPosition> GetPositionAsync(string accountNumber, Instrument instrument, CancellationToken cancellationToken) => Task.FromResult(Position);

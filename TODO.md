@@ -14,6 +14,12 @@ At the September 10 source review, refreshed Windows CI, release packaging, chec
 
 ## Desktop controls — implemented
 
+- [x] After the published 1.3 rebuild: clear the previous symbol's captured chart, prices, and paper-account display when selecting a different symbol while idle, preserving completed journal and structured session results.
+
+- [x] After the published 1.3 rebuild: keep an existing Robinhood connection available for autocomplete after local Replay, while preserving disconnected offline playback and shared background downloads.
+
+- [x] After the published 1.3 rebuild: increase paced Replay to 500x, add **MAX** beside the speed input to select 500x, and place **CHECK** to the left of the availability guidance.
+
 - [x] Save the LIVE loss-warning acknowledgement once in local preferences across restarts. LIVE execution remains off by default and each LIVE session requires an explicit start.
 - [x] Use a gray rounded outer window border, with square corners when maximized.
 

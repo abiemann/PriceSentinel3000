@@ -31,6 +31,50 @@ public sealed partial class MainViewModel
         ];
     }
 
+    private void ClearCapturedDisplayForSymbol()
+    {
+        if (_activeSession is not null || _ringBuffer is null ||
+            string.Equals(_ringBuffer.Instrument.Symbol, Symbol.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _ringBuffer = null;
+        _chartRingBuffer = null;
+        _marketDataRequest = null;
+        _tradeMarkers.Clear();
+        _lastProjectedHistory = null;
+        _automationChartSessionId = null;
+        ChartPoints.Clear();
+        _chartScaleResetVersion++;
+        OnPropertyChanged(nameof(ChartScaleResetVersion));
+        _resolvedReplayHistory = null;
+        SetHistoricalSourceInterval(null);
+        _hasMarketData = false;
+        _currentPrice = "--";
+        _bidAskDisplay = "-- / --";
+        OnPropertyChanged(nameof(HasMarketData));
+        OnPropertyChanged(nameof(CurrentPrice));
+        OnPropertyChanged(nameof(BidAskDisplay));
+
+        if (!IsLiveEffective)
+        {
+            UpdatePaperAccount(new(
+                StartingBalance, StartingBalance, StartingBalance,
+                0m, 0m, 0m, 0m, 0m, 0, false));
+        }
+
+        _strategyStateLabel = "IDLE";
+        _strategyMessage = "Start a new session to load prices for the selected symbol.";
+        _strategyMetrics = "RSI --  |  MOM --  |  CONF --";
+        NotifyStrategyProperties();
+        SetMarketDataState(
+            _isMarketDataConnected ? "ROBINHOOD READY" : "ADAPTER OFFLINE",
+            _isMarketDataConnected ? "CONNECTED" : "OFFLINE",
+            _isMarketDataConnected);
+        StatusMessage = _strategyMessage;
+    }
+
     private void RefreshMarketView()
     {
         if (_ringBuffer is null)

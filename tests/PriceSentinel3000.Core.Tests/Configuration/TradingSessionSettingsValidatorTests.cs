@@ -267,8 +267,25 @@ public sealed class TradingSessionSettingsValidatorTests
     }
 
     [Theory]
-    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(100)]
     [InlineData(101)]
+    [InlineData(500)]
+    public void ReplaySpeedWithinRange_IsAccepted(int speed)
+    {
+        TradingSessionSettings settings = TradingSessionSettings.Default with
+        {
+            ReplaySpeed = speed,
+        };
+
+        IReadOnlyList<string> errors = TradingSessionSettingsValidator.Validate(settings);
+
+        Assert.DoesNotContain(errors, error => error.Contains("Replay speed"));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(501)]
     public void ReplaySpeedOutsideRange_IsRejected(int speed)
     {
         TradingSessionSettings settings = TradingSessionSettings.Default with

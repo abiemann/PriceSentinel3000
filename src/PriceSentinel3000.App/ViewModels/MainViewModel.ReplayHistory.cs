@@ -43,10 +43,10 @@ public sealed partial class MainViewModel
         var resolver = new LibraryReplayHistoryResolver(library, retention.Provider, cancellation =>
             dispatcher.InvokeAsync(() =>
             {
-                SetMarketDataState("ROBINHOOD LOGIN", "AUTHORIZING", isConnected: false);
+                SetMarketDataState("ROBINHOOD LOGIN", "AUTHORIZING", isConnected: _isMarketDataConnected);
                 return retention.PrepareConnectionAsync(cancellation);
             }).Task.Unwrap());
-        SetMarketDataState("LOCAL LIBRARY", "READING HISTORY", isConnected: false);
+        SetMarketDataState("LOCAL LIBRARY", "READING HISTORY", isConnected: _isMarketDataConnected);
         ReplayCheckContext current = CreateReplayCheckContext(ReplayDate);
         PreparedReplay? prepared = _preparedReplay;
         if (prepared is not null && prepared.Key == current.Key &&

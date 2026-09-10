@@ -31,7 +31,9 @@ The library stores one current 15-second file per equity and **Eastern market da
 
 In **LOCAL LIBRARY**, **RESCAN LIBRARY** shows processing progress and the total size of active candle files in MB. Library rows and the download table support primary sorting and Shift-click secondary sorting. Local-library coverage excludes market closures and future candles, so today's denominator stops at the latest completed candle. Click a library row for a timeline of that **Eastern date**, with its boundaries displayed as local dates and times. For example, September 10 Eastern spans September 9 at 21:00 through September 10 at 21:00 Pacific daylight time. Confirmed non-overnight equities show the 04:00–20:00 Eastern extended-hours span in local time. Click a 15-minute block for details; a selected black **Missing** block offers **DOWNLOAD** for that block and its connected missing neighbors. Green means complete, light green partial, striped gray market closed, and blue future time.
 
-Replay checks disk first and fills missing coverage from supported broker history. Complete finer candles can be aggregated alongside coarser gap fills to one Replay interval, with the native resolutions shown and preserved in the files. Choose **Replay from local files only (offline)** in the dashboard before START to prevent broker requests.
+Replay keeps an existing Robinhood connection available for symbol autocomplete, including after playback from saved files. Local-only Replay can still run without connecting. Selecting OFF does not open a connection; background downloads can continue using an existing one.
+
+Replay checks disk first and fills missing coverage from supported broker history. Complete finer candles can be aggregated alongside coarser gap fills to one Replay interval, with the native resolutions shown and preserved in the files. Choose **Replay from local files only (offline)** in the dashboard before START to prevent broker history requests.
 
 In Replay, press **Enter** after entering a date or time, click **CHECK**, or choose a calendar date to check coverage before starting. Dark green means complete local 15-second data, light green means verified broker 15-second data, orange means 30–60-second data, and red means two-minute data. Neutral dates have details explaining unchecked, partial, or unavailable coverage.
 
@@ -99,9 +101,13 @@ folder strategies, the local candle library, and optional MCP/CLI app control:
 - Replay accepts a ticker plus an exact local date/time and checks saved history
   before provider history at 15 seconds, 30 seconds, then one minute. It preserves
   the source duration and can be paused, resumed, or stopped without losing the
-  captured chart and paper-account state
-- Replay local start/end range (up to 24 hours) and playback speed (1x-100x)
-  are tunable
+  captured chart and paper-account state. In current source, selecting a different
+  symbol while idle clears the old chart, prices, and paper-account display;
+  completed journal records and structured session results remain available
+- Replay local start/end range (up to 24 hours) and playback speed are tunable.
+  Current source supports 1x-500x with a **MAX** button to select 500x.
+  Speeds outside 1x-500x are set to the nearest limit when you leave the field or press START.
+  The published 1.3 build supports 1x-100x
 - Built-In analyzes a tunable 5-15 minute rolling buffer as individual one-minute
   blocks and as a whole, retaining at least 16 observations for RSI when slow
   polling would otherwise leave too little history. Scripts use completed candles

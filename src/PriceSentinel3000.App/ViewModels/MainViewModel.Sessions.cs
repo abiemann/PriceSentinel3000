@@ -124,7 +124,8 @@ public sealed partial class MainViewModel
                 }
             }
 
-            StopActiveSession("ERROR", $"Data engine stopped: {exception.Message}");
+            StopActiveSession("ERROR", $"Data engine stopped: {exception.Message}",
+                keepRobinhoodConnected: EffectiveMode is TradingMode.Replay && _isMarketDataConnected);
         }
         finally
         {
@@ -404,7 +405,7 @@ public sealed partial class MainViewModel
 
         if (historicalQuotes.Count == 0)
         {
-            SetMarketDataState(ReplayUsesLocalFiles ? "LOCAL LIBRARY" : "ROBINHOOD READY", "NO HISTORY", !ReplayUsesLocalFiles);
+            SetMarketDataState(ReplayUsesLocalFiles ? "LOCAL LIBRARY" : "ROBINHOOD READY", "NO HISTORY", !ReplayUsesLocalFiles || _isMarketDataConnected);
             StatusMessage = $"No usable {instrument.Symbol} Replay history was returned from {replayStart:g} through {replayEnd:t} at the supported intervals up to two minutes.";
             AddActivity(StatusMessage, "WARNING");
             return;
@@ -413,7 +414,7 @@ public sealed partial class MainViewModel
         int sourceInterval = ValidateReplaySourceInterval(historicalQuotes);
         if (_scriptSignalEngine is not null && settings.ScriptBarIntervalSeconds % sourceInterval != 0)
         {
-            SetMarketDataState(ReplayUsesLocalFiles ? "LOCAL LIBRARY" : "ROBINHOOD READY", "INTERVAL MISMATCH", !ReplayUsesLocalFiles);
+            SetMarketDataState(ReplayUsesLocalFiles ? "LOCAL LIBRARY" : "ROBINHOOD READY", "INTERVAL MISMATCH", !ReplayUsesLocalFiles || _isMarketDataConnected);
             _strategyStateLabel = "INTERVAL MISMATCH";
             StatusMessage = $"History is available as {sourceInterval}-second candles. The selected {settings.ScriptBarIntervalSeconds}-second script needs finer data. Choose a script interval that is a multiple of {sourceInterval} seconds to run a separate experiment; the script interval has not changed.";
             _strategyMessage = StatusMessage;
@@ -423,7 +424,7 @@ public sealed partial class MainViewModel
         }
 
         PrepareDataSession(instrument, settings, TradingMode.Replay, sourceInterval);
-        SetMarketDataState(ReplayUsesLocalFiles ? "LOCAL LIBRARY" : "ROBINHOOD HISTORY", "REPLAY", !ReplayUsesLocalFiles);
+        SetMarketDataState(ReplayUsesLocalFiles ? "LOCAL LIBRARY" : "ROBINHOOD HISTORY", "REPLAY", !ReplayUsesLocalFiles || _isMarketDataConnected);
         _strategyStateLabel = "REPLAYING";
         _strategyMessage = "Historical prices are arriving as a new stream. Orders are simulated only.";
         NotifyStrategyProperties();
@@ -478,7 +479,7 @@ public sealed partial class MainViewModel
         StopActiveSession(
             "COMPLETED",
             $"Replay completed for {instrument.Symbol} using {sourceInterval}-second candles. The chart remains available for inspection.",
-            keepRobinhoodConnected: !ReplayUsesLocalFiles);
+            keepRobinhoodConnected: _isMarketDataConnected);
     }
 
     private void PrepareDataSession(
@@ -681,7 +682,7 @@ public sealed partial class MainViewModel
 
         if (EffectiveMode is TradingMode.Replay && ReplayUsesLocalFiles)
         {
-            SetMarketDataState("LOCAL LIBRARY", "HISTORY LOADED", isConnected: false);
+            SetMarketDataState("LOCAL LIBRARY", "HISTORY LOADED", isConnected: _isMarketDataConnected);
         }
         else if (keepRobinhoodConnected)
         {

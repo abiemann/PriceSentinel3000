@@ -102,8 +102,10 @@ public sealed partial class SessionWorkflowTests
             Assert.Equal(SimpleRsiCalculator.Calculate(vm.ChartPoints.Select(point => point.Close).ToArray()), updated.GetProperty("rsiLatestValue").GetDecimal());
 
             await Automate(vm, "stop");
+            JsonElement retainedResults = (await Automate(vm, "results")).Result!.Value;
             vm.Symbol = "AAPL";
-            Assert.Equal("SOFI", (await Automate(vm, "capture_chart")).Result!.Value.GetProperty("symbol").GetString());
+            Assert.Equal("chart_unavailable", (await Automate(vm, "capture_chart")).ErrorCode);
+            Assert.Equal(retainedResults.GetRawText(), (await Automate(vm, "results")).Result!.Value.GetRawText());
             vm.RequestModeSelection(TradingMode.Live);
             Assert.Equal("live_forbidden", (await Automate(vm, "capture_chart")).ErrorCode);
             vm.CancelModeSelection();

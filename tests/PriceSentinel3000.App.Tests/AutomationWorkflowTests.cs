@@ -244,8 +244,10 @@ public sealed partial class SessionWorkflowTests
         await WaitForAutomation(vm, value => value.GetProperty("operationState").GetString() == "completed");
     });
 
-    [Fact]
-    public Task Automation_FastAndPacedReplayProduceIdenticalDecisionsFillsAndAccount() => host.RunAsync(async () =>
+    [Theory]
+    [InlineData(100)]
+    [InlineData(500)]
+    public Task Automation_FastAndPacedReplayProduceIdenticalDecisionsFillsAndAccount(int speed) => host.RunAsync(async () =>
     {
         var catalog = new TestScriptCatalog
         {
@@ -258,7 +260,7 @@ public sealed partial class SessionWorkflowTests
         workspace.Broker.ReplayHistory = prices.Select((price, index) => Bar(at.AddSeconds(index * 15), price)).ToArray();
         Assert.True((await Automate(vm, "configure", new
         {
-            mode = "Replay", settings = new { strategyId = "test.thinkscript", scriptBarIntervalSeconds = 15, replaySpeed = 100 },
+            mode = "Replay", settings = new { strategyId = "test.thinkscript", scriptBarIntervalSeconds = 15, replaySpeed = speed },
         })).Success);
         Assert.True((await Automate(vm, "start", new { fast = false })).Success);
         await WaitForAutomation(vm, value => value.GetProperty("operationState").GetString() == "completed");
