@@ -1,9 +1,9 @@
 namespace PriceSentinel3000.Application.MarketDataLibrary;
 
-/// <summary>Saved native candles as a share of the full requested trading day.</summary>
+/// <summary>Saved native candles as a share of completed trading candles through the supplied time.</summary>
 public static class CollectionDayCoverage
 {
-    public static decimal? Calculate(CollectionJob job, IEnumerable<HistoricalDatasetInfo> datasets)
+    public static decimal? Calculate(CollectionJob job, IEnumerable<HistoricalDatasetInfo> datasets, DateTimeOffset now)
     {
         if (job.SourceIntervalSeconds != 15 || job.SessionBounds is not ("regular" or "extended" or "24_5") ||
             job.SessionDate == DateOnly.MaxValue)
@@ -14,6 +14,11 @@ public static class CollectionDayCoverage
                 session.FromUtc > requestedFrom ? session.FromUtc : requestedFrom,
                 session.ThroughUtc < requestedThrough ? session.ThroughUtc : requestedThrough))
                 .Where(session => session.FromUtc < session.ThroughUtc).ToArray();
+        const long intervalTicks = 15 * TimeSpan.TicksPerSecond;
+        DateTimeOffset completedThrough = new(now.UtcTicks - now.UtcTicks % intervalTicks, TimeSpan.Zero);
+        sessions = sessions.Select(session => new CollectionSessionWindow(session.FromUtc,
+                session.ThroughUtc < completedThrough ? session.ThroughUtc : completedThrough))
+            .Where(session => session.FromUtc < session.ThroughUtc).ToArray();
         if (sessions.Count == 0) return null;
 
         HistoricalDatasetInfo[] matching = datasets.Where(dataset =>
@@ -27,7 +32,6 @@ public static class CollectionDayCoverage
             matching.Select(dataset => (dataset.Provider, dataset.InstrumentId)).Distinct().Count() != 1)
             return null;
 
-        const long intervalTicks = 15 * TimeSpan.TicksPerSecond;
         var saved = new List<CollectionSessionWindow>();
         foreach (HistoricalDatasetInfo dataset in matching)
         {

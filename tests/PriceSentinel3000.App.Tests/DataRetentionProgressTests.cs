@@ -368,7 +368,7 @@ public sealed partial class SessionWorkflowTests
     });
 
     [Fact]
-    public void DownloadProgress_FullDayAndCurrentDayCutoffKeepTheirExistingProgressAndCoverageMeaning()
+    public void DownloadProgress_RequestCutoffControlsCheckedProgressWhileCoverageExcludesFutureCandles()
     {
         var job = new CollectionJob
         {
@@ -383,7 +383,7 @@ public sealed partial class SessionWorkflowTests
 
         Assert.Equal(52.5d, fullDay.CheckedProgressPercent);
         Assert.Equal(100d * 10.5 / 11, currentDay.CheckedProgressPercent, 8);
-        Assert.Contains("full day's available trading hours", fullDay.StateToolTip);
+        Assert.Contains("Market closures and future candles are excluded", fullDay.StateToolTip);
         Assert.Equal(fullDay.StateToolTip, currentDay.StateToolTip);
         Assert.Equal(0d, new DownloadJobViewModel(job with { NextGapFromUtc = null }).CheckedProgressPercent);
         Assert.Contains("failed download attempt", new DownloadJobViewModel(job with

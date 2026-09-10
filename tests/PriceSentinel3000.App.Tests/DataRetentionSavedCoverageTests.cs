@@ -40,8 +40,8 @@ public sealed partial class SessionWorkflowTests
         }
         else
         {
-            Assert.Contains("full day's", row.StateToolTip);
-            Assert.Contains("Market closures are excluded", row.StateToolTip);
+            Assert.Contains("completed trading candles", row.StateToolTip);
+            Assert.Contains("Market closures and future candles are excluded", row.StateToolTip);
         }
     }
 

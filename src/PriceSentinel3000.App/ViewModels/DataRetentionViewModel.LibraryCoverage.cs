@@ -6,11 +6,13 @@ public sealed partial class DataRetentionViewModel
 
     internal void RefreshLibraryCoverage()
     {
-        if (_disposed || Datasets.Count == 0 || LibraryDays.Count == 0) return;
+        if (_disposed) return;
         DateTimeOffset now = _clock.GetUtcNow();
         long slot = now.UtcTicks / (15 * TimeSpan.TicksPerSecond);
         if (_libraryCoverageClockSlot == slot) return;
         _libraryCoverageClockSlot = slot;
+        RefreshJobRows(now);
+        if (Datasets.Count == 0 || LibraryDays.Count == 0) return;
 
         // The table already owns validated metadata. Advancing the clock must not
         // scan files, request history, or clear the user's selection and sorting.

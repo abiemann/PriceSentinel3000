@@ -570,7 +570,7 @@ public sealed class CollectionGapIndexIntegrationTests
 
         await fixture.Collector.TickAsync(true);
 
-        decimal expected = 100m * 45 / (decimal)(Close(Today) - start).TotalSeconds;
+        decimal expected = 75m; // Three saved candles out of the four completed candles so far.
         CollectionJob partial = Assert.Single(fixture.Collector.State.Jobs);
         Assert.Equal(expected, partial.SavedCoveragePercent);
         Assert.Equal(CollectionJobStatus.Pending, partial.Status);
@@ -621,7 +621,7 @@ public sealed class CollectionGapIndexIntegrationTests
 
         CollectionJob failed = Assert.Single(fixture.Collector.State.Jobs);
         Assert.Equal(CollectionJobStatus.Failed, failed.Status);
-        Assert.Equal(100m * 15 / (decimal)(Close(Today) - start).TotalSeconds, failed.SavedCoveragePercent);
+        Assert.Equal(100m, failed.SavedCoveragePercent); // The one completed candle is still saved.
         Assert.Single(fixture.Read(Today).Candles);
         Assert.Empty(fixture.Snapshot(Today).UnavailableRanges);
         await fixture.Collector.RetryMissingAsync();

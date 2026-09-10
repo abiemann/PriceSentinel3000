@@ -32,7 +32,7 @@ public sealed partial class MarketDataCollector
             if (!saved.Succeeded || job.ProviderInstrumentId is not null &&
                 saved.Datasets.Any(d => d.InstrumentId != job.ProviderInstrumentId))
                 throw new InvalidDataException("Saved history could not be validated for gap recovery. Existing files were preserved.");
-            job = job with { SavedCoveragePercent = CollectionDayCoverage.Calculate(job, saved.Datasets) };
+            job = job with { SavedCoveragePercent = CalculateSavedCoverage(job, saved.Datasets) };
             active = job;
             IReadOnlyList<CollectionSessionWindow> windows = CollectionSchedule.GetSessionWindows(job.SessionDate, job.SessionBounds);
             HistoricalGap[] missing = windows
@@ -191,7 +191,7 @@ public sealed partial class MarketDataCollector
                 AvailabilityCheckPending = job.AvailabilityCheckPending && downloaded.Candles.Count == 0,
                 ActualSourceIntervalSeconds = saved.Candles.Count > 0 || downloaded.Candles.Count > 0 ? 15 : null,
                 DatasetHashes = saved.Datasets.Concat(added).Select(d => d.DatasetHash).Distinct().ToArray(),
-                SavedCoveragePercent = CollectionDayCoverage.Calculate(job, saved.Datasets.Concat(added)),
+                SavedCoveragePercent = CalculateSavedCoverage(job, saved.Datasets.Concat(added), refreshRelated: true),
             });
         }
         catch (MarketDataConnectionUnavailableException exception)

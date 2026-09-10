@@ -256,7 +256,7 @@ public sealed partial class MarketDataCollector
                 throw new InvalidDataException("Saved history could not be validated for gap recovery. Review the local library diagnostics.");
             if (job.ProviderInstrumentId is not null && saved.Datasets.Any(d => d.InstrumentId != job.ProviderInstrumentId))
                 throw new InvalidDataException("Saved history belongs to a different instrument; it cannot be used for gap recovery.");
-            job = job with { SavedCoveragePercent = CollectionDayCoverage.Calculate(job, saved.Datasets) };
+            job = job with { SavedCoveragePercent = CalculateSavedCoverage(job, saved.Datasets) };
             active = job;
             if (saved.Succeeded && saved.Coverage.Complete && (job.ProviderInstrumentId is null ||
                 saved.Datasets.All(d => d.InstrumentId == job.ProviderInstrumentId)))
@@ -351,7 +351,7 @@ public sealed partial class MarketDataCollector
                 ActualSourceIntervalSeconds = downloaded.SourceIntervalSeconds,
                 AdjustmentBasis = downloaded.AdjustmentBasis,
                 DatasetHashes = datasets.Select(d => d.DatasetHash).ToArray(),
-                SavedCoveragePercent = CollectionDayCoverage.Calculate(job, saved.Datasets.Concat(datasets)),
+                SavedCoveragePercent = CalculateSavedCoverage(job, saved.Datasets.Concat(datasets), refreshRelated: true),
                 Error = complete ? null : "Saved genuine 15-second history; coverage has gaps. Recent gaps are checked again on the next scheduled run.",
             }, receivedCandles: true);
         }
@@ -430,6 +430,9 @@ public sealed partial class MarketDataCollector
         state = state with { ActiveJobIds = state.ActiveJobIds.Where(eligible.Contains).Distinct().Take(MaximumActiveJobs).ToArray() };
         _store.Save(state);
         Volatile.Write(ref _state, state);
+        HashSet<Guid> retained = state.Jobs.Select(job => job.Id).ToHashSet();
+        foreach (Guid id in _savedCoverageDatasets.Keys)
+            if (!retained.Contains(id)) _savedCoverageDatasets.TryRemove(id, out _);
         StateChanged?.Invoke(this, EventArgs.Empty);
     }
 

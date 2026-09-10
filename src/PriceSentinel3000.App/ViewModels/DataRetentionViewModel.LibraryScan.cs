@@ -64,10 +64,11 @@ public sealed partial class DataRetentionViewModel
                 if (!_disposed && IsLibraryScanning && generation == _libraryScanGeneration)
                     LibraryScanPercent = Math.Max(LibraryScanPercent, Math.Clamp(percent, 0, 99));
             });
-            var (scan, days) = await Task.Run(() =>
+            MarketDataLibraryScan scan = await Collector.ScanLibraryAsync(library, progress, _lifetime.Token);
+            var (days, now) = await Task.Run(() =>
             {
-                MarketDataLibraryScan result = library.ConsolidateDailyFiles(progress);
-                return (result, LibraryDaySummary.Create(result.Datasets, _clock.GetUtcNow()));
+                DateTimeOffset at = _clock.GetUtcNow();
+                return (LibraryDaySummary.Create(scan.Datasets, at), at);
             }, _lifetime.Token);
             LibraryDaySummary? selected = SelectedLibraryDay;
             LibraryDays.Clear();
@@ -80,6 +81,8 @@ public sealed partial class DataRetentionViewModel
             Status = $"Found {days.Count} daily entries from {scan.Datasets.Count} saved files. {scan.Diagnostics.Count} scan notices." +
                 (HasLibraryDiagnostics ? " Open Library details." : "");
             LibrarySizeText = $"{scan.TotalFileBytes / 1_000_000m:#,0.##} MB";
+            _libraryCoverageClockSlot = now.UtcTicks / (15 * TimeSpan.TicksPerSecond);
+            RefreshJobRows(now);
             LibraryScanPercent = 100;
         }
         finally { IsLibraryScanning = false; }

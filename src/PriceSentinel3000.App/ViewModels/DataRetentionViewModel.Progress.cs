@@ -49,7 +49,7 @@ public sealed class DownloadJobViewModel(CollectionJob job) : INotifyPropertyCha
         ? "0% identifies this failed download attempt. Previously saved candles are kept; see Details for the error."
         : _job.RequestedFromUtc is not null && RequestedThroughUtc is not null
             ? "Genuine 15-second candles saved as a percentage of the selected trading range. Market closures and future time are excluded. -- means saved coverage has not been verified."
-        : "Genuine 15-second candles saved as a percentage of the full day's available trading hours. Market closures are excluded. Today's remaining hours still count toward the full day. -- means saved coverage has not been verified.";
+        : "Genuine 15-second candles saved as a percentage of completed trading candles through the latest coverage check, like Local Library. Market closures and future candles are excluded. -- means no completed candles are expected yet or saved coverage has not been verified.";
     public string StatusText => Status switch
     {
         CollectionJobStatus.Pending => RetryAfterUtc is null ? "Queued" : "Retry waiting",
@@ -214,9 +214,11 @@ public sealed partial class DataRetentionViewModel
         _timer.Start();
     }
 
-    private void RefreshJobRows()
+    private void RefreshJobRows(DateTimeOffset? atUtc = null)
     {
-        CollectionJob[] jobs = Collector.State.Jobs.OrderByDescending(j => j.QueuedAtUtc).ToArray();
+        DateTimeOffset now = atUtc ?? _clock.GetUtcNow();
+        CollectionJob[] jobs = Collector.State.Jobs.OrderByDescending(j => j.QueuedAtUtc)
+            .Select(job => job with { SavedCoveragePercent = Collector.GetSavedCoverage(job, now) }).ToArray();
         HashSet<Guid> ids = jobs.Select(j => j.Id).ToHashSet();
         for (int index = Jobs.Count - 1; index >= 0; index--)
             if (!ids.Contains(Jobs[index].Id)) { _jobRows.Remove(Jobs[index].Id); Jobs.RemoveAt(index); }
