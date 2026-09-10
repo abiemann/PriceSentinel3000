@@ -105,7 +105,7 @@ public sealed partial class MarketDataCollector
                 j.Status is CollectionJobStatus.Partial or CollectionJobStatus.Unavailable or CollectionJobStatus.Failed
                 ? j with { Status = CollectionJobStatus.Pending, Attempts = 0, NextSourceIntervalSeconds = 15,
                     IsAutomatic = false, IsAvailabilityProbe = false, IgnoreKnownGaps = false, RetryAfterUtc = null, Error = null, NextGapFromUtc = null, ReceivedCandlesThisRun = false,
-                    DiscoveryAsOfDate = null, AvailabilityCheckPending = false, DiscoveryEmptySessions = null }
+                    DiscoveryAsOfDate = null, AvailabilityRunId = null, AvailabilityCheckPending = false, DiscoveryEmptySessions = null }
                 : j).ToArray(),
         }), cancellationToken);
 
@@ -133,9 +133,11 @@ public sealed partial class MarketDataCollector
                 remaining -= result.Requests;
                 if (result.ConnectionLost) return CollectionBatchResult.Disconnected;
             }
+            cancellationToken.ThrowIfCancellationRequested();
+            bool discoveryReady = AdvanceAvailabilityDiscovery();
             CollectionJob[] pending = _state.Jobs.Where(j => j.Status == CollectionJobStatus.Pending &&
                 (!j.IsAutomatic || _state.Settings.AutomaticDownloadsEnabled)).ToArray();
-            return pending.Any(j => j.RetryAfterUtc is null || j.RetryAfterUtc <= _clock.GetUtcNow())
+            return discoveryReady || pending.Any(j => j.RetryAfterUtc is null || j.RetryAfterUtc <= _clock.GetUtcNow())
                 ? CollectionBatchResult.Ready : pending.Length > 0
                     ? CollectionBatchResult.WaitingForRetry : CollectionBatchResult.Idle;
         }
@@ -288,6 +290,7 @@ public sealed partial class MarketDataCollector
             SetActivity("Downloading", job);
             HistoricalDownload downloaded = await _provider.DownloadHistoryAsync(new(job.Symbol, from, window.ThroughUtc,
                 15, job.SessionBounds, job.AdjustmentPolicy, job.ProviderInstrumentId), cancellationToken).ConfigureAwait(false);
+            downloaded = downloaded with { Candles = (downloaded.Candles ?? []).Where(candle => candle is not null).ToArray() };
             if (downloaded.Symbol != job.Symbol || downloaded.SourceIntervalSeconds != 15 ||
                 downloaded.SessionBounds != job.SessionBounds || downloaded.AdjustmentPolicy != job.AdjustmentPolicy ||
                 downloaded.AdjustmentBasis != job.AdjustmentBasis ||
@@ -295,6 +298,10 @@ public sealed partial class MarketDataCollector
                 downloaded.RequestedFromUtc != from || downloaded.RequestedThroughUtc != window.ThroughUtc ||
                 downloaded.Candles.Any(c => c.StartsAtUtc < from || c.EndsAtUtc > window.ThroughUtc))
                 throw new InvalidDataException("The provider returned mismatched 15-second history provenance.");
+            if (downloaded.Candles.Any(candle => candle.EndsAtUtc - candle.StartsAtUtc != TimeSpan.FromSeconds(15) ||
+                candle.StartsAtUtc.UtcTicks % (15 * TimeSpan.TicksPerSecond) != 0 ||
+                candle.AvailableAtUtc != candle.EndsAtUtc || candle.AvailableAtUtc > downloaded.FetchedAtUtc))
+                throw new InvalidDataException("The provider returned invalid 15-second candle timing; saved history was preserved.");
             if (downloaded.Candles.Count == 0)
             {
                 FinishCollection(active with { Status = saved.Candles.Count > 0 ? CollectionJobStatus.Partial : CollectionJobStatus.Unavailable,
@@ -309,13 +316,27 @@ public sealed partial class MarketDataCollector
                 throw new InvalidDataException("Downloaded and saved history have different provenance; they cannot be merged.");
             var candles = saved.Candles.ToDictionary(c => c.StartsAtUtc);
             var received = new HashSet<DateTimeOffset>();
+            int acceptedCount = 0;
             foreach (HistoricalCandle candle in downloaded.Candles)
             {
                 if (!received.Add(candle.StartsAtUtc))
                     throw new InvalidDataException("The provider returned duplicate candle timestamps.");
-                if (candles.TryGetValue(candle.StartsAtUtc, out HistoricalCandle? previous) && previous != candle)
-                    throw new InvalidDataException("Provider revisions changed overlapping saved candles. Gap recovery cannot blend different revisions; existing files were preserved.");
-                candles[candle.StartsAtUtc] = candle;
+                candles.TryGetValue(candle.StartsAtUtc, out HistoricalCandle? previous);
+                HistoricalCandle? updated = HistoricalCandleUpdates.Apply(candle, previous);
+                if (updated is null) continue;
+                candles[candle.StartsAtUtc] = updated;
+                acceptedCount++;
+            }
+            if (acceptedCount == 0)
+            {
+                FinishCollection(active with
+                {
+                    Status = saved.Candles.Count > 0 ? CollectionJobStatus.Partial : CollectionJobStatus.Unavailable,
+                    ActualSourceIntervalSeconds = saved.Candles.Count > 0 ? 15 : null,
+                    DatasetHashes = saved.Datasets.Select(d => d.DatasetHash).ToArray(),
+                    Error = "No usable 15-second candles were returned. Empty values were ignored and saved history was preserved.",
+                }, emptySession: saved.Candles.Count == 0);
+                return (requests, false);
             }
             downloaded = downloaded with { RequestedFromUtc = window.FromUtc,
                 Candles = candles.Values.OrderBy(c => c.StartsAtUtc).ToArray() };
@@ -429,5 +450,7 @@ public sealed partial class MarketDataCollector
         Settings = state.Settings with { Lists = state.Settings.Lists.Select(l => l with { Members = l.Members.ToArray() }).ToArray() },
         Jobs = state.Jobs.Select(j => j with { DatasetHashes = j.DatasetHashes.ToArray() }).ToArray(),
         ContinuityGaps = state.ContinuityGaps.ToArray(),
+        AvailabilityRun = state.AvailabilityRun is { } run
+            ? run with { Members = run.Members.ToArray(), CurrentJobIds = run.CurrentJobIds.ToArray() } : null,
     };
 }

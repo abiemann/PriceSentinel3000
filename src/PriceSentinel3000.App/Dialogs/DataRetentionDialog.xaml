@@ -187,7 +187,7 @@
        <TextBlock x:Name="DownloadInteractionGuidance" FontSize="12" Margin="0,10,0,0" Text="{Binding DownloadInteractionHint}" />
        <Separator Margin="0,12" />
        <TextBlock FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource PrimaryTextBrush}" Text="How downloads work" />
-       <TextBlock x:Name="DownloadAvailableGuidance" Margin="0,6,0,0" FontSize="12" Text="Fill today's gaps, then older days. Nearby gaps are checked together; saved candles are reused. Known empty ranges are skipped; today's can be retried after 15 minutes." />
+       <TextBlock x:Name="DownloadAvailableGuidance" Margin="0,6,0,0" FontSize="12" Text="Queue today, then check older days. Saved candles are reused. Older gaps get two attempts, recorded in the daily JSON; Forced download can recheck them. Today's unavailable ranges can be retried after 15 minutes." />
        <TextBlock x:Name="DownloadCoverageGuidance" Margin="0,10,0,0" FontSize="12" Text="All available trading hours, including overnight. Only completed 15-second candles are saved. Market closures are excluded from expected coverage." />
        <TextBlock x:Name="ScheduleHelpText" Margin="0,10,0,0" FontSize="12" Text="{Binding ScheduleHelp}" />
        <TextBlock Margin="0,10,0,0" FontSize="12" Text="{Binding ContinuityWarnings}" />

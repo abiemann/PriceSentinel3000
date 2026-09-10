@@ -117,11 +117,9 @@ public sealed class CollectionGapBatchingTests
     }
 
     [Theory]
-    [InlineData("open")]
-    [InlineData("volume")]
     [InlineData("end")]
     [InlineData("available")]
-    public async Task ConflictingOverlapIsRejectedBeforeWritingAnyRevision(string field)
+    public async Task ConflictingTimingIsRejectedBeforeWritingAnyRevision(string field)
     {
         using var fixture = new Fixture();
         HistoricalDatasetInfo original = fixture.Seed(index => index is not (1 or 10));
@@ -139,12 +137,70 @@ public sealed class CollectionGapBatchingTests
         await fixture.Drain();
 
         Assert.Equal(CollectionJobStatus.Failed, fixture.Job.Status);
-        Assert.Contains("conflict", fixture.Job.Error!, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("tim", fixture.Job.Error!, StringComparison.OrdinalIgnoreCase);
         Assert.Single(fixture.Provider.Requests);
         Assert.Equal(0, fixture.CountedLibrary.SaveCalls);
         Assert.Equal(original.DatasetHash, Assert.Single(fixture.Library.Scan().Datasets).DatasetHash);
         Assert.Equal(bytes, fixture.Bytes(original));
         Assert.True(fixture.Read().Succeeded);
+        Assert.Equal(2, fixture.Read().Coverage.Gaps.Count);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RevisedOverlapIsSavedEvenWhenResponseAddsNoNewCandles(bool correctionsOnly)
+    {
+        using var fixture = new Fixture(cutoffAfter: TimeSpan.FromMinutes(3));
+        HistoricalDatasetInfo original = fixture.Seed(index => index is not (1 or 10));
+        HistoricalCandle[] snapshot = fixture.Library.Read(original.DatasetHash).Candles.ToArray();
+        DateTimeOffset overlap = fixture.From.AddSeconds(30);
+        HistoricalCandle corrected = Candle(overlap) with { Open = 10.25m, Close = 10.5m, Volume = 50 };
+        fixture.Provider.Transform = candles => correctionsOnly ? [corrected] :
+            candles.Select(candle => candle.StartsAtUtc == overlap ? corrected : candle).ToArray();
+
+        await fixture.Drain();
+
+        Assert.Equal(correctionsOnly ? CollectionJobStatus.Partial : CollectionJobStatus.Complete, fixture.Job.Status);
+        Assert.Equal(1, fixture.CountedLibrary.SaveCalls);
+        Assert.Equal(corrected, fixture.Read().Candles.Single(candle => candle.StartsAtUtc == overlap));
+        Assert.Equal(snapshot, fixture.Library.Read(original.DatasetHash).Candles);
+        Assert.NotEqual(original.DatasetHash, Assert.Single(fixture.Library.Scan().Datasets).DatasetHash);
+        Assert.Equal(correctionsOnly ? 2 : 0, fixture.Read().Coverage.Gaps.Count);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    public async Task ZeroAndNullFieldsKeepStoredValuesWhileOtherUpdatesAndGapsAreSaved(int? volume)
+    {
+        using var fixture = new Fixture(cutoffAfter: TimeSpan.FromMinutes(3));
+        fixture.Seed(index => index is not (1 or 10));
+        DateTimeOffset overlap = fixture.From.AddSeconds(30);
+        fixture.Provider.Transform = candles => candles.Select(candle => candle.StartsAtUtc == overlap
+            ? candle with { Open = 0, High = 0, Low = 0, Close = 10.5m, Volume = volume } : candle).ToArray();
+
+        await fixture.Drain();
+
+        Assert.Equal(CollectionJobStatus.Complete, fixture.Job.Status);
+        Assert.Equal(Candle(overlap) with { Close = 10.5m }, fixture.Read().Candles.Single(candle => candle.StartsAtUtc == overlap));
+        Assert.Empty(fixture.Read().Coverage.Gaps);
+    }
+
+    [Fact]
+    public async Task ZeroResponsesNeverEraseStoredCandlesOrFillGaps()
+    {
+        using var fixture = new Fixture(cutoffAfter: TimeSpan.FromMinutes(3));
+        HistoricalDatasetInfo original = fixture.Seed(index => index is not (1 or 10));
+        byte[] bytes = fixture.Bytes(original);
+        fixture.Provider.Transform = candles => candles.Select(candle => candle with
+            { Open = 0, High = 0, Low = 0, Close = 0, Volume = 0 }).ToArray();
+
+        await fixture.Drain();
+
+        Assert.Equal(CollectionJobStatus.Partial, fixture.Job.Status);
+        Assert.Equal(0, fixture.CountedLibrary.SaveCalls);
+        Assert.Equal(bytes, fixture.Bytes(original));
         Assert.Equal(2, fixture.Read().Coverage.Gaps.Count);
     }
 

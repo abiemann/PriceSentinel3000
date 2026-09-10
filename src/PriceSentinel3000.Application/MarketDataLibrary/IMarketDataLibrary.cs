@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace PriceSentinel3000.Application.MarketDataLibrary;
 
 public sealed record HistoricalCandle(
@@ -50,7 +52,12 @@ public sealed record HistoricalDataset(
     string SessionBounds,
     DateTimeOffset FetchedAtUtc,
     HistoricalCoverage Coverage,
-    IReadOnlyList<HistoricalCandle> Candles);
+    IReadOnlyList<HistoricalCandle> Candles)
+{
+    // Collection observations are operational metadata, excluded from DatasetHash.
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<CollectionGapState>? Collection { get; init; }
+}
 
 public sealed record HistoricalDatasetInfo(
     string DatasetHash,

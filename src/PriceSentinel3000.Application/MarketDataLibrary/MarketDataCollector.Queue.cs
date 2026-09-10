@@ -8,7 +8,7 @@ public sealed partial class MarketDataCollector
         return MutateAsync(() =>
         {
             EnsureCollectionFinished();
-            Commit(_state with { Jobs = [] });
+            Commit(_state with { Jobs = [], AvailabilityRun = null });
         }, cancellationToken);
     }
 

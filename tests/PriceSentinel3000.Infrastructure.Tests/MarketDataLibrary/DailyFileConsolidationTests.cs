@@ -158,8 +158,6 @@ public sealed partial class DailyFileConsolidationTests : IDisposable
     }
 
     [Theory]
-    [InlineData("price")]
-    [InlineData("volume")]
     [InlineData("provider")]
     [InlineData("instrument")]
     [InlineData("adjustmentPolicy")]
@@ -177,8 +175,6 @@ public sealed partial class DailyFileConsolidationTests : IDisposable
     }
 
     [Theory]
-    [InlineData("price")]
-    [InlineData("volume")]
     [InlineData("provider")]
     [InlineData("instrument")]
     [InlineData("adjustmentPolicy")]
@@ -276,7 +272,8 @@ public sealed partial class DailyFileConsolidationTests : IDisposable
         DateTimeOffset at = new(2026, 9, 5, 3, 59, 30, TimeSpan.Zero);
         HistoricalCandle first = Candle(at, 80m);
         HistoricalCandle secondDay = Candle(at.AddSeconds(30), 81m);
-        IReadOnlyList<HistoricalDatasetInfo> originals = Library.Save(Download(first, secondDay));
+        IReadOnlyList<HistoricalDatasetInfo> originals = Library.Save(Download(first))
+            .Concat(Library.Save(Download(secondDay) with { Provider = "OtherProvider" })).ToArray();
         Assert.Equal(2, originals.Count);
         Dictionary<string, string> before = JsonSnapshot();
         HistoricalDownload incoming = Download(Candle(at.AddSeconds(15), 82m), Candle(at.AddSeconds(30), 90m));
@@ -324,8 +321,6 @@ public sealed partial class DailyFileConsolidationTests : IDisposable
 
     private static HistoricalDownload Conflicting(HistoricalDownload download, string conflict) => conflict switch
     {
-        "price" => download with { Candles = [Candle(Start, 81m)] },
-        "volume" => download with { Candles = [Bar(0) with { Volume = null }] },
         "provider" => download with { Provider = "OtherProvider" },
         "instrument" => download with { InstrumentId = "other-instrument" },
         "adjustmentPolicy" => download with { AdjustmentPolicy = "unadjusted" },

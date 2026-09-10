@@ -127,11 +127,14 @@ internal static partial class RobinhoodLibraryParser
             if (start < request.FromUtc || end > request.ThroughUtc || end > fetchedAtUtc) continue;
             if (start.UtcTicks % TimeSpan.FromSeconds(request.SourceIntervalSeconds).Ticks != 0)
                 throw new InvalidOperationException("Robinhood returned an unaligned historical candle.");
-            decimal open = RequiredDecimal(bar, "open_price"), high = RequiredDecimal(bar, "high_price"),
-                low = RequiredDecimal(bar, "low_price"), close = RequiredDecimal(bar, "close_price");
-            decimal? volume = !bar.TryGetProperty("volume", out var volumeNode) || volumeNode.ValueKind == JsonValueKind.Null
-                ? null : RequiredDecimal(bar, "volume");
-            if (open <= 0 || low <= 0 || close <= 0 || high < Math.Max(open, close) || low > Math.Min(open, close) || high < low || volume < 0)
+            // Missing numeric values remain placeholders until the library can apply
+            // them against saved candles. They must never erase existing values.
+            decimal open = OptionalDecimal(bar, "open_price") ?? 0m, high = OptionalDecimal(bar, "high_price") ?? 0m,
+                low = OptionalDecimal(bar, "low_price") ?? 0m, close = OptionalDecimal(bar, "close_price") ?? 0m;
+            decimal? volume = OptionalDecimal(bar, "volume");
+            bool completePrices = open > 0 && high > 0 && low > 0 && close > 0;
+            if (open < 0 || high < 0 || low < 0 || close < 0 || volume < 0 ||
+                (completePrices && (high < Math.Max(open, close) || low > Math.Min(open, close) || high < low)))
                 throw new InvalidOperationException("Robinhood returned invalid candle prices or volume.");
             var candle = new HistoricalCandle(start, end, end, open, high, low, close, volume);
             if (candles.TryGetValue(start, out var previous) && previous != candle)
@@ -179,13 +182,12 @@ internal static partial class RobinhoodLibraryParser
     private static string RequiredText(JsonElement item, string property) => Text(item, property)
         ?? throw new InvalidOperationException($"Robinhood returned no valid {property} value.");
 
-    private static decimal RequiredDecimal(JsonElement item, string property)
+    private static decimal? OptionalDecimal(JsonElement item, string property)
     {
-        if (item.TryGetProperty(property, out var node))
-        {
-            if (node.ValueKind == JsonValueKind.Number && node.TryGetDecimal(out decimal number)) return number;
-            if (node.ValueKind == JsonValueKind.String && decimal.TryParse(node.GetString(), NumberStyles.Number, CultureInfo.InvariantCulture, out number)) return number;
-        }
+        if (!item.TryGetProperty(property, out var node) || node.ValueKind == JsonValueKind.Null ||
+            (node.ValueKind == JsonValueKind.String && string.IsNullOrWhiteSpace(node.GetString()))) return null;
+        if (node.ValueKind == JsonValueKind.Number && node.TryGetDecimal(out decimal number)) return number;
+        if (node.ValueKind == JsonValueKind.String && decimal.TryParse(node.GetString(), NumberStyles.Number, CultureInfo.InvariantCulture, out number)) return number;
         throw new InvalidOperationException($"Robinhood returned no valid {property} value.");
     }
 }

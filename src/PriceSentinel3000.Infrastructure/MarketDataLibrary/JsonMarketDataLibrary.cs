@@ -93,7 +93,13 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
     public IReadOnlyList<HistoricalDatasetInfo> Save(HistoricalDownload download)
     {
         ArgumentNullException.ThrowIfNull(download);
-        ValidateDownload(download);
+        if (download.SourceIntervalSeconds == 15)
+        {
+            if (download.Candles?.Count > 100_000)
+                throw new InvalidDataException("One download may contain at most 100,000 candles.");
+            download = download with { Candles = download.Candles?.Where(item => item is not null).ToArray() ?? [] };
+        }
+        ValidateDownload(download, allowZeroPrices: download.SourceIntervalSeconds == 15);
         return WithLibraryWriteLock(() =>
         {
             MarketDataLibraryScan scan = Scan(includeDuplicates: true);
@@ -105,8 +111,25 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
             {
                 DateTimeOffset from = Max(download.RequestedFromUtc, DayStart(day));
                 DateTimeOffset through = Min(download.RequestedThroughUtc, DayStart(day.AddDays(1)));
+                HistoricalDatasetInfo[] parts = download.SourceIntervalSeconds == 15
+                    ? scan.Datasets.Where(item => item.Symbol == download.Symbol &&
+                        item.TradingDate == day && item.SourceIntervalSeconds == 15).ToArray()
+                    : [];
+                HistoricalDataset[] sources = parts.Select(LoadExact).ToArray();
+                HistoricalDataset? existing = sources.Length > 0 ? MergeDaily(sources) : null;
                 HistoricalCandle[] candles = download.Candles.Where(item => EasternDate(item.StartsAtUtc) == day)
                     .OrderBy(item => item.StartsAtUtc).ToArray();
+                if (download.SourceIntervalSeconds == 15)
+                {
+                    // Only compatible history may fill empty fields in a provider update.
+                    var previous = existing is not null && existing.Provider == download.Provider &&
+                        existing.InstrumentId == download.InstrumentId && existing.AdjustmentPolicy == download.AdjustmentPolicy &&
+                        existing.AdjustmentBasis == download.AdjustmentBasis
+                        ? existing.Candles.ToDictionary(item => item.StartsAtUtc)
+                        : new Dictionary<DateTimeOffset, HistoricalCandle>();
+                    candles = candles.Select(item => HistoricalCandleUpdates.Apply(item, previous.GetValueOrDefault(item.StartsAtUtc)))
+                        .OfType<HistoricalCandle>().ToArray();
+                }
                 var dataset = new HistoricalDataset(SchemaVersion, GroupingZone, "", download.Provider,
                     download.InstrumentId, download.Symbol, day, download.SourceIntervalSeconds,
                     download.AdjustmentPolicy, download.AdjustmentBasis, download.SessionBounds,
@@ -115,9 +138,7 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
                 ValidateDataset(dataset);
                 if (dataset.SourceIntervalSeconds == 15)
                 {
-                    HistoricalDatasetInfo[] parts = scan.Datasets.Where(item => item.Symbol == dataset.Symbol &&
-                        item.TradingDate == day && item.SourceIntervalSeconds == 15).ToArray();
-                    plans.Add((MergeDaily(parts.Select(LoadExact).Append(dataset).ToArray()), parts));
+                    plans.Add((MergeDaily(sources.Append(dataset).ToArray(), dataset), parts));
                     continue;
                 }
                 plans.Add((dataset, []));
@@ -174,7 +195,7 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
         }
         if (diagnostics.Any(item => item.Code == "scan_failed"))
             return Failed("incomplete_scan", "The library could not be completely scanned; no dataset selection was made.");
-        bool Matches(HistoricalDatasetInfo item) => item.Symbol == query.Symbol &&
+        bool Matches(HistoricalDatasetInfo item) => item.InstrumentId != UnresolvedInstrument && item.Symbol == query.Symbol &&
             item.SourceIntervalSeconds == query.SourceIntervalSeconds &&
             item.Coverage.RequestedFromUtc < query.ThroughUtc && item.Coverage.RequestedThroughUtc > query.FromUtc &&
             (query.Provider is null || item.Provider == query.Provider) &&
@@ -304,7 +325,7 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
     private static string RevisionKey(HistoricalDatasetInfo item) =>
         FormattableString.Invariant($"{IdentityKey(item)}|{item.TradingDate:yyyy-MM-dd}|{item.SourceIntervalSeconds}");
     private static string Hash(HistoricalDataset dataset) => Convert.ToHexStringLower(SHA256.HashData(
-        JsonSerializer.SerializeToUtf8Bytes(dataset with { DatasetHash = "" }, JsonOptions)));
+        JsonSerializer.SerializeToUtf8Bytes(dataset with { DatasetHash = "", Collection = null }, JsonOptions)));
     private static string SemanticHash(HistoricalDataset dataset) => Hash(dataset with { FetchedAtUtc = DateTimeOffset.UnixEpoch });
     private static string DailyPath(HistoricalDataset dataset) => Path.Combine(dataset.TradingDate.Year.ToString("0000", CultureInfo.InvariantCulture),
         dataset.TradingDate.ToString("MM - MMMM", CultureInfo.InvariantCulture), dataset.Symbol,
@@ -346,14 +367,20 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
         {
             EnsureNoReparsePoint(path);
             string original = File.ReadAllText(path);
+            const string updateRule = "newer valid prices and positive volumes replace saved values; zero or missing fields keep saved values. Incompatible provenance never merges.";
+            string updated = original
+                .Replace("datasetHash is SHA-256 over the canonical schema document with datasetHash replaced by an empty string.",
+                    "datasetHash is SHA-256 over the candle schema with datasetHash empty and optional collection metadata omitted.", StringComparison.Ordinal)
+                .Replace("conflicting prices or provenance are never overwritten.", updateRule, StringComparison.Ordinal)
+                .Replace("conflicting candles or provenance are never overwritten.", updateRule, StringComparison.Ordinal);
             const string oldRule = "provenance or coverage creates a .rev-<full-hash>.json revision without replacing old files.";
             if (original.Contains(oldRule, StringComparison.Ordinal) &&
                 !original.Contains("15-second daily consolidation:", StringComparison.Ordinal))
-                WriteAtomic(path, Encoding.UTF8.GetBytes(original + Environment.NewLine + Environment.NewLine +
+                updated += Environment.NewLine + Environment.NewLine +
                     "15-second daily consolidation: compatible sections now merge atomically into one date.15s.json file per stock. " +
                     "Superseded exact-hash files are kept in .archive and excluded from normal scans. Overlapping candles count once; " +
-                    "conflicting prices or provenance are never overwritten. Days use Eastern start dates, including midnight, month and year boundaries." +
-                    Environment.NewLine), overwrite: true);
+                    updateRule + " Days use Eastern start dates, including midnight, month and year boundaries." + Environment.NewLine;
+            if (updated != original) WriteAtomic(path, Encoding.UTF8.GetBytes(updated), overwrite: true);
             return;
         }
         const string readme = """
@@ -367,10 +394,13 @@ public sealed partial class JsonMarketDataLibrary : IMarketDataLibrary
             Coverage and gaps describe only the requested UTC range and declared session bounds, not an entire 24-hour day.
             Complete price coverage with unknown volume is not complete OHLCV data.
 
-            datasetHash is SHA-256 over the canonical schema document with datasetHash replaced by an empty string.
+            datasetHash is SHA-256 over the candle schema with datasetHash empty and optional collection metadata omitted.
+            Collection attempt counts and unavailable intervals travel inside the daily file and are validated separately.
+            Updating this operational metadata keeps candle hashes stable; filled candle intervals clear their observations.
             PriceSentinel fully validates new or changed files during scans and validates every candle document it reads.
             Compatible 15-second sections merge into one date.15s.json file per stock and Eastern calendar date.
-            Overlaps count once; conflicting candles or provenance are never overwritten. Replacement is atomic.
+            Overlaps count once; newer valid prices and positive volumes replace saved values. Zero or missing fields
+            keep saved values; an empty response never removes candles. Incompatible provenance never merges. Replacement is atomic.
             Superseded files live in .archive by exact hash for prior Replay records; normal scans exclude them.
             Other native resolutions keep their separate files. Identical saves retain the original hash.
             Competing revisions require explicit hashes or the LatestFetched policy (ties use lexicographically lowest hash).

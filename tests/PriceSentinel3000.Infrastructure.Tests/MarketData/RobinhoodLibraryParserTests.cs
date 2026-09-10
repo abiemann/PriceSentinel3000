@@ -101,13 +101,53 @@ public sealed class RobinhoodLibraryParserTests
     }
 
     [Theory]
-    [InlineData("\"open_price\":\"12.123456789012345678901234567\"", "\"open_price\":null")]
+    [InlineData("\"open_price\":\"12.123456789012345678901234567\"", "\"open_price\":-1")]
+    [InlineData("\"open_price\":\"12.123456789012345678901234567\"", "\"open_price\":\"unknown\"")]
+    [InlineData("\"open_price\":\"12.123456789012345678901234567\"", "\"open_price\":true")]
+    [InlineData("\"high_price\":\"13\"", "\"high_price\":-1")]
     [InlineData("\"high_price\":\"13\"", "\"high_price\":\"10\"")]
     [InlineData("\"volume\":null", "\"volume\":-1")]
     public void History_RejectsInvalidOhlcvInsteadOfSubstitutingClose(string before, string after)
     {
         string bar = Candle(Start).Replace(before, after);
         Assert.Throws<InvalidOperationException>(() => RobinhoodLibraryParser.ParseHistory(History("15second", bar), Request(), Start.AddDays(1)));
+    }
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("0")]
+    [InlineData("\"0\"")]
+    [InlineData("\"\"")]
+    [InlineData("\"   \"")]
+    [InlineData(null)]
+    public void History_RetainsUnavailablePricesAsPlaceholdersForSavedValueFallback(string? value)
+    {
+        foreach (string field in new[] { "open_price", "high_price", "low_price", "close_price" })
+        {
+            var bar = System.Text.Json.Nodes.JsonNode.Parse(Candle(Start))!.AsObject();
+            if (value is null) bar.Remove(field);
+            else bar[field] = System.Text.Json.Nodes.JsonNode.Parse(value);
+            HistoricalDownload result = RobinhoodLibraryParser.ParseHistory(
+                History("15second", bar.ToJsonString()), Request(), Start.AddDays(1));
+            HistoricalCandle candle = Assert.Single(result.Candles);
+            Assert.Equal(0m, field switch
+            {
+                "open_price" => candle.Open, "high_price" => candle.High,
+                "low_price" => candle.Low, _ => candle.Close,
+            });
+            Assert.Equal(Start, candle.StartsAtUtc);
+        }
+    }
+
+    [Theory]
+    [InlineData("\"\"")]
+    [InlineData("\"   \"")]
+    public void History_EmptyVolumeRemainsUnknown(string value)
+    {
+        HistoricalDownload result = RobinhoodLibraryParser.ParseHistory(
+            History("15second", Candle(Start).Replace("\"volume\":null", "\"volume\":" + value)),
+            Request(), Start.AddDays(1));
+        Assert.Null(Assert.Single(result.Candles).Volume);
     }
 
     [Fact]

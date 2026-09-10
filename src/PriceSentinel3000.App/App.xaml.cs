@@ -37,7 +37,7 @@ public partial class App : System.Windows.Application
             var collector = await Task.Run(() => new MarketDataCollector(
                 new JsonCollectionStateStore(AppDataPaths.CollectionState), robinhoodGateway,
                 root => new JsonMarketDataLibrary(root),
-                gapIndexFactory: root => new SqliteCollectionGapIndex(System.IO.Path.Combine(root, ".collection-gaps.sqlite3"))));
+                gapIndexFactory: root => new JsonCollectionGapIndex(root)));
             viewModel.DataRetention = new DataRetentionViewModel(collector, robinhoodGateway,
                 robinhoodGateway, robinhoodGateway, root => new JsonMarketDataLibrary(root),
                 async token => { if (!robinhoodGateway.HasActiveConnection) await viewModel.ConnectRobinhoodAtStartupAsync(token); },

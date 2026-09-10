@@ -6,7 +6,7 @@ namespace PriceSentinel3000.Infrastructure.MarketDataLibrary;
 
 public sealed partial class JsonMarketDataLibrary
 {
-    private static void ValidateDownload(HistoricalDownload download)
+    private static void ValidateDownload(HistoricalDownload download, bool allowZeroPrices = false)
     {
         ValidateMetadata(download.Provider, download.InstrumentId, download.Symbol,
             download.AdjustmentPolicy, download.AdjustmentBasis, download.SessionBounds);
@@ -17,7 +17,7 @@ public sealed partial class JsonMarketDataLibrary
         if (download.Candles.Count > 100_000) throw new InvalidDataException("One download may contain at most 100,000 candles.");
         if (download.Candles.Any(item => item is null)) throw new InvalidDataException("A candle entry cannot be null.");
         ValidateCandles(download.Candles.OrderBy(item => item.StartsAtUtc).ToArray(), download.SourceIntervalSeconds,
-            download.RequestedFromUtc, download.RequestedThroughUtc, download.FetchedAtUtc);
+            download.RequestedFromUtc, download.RequestedThroughUtc, download.FetchedAtUtc, allowZeroPrices);
     }
 
     private static void ValidateDataset(HistoricalDataset dataset)
@@ -32,6 +32,7 @@ public sealed partial class JsonMarketDataLibrary
         ArgumentNullException.ThrowIfNull(dataset.Coverage);
         ArgumentNullException.ThrowIfNull(dataset.Coverage.Gaps);
         ArgumentNullException.ThrowIfNull(dataset.Candles);
+        ValidateCollection(dataset);
         if (dataset.Candles.Count > 10_000) throw new InvalidDataException("A daily document contains too many candles.");
         DateTimeOffset from = dataset.Coverage.RequestedFromUtc;
         DateTimeOffset through = dataset.Coverage.RequestedThroughUtc;
@@ -47,7 +48,7 @@ public sealed partial class JsonMarketDataLibrary
     }
 
     private static void ValidateCandles(IReadOnlyList<HistoricalCandle> candles, int seconds,
-        DateTimeOffset from, DateTimeOffset through, DateTimeOffset fetchedAt)
+        DateTimeOffset from, DateTimeOffset through, DateTimeOffset fetchedAt, bool allowZeroPrices = false)
     {
         DateTimeOffset? previousEnd = null;
         foreach (HistoricalCandle candle in candles)
@@ -65,9 +66,10 @@ public sealed partial class JsonMarketDataLibrary
                 throw new InvalidDataException("A candle is outside the requested or finalized range.");
             if (previousEnd is { } previous && candle.StartsAtUtc < previous)
                 throw new InvalidDataException("Candles must be ordered without duplicate or overlapping intervals.");
-            if (candle.Open <= 0m || candle.Close <= 0m || candle.Low <= 0m ||
-                candle.High < Math.Max(candle.Open, candle.Close) || candle.Low > Math.Min(candle.Open, candle.Close) ||
-                candle.Volume is < 0m)
+            bool hasEmptyPrice = candle.Open == 0m || candle.High == 0m || candle.Low == 0m || candle.Close == 0m;
+            if (candle.Open < 0m || candle.High < 0m || candle.Low < 0m || candle.Close < 0m || candle.Volume is < 0m ||
+                (hasEmptyPrice ? !allowZeroPrices :
+                    candle.High < Math.Max(candle.Open, candle.Close) || candle.Low > Math.Min(candle.Open, candle.Close)))
                 throw new InvalidDataException("Invalid OHLC or volume cannot be stored as a genuine candle.");
             previousEnd = candle.EndsAtUtc;
         }

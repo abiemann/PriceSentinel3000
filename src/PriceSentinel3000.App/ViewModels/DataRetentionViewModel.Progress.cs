@@ -313,7 +313,7 @@ public sealed partial class DataRetentionViewModel
         else if (failed > 0)
         {
             status = "Attention"; heading = "Queue finished with failed downloads";
-            detail = $"{failed} stock-day requests failed. See Details in the table for the errors. Previously saved candles are kept; Download gaps now retries failed requests.";
+            detail = $"{failed} stock-day requests failed. See Details in the table for the errors. Previously saved candles are kept. Download gaps now checks remaining attempts; Forced download can recheck older gaps already attempted twice.";
         }
         else if (partials > 0 || unavailable > 0)
         {
@@ -321,7 +321,7 @@ public sealed partial class DataRetentionViewModel
             heading = partials > 0 ? "Queue finished with partial data" : "Available-history check complete";
             detail = $"{partials} partials: stock-days with saved candles and remaining gaps. " +
                 (unavailable > 0 ? $"{unavailable} stock-days have no available data. " : "") +
-                "Saved candles are kept. No action is needed for ranges the broker cannot supply. Known empty ranges are skipped; today's can be retried after 15 minutes.";
+                "Saved candles are kept. No action is needed for ranges the broker cannot supply. Older gaps are skipped after two attempts; today's unavailable ranges can be retried after 15 minutes.";
         }
         else if (state.Jobs.Count > 0)
         {
@@ -329,7 +329,7 @@ public sealed partial class DataRetentionViewModel
             bool availabilityChecked = state.Jobs.Any(j => j.IsAvailabilityProbe);
             heading = availabilityChecked ? "Available-history check complete" : "All queued downloads complete";
             detail = availabilityChecked
-                ? "The availability check finished. Dates were checked from newest to oldest; earlier discovery stops after a trading day has no available candles in its missing hours. Download again to collect newer completed candles."
+                ? "The availability check finished. Dates were checked from newest to oldest; each ticker stops after an older trading day is wholly unavailable after two attempts. Download again to collect newer completed candles."
                 : "Completed history is saved in the local library. You can replay it or close this window.";
         }
         else

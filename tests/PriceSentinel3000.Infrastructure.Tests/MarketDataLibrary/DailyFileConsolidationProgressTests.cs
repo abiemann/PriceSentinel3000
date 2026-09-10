@@ -68,7 +68,7 @@ public sealed partial class DailyFileConsolidationTests
     public void Consolidate_ProgressCompletesWithMergeAndValidationNoticesWithoutChangingOriginals()
     {
         Seed(Download(Bar(0)));
-        Seed(Conflicting(Download(Bar(0)), "price"));
+        Seed(Conflicting(Download(Bar(0)), "provider"));
         File.WriteAllText(Path.Combine(Root, "invalid.json"), "broken original");
         File.WriteAllText(Path.Combine(Root, "pending.json.tmp-test"), "unfinished");
         Dictionary<string, string> originalFiles = JsonSnapshot();

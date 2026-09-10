@@ -79,8 +79,11 @@ public sealed class ReplayHistoryAvailabilityService(IMarketDataLibrary library,
             cancellationToken.ThrowIfCancellationRequested();
             // Snapshot provider collections before validating/preparing so a later
             // provider request cannot change the candles promised by this check.
-            ArgumentNullException.ThrowIfNull(download.Candles);
-            download = download with { Candles = download.Candles.ToArray() };
+            if (download.Candles?.Count > 100_000)
+                throw new InvalidDataException("Historical download has an invalid candle count.");
+            download = download with { Candles = download.Candles?.Where(candle => candle is not null).ToArray() ?? [] };
+            ValidateDownload(current, download, allowUnavailableValues: true);
+            download = ApplyAvailableUpdates(download, sources, query);
             ValidateDownload(current, download);
             if (download.Candles.Count > 0) sources.Add(new(interval, [], download.Candles, download));
             composition = ReplayHistoryComposer.Compose(query, sources);
@@ -239,7 +242,29 @@ public sealed class ReplayHistoryAvailabilityService(IMarketDataLibrary library,
         return result with { Diagnostics = diagnostics };
     }
 
-    private static HistoricalCoverage ValidateDownload(HistoricalDataQuery query, HistoricalDownload download)
+    private static HistoricalDownload ApplyAvailableUpdates(HistoricalDownload download,
+        IReadOnlyList<ReplayHistorySource> sources, HistoricalDataQuery query)
+    {
+        var saved = sources.Where(source => source.SourceIntervalSeconds == download.SourceIntervalSeconds &&
+                source.Datasets.Count > 0 && source.Datasets.All(info => info.Provider == download.Provider &&
+                    info.InstrumentId == download.InstrumentId && info.Symbol == download.Symbol &&
+                    info.AdjustmentPolicy == download.AdjustmentPolicy && info.AdjustmentBasis == download.AdjustmentBasis &&
+                    query.SessionIdentity(info.SessionBounds) == query.SessionIdentity(download.SessionBounds)))
+            .SelectMany(source => source.Candles).GroupBy(candle => candle.StartsAtUtc)
+            .ToDictionary(group => group.Key, group => group.First());
+        var candles = new List<HistoricalCandle>();
+        foreach (HistoricalCandle incoming in download.Candles)
+        {
+            if (incoming is null) continue;
+            saved.TryGetValue(incoming.StartsAtUtc, out HistoricalCandle? previous);
+            if (HistoricalCandleUpdates.Apply(incoming, previous) is { } updated) candles.Add(updated);
+        }
+        // START must archive exactly the normalized provider snapshot promised by CHECK.
+        return download with { Candles = candles.ToArray() };
+    }
+
+    private static HistoricalCoverage ValidateDownload(HistoricalDataQuery query, HistoricalDownload download,
+        bool allowUnavailableValues = false)
     {
         if (download.Symbol != query.Symbol || download.SourceIntervalSeconds != query.SourceIntervalSeconds ||
             (query.Provider is not null && download.Provider != query.Provider) ||
@@ -260,15 +285,17 @@ public sealed class ReplayHistoryAvailabilityService(IMarketDataLibrary library,
         DateTimeOffset cursor = query.FromUtc;
         foreach (HistoricalCandle candle in download.Candles)
         {
+            if (candle is null && allowUnavailableValues) continue;
             if (candle is null || candle.StartsAtUtc.Offset != TimeSpan.Zero || candle.EndsAtUtc.Offset != TimeSpan.Zero ||
                 candle.AvailableAtUtc.Offset != TimeSpan.Zero ||
                 candle.EndsAtUtc - candle.StartsAtUtc != TimeSpan.FromSeconds(query.SourceIntervalSeconds) ||
                 candle.StartsAtUtc.Ticks % TimeSpan.FromSeconds(query.SourceIntervalSeconds).Ticks != 0 ||
                 candle.AvailableAtUtc != candle.EndsAtUtc || candle.AvailableAtUtc > download.FetchedAtUtc ||
                 candle.StartsAtUtc < cursor || candle.EndsAtUtc > query.ThroughUtc ||
-                candle.Open <= 0m || candle.Close <= 0m || candle.Low <= 0m ||
-                candle.High < Math.Max(candle.Open, candle.Close) || candle.Low > Math.Min(candle.Open, candle.Close) ||
-                candle.Volume is < 0m)
+                candle.Open < 0m || candle.High < 0m || candle.Close < 0m || candle.Low < 0m || candle.Volume is < 0m ||
+                ((!allowUnavailableValues || (candle.Open > 0m && candle.High > 0m && candle.Low > 0m && candle.Close > 0m)) &&
+                    (candle.Open <= 0m || candle.Close <= 0m || candle.Low <= 0m ||
+                     candle.High < Math.Max(candle.Open, candle.Close) || candle.Low > Math.Min(candle.Open, candle.Close))))
                 throw new InvalidDataException("Historical download contains invalid, overlapping, unfinalized or out-of-range candles.");
             if (candle.StartsAtUtc > cursor) gaps.Add(new(cursor, candle.StartsAtUtc));
             cursor = candle.EndsAtUtc;

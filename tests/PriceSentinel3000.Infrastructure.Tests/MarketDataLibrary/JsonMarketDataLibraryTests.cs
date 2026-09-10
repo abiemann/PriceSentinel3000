@@ -64,20 +64,23 @@ public sealed class JsonMarketDataLibraryTests : IDisposable
     }
 
     [Fact]
-    public async Task ConcurrentCorrections_AreRejectedWithoutChangingSavedFile()
+    public async Task ConcurrentCorrections_PreserveSnapshotsAndKeepNewestValues()
     {
         HistoricalDownload download = Download();
         HistoricalDatasetInfo original = Assert.Single(Library.Save(download));
-        byte[] originalBytes = File.ReadAllBytes(Path.Combine(_directory, original.RelativePath));
-        Exception?[] failures = await Task.WhenAll(
-            Task.Run(() => Record.Exception(() => Library.Save(download with { Candles = [Candle(Start, 81m)] }))),
-            Task.Run(() => Record.Exception(() => Library.Save(download with { Candles = [Candle(Start, 82m)] }))));
+        IReadOnlyList<HistoricalDatasetInfo>[] results = await Task.WhenAll(
+            Task.Run(() => Library.Save(download with
+            {
+                FetchedAtUtc = download.FetchedAtUtc.AddDays(1), Candles = [Candle(Start, 81m)],
+            })),
+            Task.Run(() => Library.Save(download with
+            {
+                FetchedAtUtc = download.FetchedAtUtc.AddDays(2), Candles = [Candle(Start, 82m)],
+            })));
 
-        Assert.All(failures, failure => Assert.IsType<InvalidDataException>(failure));
-        Assert.Equal(original.DatasetHash, Assert.Single(Library.Scan().Datasets).DatasetHash);
-        Assert.Equal(originalBytes, File.ReadAllBytes(Path.Combine(_directory, original.RelativePath)));
-        Assert.Single(Directory.EnumerateFiles(_directory, "*.json", SearchOption.AllDirectories));
+        Assert.Equal(82m, Assert.Single(Library.Read(Assert.Single(Library.Scan().Datasets).DatasetHash).Candles).Open);
         Assert.Equal(80m, Assert.Single(Library.Read(original.DatasetHash).Candles).Open);
+        Assert.All(results, result => Assert.Single(Library.Read(Assert.Single(result).DatasetHash).Candles));
     }
 
     [Fact]
@@ -98,23 +101,25 @@ public sealed class JsonMarketDataLibraryTests : IDisposable
     }
 
     [Fact]
-    public void CorrectedDailyData_IsRejectedWithoutChangingSavedFile()
+    public void CorrectedDailyData_UpdatesCurrentFileAndPreservesPinnedHistory()
     {
         HistoricalDownload original = Download();
         HistoricalDatasetInfo first = Assert.Single(Library.Save(original));
-        byte[] originalBytes = File.ReadAllBytes(Path.Combine(_directory, first.RelativePath));
 
-        Assert.Throws<InvalidDataException>(() => Library.Save(original with
+        HistoricalDatasetInfo corrected = Assert.Single(Library.Save(original with
         {
             FetchedAtUtc = original.FetchedAtUtc.AddDays(1), Candles = [Candle(Start, 81m)],
         }));
 
-        Assert.Equal(originalBytes, File.ReadAllBytes(Path.Combine(_directory, first.RelativePath)));
-        Assert.Equal(first.DatasetHash, Assert.Single(Library.Scan().Datasets).DatasetHash);
-        Assert.Single(Directory.EnumerateFiles(_directory, "*.json", SearchOption.AllDirectories));
+        Assert.NotEqual(first.DatasetHash, corrected.DatasetHash);
+        Assert.Equal(corrected.DatasetHash, Assert.Single(Library.Scan().Datasets).DatasetHash);
+        Assert.Equal(80m, Assert.Single(Library.Read(first.DatasetHash).Candles).Open);
         HistoricalDataQueryResult result = Library.Query(Query());
         Assert.True(result.Succeeded);
-        Assert.Equal(80m, Assert.Single(result.Candles).Open);
+        Assert.Equal(81m, Assert.Single(result.Candles).Open);
+        HistoricalDataQueryResult pinned = Library.Query(Query() with { PinnedHashes = [first.DatasetHash] });
+        Assert.True(pinned.Succeeded);
+        Assert.Equal(80m, Assert.Single(pinned.Candles).Open);
     }
 
     [Fact]
@@ -362,7 +367,7 @@ public sealed class JsonMarketDataLibraryTests : IDisposable
         foreach (HistoricalCandle invalid in new[]
                  {
                      original with { AvailableAtUtc = original.EndsAtUtc.AddSeconds(1) },
-                     original with { High = 1m }, original with { Low = 0m },
+                     original with { High = 1m }, original with { Low = -1m },
                      original with { Volume = -1m }, original with { EndsAtUtc = original.EndsAtUtc.AddSeconds(1) },
                  })
             Assert.Throws<InvalidDataException>(() => Library.Save(Download() with { Candles = [invalid] }));

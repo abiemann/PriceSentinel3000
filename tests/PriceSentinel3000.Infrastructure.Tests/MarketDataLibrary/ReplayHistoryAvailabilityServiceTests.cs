@@ -477,6 +477,86 @@ public sealed class ReplayHistoryAvailabilityServiceTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task PendingRevision_PreservesUnavailableFields_AndCheckedLocalSnapshot(bool nullVolume)
+    {
+        HistoricalCandle[] all = Download(15).Candles.ToArray();
+        HistoricalCandle saved = all[2];
+        string originalHash = Assert.Single(Library.Save(Download(15) with { Candles = [saved] })).DatasetHash;
+        all[2] = saved with { Open = 0m, Close = 100.5m, Volume = nullVolume ? null : 0m };
+        _provider.Downloads[15] = Download(15) with { Candles = all };
+
+        ReplayHistoryAvailability prepared = await Service.CheckAsync(Query, false, default);
+
+        Assert.True(prepared.Complete);
+        Assert.Equal(saved, prepared.Candles[2]);
+        HistoricalCandle expectedRevision = saved with { Close = 100.5m };
+        Assert.Equal(expectedRevision, prepared.PendingDownload!.Candles[2]);
+        Assert.Equal(originalHash, Assert.Single(Library.Scan().Datasets).DatasetHash);
+
+        LibraryReplayHistoryResult loaded = await Service.LoadPreparedAsync(prepared, default);
+        LibraryReplayHistoryResult repeated = await Service.LoadPreparedAsync(prepared, default);
+
+        Assert.Equal(prepared.Candles, loaded.Candles);
+        Assert.Equal(loaded.Candles, repeated.Candles);
+        Assert.Equal(saved, Assert.Single(Library.Read(originalHash).Candles));
+        Assert.Equal(expectedRevision, Library.Read(Assert.Single(Library.Scan().Datasets).DatasetHash).Candles[2]);
+        Assert.Single(_provider.Requests);
+    }
+
+    [Fact]
+    public async Task NullEntries_AreIgnoredWhileValidProviderCandlesRemainPrepared()
+    {
+        HistoricalCandle valid = Download(15).Candles[1];
+        _provider.Downloads[15] = Download(15) with { Candles = [null!, valid, null!] };
+
+        ReplayHistoryAvailability prepared = await Service.CheckAsync(Query, false, default);
+
+        Assert.False(prepared.Complete);
+        Assert.Equal(valid, Assert.Single(prepared.Candles));
+        Assert.Equal(valid, Assert.Single(prepared.PendingDownload!.Candles));
+        LibraryReplayHistoryResult loaded = await Service.LoadPreparedAsync(prepared, default);
+        Assert.Equal(prepared.Candles, loaded.Candles);
+    }
+
+    [Fact]
+    public async Task AllNullProviderCandles_PreserveLocalSnapshotAndMissingGaps()
+    {
+        HistoricalCandle saved = Download(15).Candles[2];
+        string hash = Assert.Single(Library.Save(Download(15) with { Candles = [saved] })).DatasetHash;
+        _provider.Downloads[15] = Download(15) with { Candles = [null!, null!] };
+
+        ReplayHistoryAvailability prepared = await Service.CheckAsync(Query, false, default);
+
+        Assert.False(prepared.Complete);
+        Assert.True(prepared.IsLocal);
+        Assert.Equal(saved, Assert.Single(prepared.Candles));
+        Assert.Null(prepared.PendingDownload);
+        Assert.Equal(2, prepared.Coverage.Gaps.Count);
+        Assert.Equal(hash, Assert.Single(Library.Scan().Datasets).DatasetHash);
+        Assert.Equal(prepared.Candles, (await Service.LoadPreparedAsync(prepared, default)).Candles);
+    }
+
+    [Fact]
+    public async Task UnavailableNewPrice_RemainsGapAndIsNotPromisedForStart()
+    {
+        HistoricalCandle[] all = Download(15).Candles.ToArray();
+        all[2] = all[2] with { Open = 0m };
+        _provider.Downloads[15] = Download(15) with { Candles = all };
+
+        ReplayHistoryAvailability prepared = await Service.CheckAsync(Query, false, default);
+
+        Assert.False(prepared.Complete);
+        Assert.Equal(7, prepared.Candles.Count);
+        Assert.DoesNotContain(prepared.Candles, candle => candle.StartsAtUtc == all[2].StartsAtUtc);
+        Assert.False(Directory.Exists(_root));
+        LibraryReplayHistoryResult loaded = await Service.LoadPreparedAsync(prepared, default);
+        Assert.Equal(prepared.Candles, loaded.Candles);
+        Assert.Equal(7, Library.Read(Assert.Single(Library.Scan().Datasets).DatasetHash).Candles.Count);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task PendingDownload_MissingOrChangedPromisedCandleFailsPreparedStart(bool removeCandle)
     {
         _provider.Downloads[15] = Download(15);

@@ -33,12 +33,24 @@ public sealed record CollectionJob
     public DateTimeOffset? RequestedFromUtc { get; init; }
     public DateTimeOffset? RequestedThroughUtc { get; init; }
     public DateOnly? DiscoveryAsOfDate { get; init; }
+    public Guid? AvailabilityRunId { get; init; }
     public bool AvailabilityCheckPending { get; init; }
     public int? DiscoveryEmptySessions { get; init; }
     public DateTimeOffset? NextGapFromUtc { get; init; }
     public bool ReceivedCandlesThisRun { get; init; }
 }
 
+public sealed record CollectionAvailabilityRun
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public DateOnly AsOfDate { get; init; }
+    public DateOnly CurrentDate { get; init; }
+    public string LibraryRootPath { get; init; } = "";
+    public IReadOnlyList<DownloadListMember> Members { get; init; } = [];
+    public IReadOnlyList<Guid> CurrentJobIds { get; init; } = [];
+    public bool IsAutomatic { get; init; }
+    public bool IgnoreKnownGaps { get; init; }
+}
 public sealed record CollectionState
 {
     public int SchemaVersion { get; init; } = 1;
@@ -46,6 +58,7 @@ public sealed record CollectionState
     public IReadOnlyList<CollectionJob> Jobs { get; init; } = [];
     public IReadOnlyList<CollectionContinuityGap> ContinuityGaps { get; init; } = [];
     public DateTimeOffset? LastScheduledOccurrenceUtc { get; init; }
+    public CollectionAvailabilityRun? AvailabilityRun { get; init; }
 }
 
 public interface ICollectionStateStore
@@ -57,7 +70,7 @@ public interface ICollectionStateStore
 public sealed record CollectionRunOptions
 {
     public int MaximumRequestsPerTick { get; init; } = 8;
-    public int MaximumTransientAttempts { get; init; } = 3;
+    public int MaximumTransientAttempts { get; init; } = 2;
     public TimeSpan MinimumRequestInterval { get; init; } = TimeSpan.FromMilliseconds(250);
     public TimeSpan RetryDelay { get; init; } = TimeSpan.FromSeconds(5);
 }

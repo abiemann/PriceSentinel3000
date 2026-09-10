@@ -130,7 +130,7 @@ public sealed partial class MarketDataCollectorTests
         await collector.TickAsync(true);
         await collector.TickAsync(true);
         Assert.Equal(CollectionJobStatus.Failed, collector.State.Jobs[0].Status);
-        Assert.Equal(3, collector.State.Jobs[0].Attempts);
+        Assert.Equal(2, collector.State.Jobs[0].Attempts);
     }
 
     [Fact]

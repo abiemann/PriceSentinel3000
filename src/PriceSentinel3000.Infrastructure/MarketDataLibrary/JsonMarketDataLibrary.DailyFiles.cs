@@ -128,21 +128,25 @@ public sealed partial class JsonMarketDataLibrary
             ?? throw new InvalidDataException("The selected dataset changed or disappeared; no replacement was selected.");
     }
 
-    private static HistoricalDataset MergeDaily(IReadOnlyList<HistoricalDataset> sources)
+    private static HistoricalDataset MergeDaily(IReadOnlyList<HistoricalDataset> sources, HistoricalDataset? incoming = null)
     {
-        HistoricalDataset first = sources[0];
+        HistoricalDataset first = sources.FirstOrDefault(item => item.InstrumentId != UnresolvedInstrument) ?? sources[0];
         if (sources.Any(item => item.Symbol != first.Symbol || item.TradingDate != first.TradingDate ||
-                item.SourceIntervalSeconds != 15 || item.Provider != first.Provider || item.InstrumentId != first.InstrumentId ||
+                item.SourceIntervalSeconds != 15 || item.Provider != first.Provider ||
+                (item.InstrumentId != first.InstrumentId && !(item.InstrumentId == UnresolvedInstrument && item.Candles.Count == 0)) ||
                 item.AdjustmentPolicy != first.AdjustmentPolicy || item.AdjustmentBasis != first.AdjustmentBasis ||
                 item.SessionBounds is not ("regular" or "extended" or "24_5")))
             throw new InvalidDataException("Different providers, instruments, resolutions, adjustments or unsupported sessions cannot share one daily file.");
 
         var candles = new SortedDictionary<DateTimeOffset, HistoricalCandle>();
-        foreach (HistoricalCandle candle in sources.SelectMany(item => item.Candles))
+        // Newer provider data wins. A new save also wins equal fetch times; legacy
+        // consolidation resolves equal times by the lexicographically lowest hash.
+        foreach (HistoricalCandle candle in sources.OrderBy(item => item.FetchedAtUtc)
+                     .ThenBy(item => ReferenceEquals(item, incoming) ? 1 : 0)
+                     .ThenByDescending(item => item.DatasetHash, StringComparer.Ordinal).SelectMany(item => item.Candles))
         {
-            if (candles.TryGetValue(candle.StartsAtUtc, out HistoricalCandle? existing) && existing != candle)
-                throw new InvalidDataException($"Saved and incoming candles disagree at {candle.StartsAtUtc:O}; no prices or volume were overwritten.");
-            candles[candle.StartsAtUtc] = candle;
+            HistoricalCandle? updated = HistoricalCandleUpdates.Apply(candle, candles.GetValueOrDefault(candle.StartsAtUtc));
+            if (updated is not null) candles[candle.StartsAtUtc] = updated;
         }
         HistoricalCandle[] merged = candles.Values.ToArray();
         DateTimeOffset from = sources.Min(item => item.Coverage.RequestedFromUtc);
@@ -154,6 +158,7 @@ public sealed partial class JsonMarketDataLibrary
             DatasetHash = "", Candles = merged, SessionBounds = session,
             FetchedAtUtc = sources.Max(item => item.FetchedAtUtc),
             Coverage = Coverage(from, through, 15, merged),
+            Collection = MergeCollection(sources, first.InstrumentId, merged),
         };
         result = result with { DatasetHash = Hash(result) };
         ValidateDataset(result); // Includes overlap and midnight-boundary validation.
@@ -168,7 +173,7 @@ public sealed partial class JsonMarketDataLibrary
         HistoricalDataset? current = File.Exists(path) ? Load(path) : null;
         if (current is not null && !originals.Any(item => item.DatasetHash == current.DatasetHash))
             throw new InvalidDataException("The daily destination contains another dataset; its original content was retained.");
-        if (current is not null && SemanticHash(current) == SemanticHash(merged)) merged = current;
+        if (current is not null && SemanticHash(current) == SemanticHash(merged)) merged = current with { Collection = merged.Collection };
         byte[] content = JsonSerializer.SerializeToUtf8Bytes(merged, JsonOptions);
         if (content.Length > MaximumFileBytes) throw new InvalidDataException("The combined daily file exceeds the 8 MiB limit.");
 
@@ -190,7 +195,9 @@ public sealed partial class JsonMarketDataLibrary
         }
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         EnsureNoReparsePoint(path);
-        if (current?.DatasetHash != merged.DatasetHash) WriteAtomic(path, content, overwrite: true);
+        if (current?.DatasetHash != merged.DatasetHash ||
+            JsonSerializer.Serialize(current?.Collection, JsonOptions) != JsonSerializer.Serialize(merged.Collection, JsonOptions))
+            WriteAtomic(path, content, overwrite: true);
         HistoricalDataset persisted = Load(path);
         if (persisted.DatasetHash != merged.DatasetHash) throw new InvalidDataException("The merged daily file failed verification.");
         foreach (HistoricalDatasetInfo info in originals.Where(item => !SamePath(item.RelativePath, relative)))

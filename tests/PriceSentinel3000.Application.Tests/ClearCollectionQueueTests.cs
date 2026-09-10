@@ -21,6 +21,7 @@ public sealed class ClearCollectionQueueTests
                 Lists = [new(Guid.NewGuid(), "Saved equities", true, [new("AAPL", "Apple")])],
             },
             LastScheduledOccurrenceUtc = Now.AddDays(-1),
+            AvailabilityRun = new() { AsOfDate = Day, CurrentDate = Day, Members = [new("AAPL")] },
             ContinuityGaps = [new("AAPL", Day.AddDays(-1), Day, "24_5", Path.GetFullPath("test-library"))],
             Jobs = [Job(CollectionJobStatus.Complete), Job(CollectionJobStatus.Partial),
                 Job(CollectionJobStatus.Unavailable), Job(CollectionJobStatus.Failed)],
@@ -36,6 +37,7 @@ public sealed class ClearCollectionQueueTests
         Assert.Empty(store.Load().Jobs);
         MarketDataCollector restarted = Create(store);
         Assert.Empty(restarted.State.Jobs);
+        Assert.Null(restarted.State.AvailabilityRun);
         Assert.Equal(JsonSerializer.Serialize(before.Settings), JsonSerializer.Serialize(restarted.State.Settings));
         Assert.Equal(before.LastScheduledOccurrenceUtc, restarted.State.LastScheduledOccurrenceUtc);
         Assert.Equal(before.ContinuityGaps, restarted.State.ContinuityGaps);

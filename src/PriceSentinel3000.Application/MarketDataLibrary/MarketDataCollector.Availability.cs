@@ -25,7 +25,7 @@ public sealed partial class MarketDataCollector
             if (automatic) return;
             throw new ArgumentException("Save a list with at least one included equity before downloading.");
         }
-        GetGapIndex(_state.Settings.LibraryRootPath);
+        bool tracksAttempts = GetGapIndex(_state.Settings.LibraryRootPath)?.SupportsAttemptTracking == true;
         DateTimeOffset now = _clock.GetUtcNow();
         string bounds = CollectionSettings.AllAvailableSessionBounds;
         DateOnly today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, CollectionEastern).DateTime);
@@ -42,15 +42,39 @@ public sealed partial class MarketDataCollector
             }
         }
 
-        // A new run supersedes speculative queued dates. Older work is discovered
-        // one date at a time; terminal history and explicitly queued work remain.
-        var jobs = _state.Jobs.Where(j => !(j.Status == CollectionJobStatus.Pending && j.IsAvailabilityProbe &&
+        // A tracked run replaces its prior availability rows. Explicit work and other
+        // scopes remain; legacy indexes retain their terminal history.
+        var jobs = _state.Jobs.Where(j => !((tracksAttempts || j.Status == CollectionJobStatus.Pending) && j.IsAvailabilityProbe &&
             j.SourceIntervalSeconds == 15 && j.AdjustmentPolicy == "split" &&
             j.AdjustmentBasis == "robinhood-split-unversioned" &&
             j.SessionBounds is "regular" or "extended" or "24_5" &&
             SamePath(j.LibraryRootPath, _state.Settings.LibraryRootPath) && members.Any(m => m.Symbol == j.Symbol &&
                 (m.ProviderInstrumentId is null || j.ProviderInstrumentId is null ||
                     m.ProviderInstrumentId == j.ProviderInstrumentId)))).ToList();
+        if (!tracksAttempts)
+        {
+            QueueLegacyAvailability(jobs, members, latest, today, partialThrough, bounds, automatic, ignoreKnownGaps);
+            return;
+        }
+        var run = new CollectionAvailabilityRun
+        {
+            AsOfDate = today, CurrentDate = latest, LibraryRootPath = _state.Settings.LibraryRootPath,
+            Members = members, IsAutomatic = automatic, IgnoreKnownGaps = ignoreKnownGaps,
+        };
+        var currentJobs = new List<Guid>();
+        foreach (DownloadListMember member in members)
+        {
+            CollectionJob candidate = AvailabilityJob(run, member, latest) with { RequestedThroughUtc = partialThrough };
+            currentJobs.Add(QueueAvailabilityJob(jobs, candidate));
+        }
+        // The newest date always appears. Older dates are checked against local
+        // files and persistent attempt counts before any row is added.
+        Commit(_state with { Jobs = jobs.ToArray(), AvailabilityRun = run with { CurrentJobIds = currentJobs.ToArray() } });
+    }
+
+    private void QueueLegacyAvailability(List<CollectionJob> jobs, DownloadListMember[] members, DateOnly latest,
+        DateOnly today, DateTimeOffset? partialThrough, string bounds, bool automatic, bool ignoreKnownGaps)
+    {
         AddJobs(jobs, members, latest, bounds, automatic);
         foreach (DownloadListMember member in members)
         {
@@ -63,14 +87,10 @@ public sealed partial class MarketDataCollector
                 };
             jobs[index] = jobs[index] with
             {
-                IsAvailabilityProbe = true,
-                IgnoreKnownGaps = ignoreKnownGaps,
-                RequestedThroughUtc = partialThrough,
-                DiscoveryAsOfDate = today,
-                AvailabilityCheckPending = latest < today,
-                DiscoveryEmptySessions = 0,
-                NextGapFromUtc = null,
-                ReceivedCandlesThisRun = false,
+                IsAvailabilityProbe = true, IgnoreKnownGaps = ignoreKnownGaps,
+                RequestedThroughUtc = partialThrough, DiscoveryAsOfDate = today,
+                AvailabilityCheckPending = latest < today, DiscoveryEmptySessions = 0,
+                NextGapFromUtc = null, ReceivedCandlesThisRun = false,
             };
         }
         Commit(_state with { Jobs = jobs.ToArray() });
@@ -80,6 +100,17 @@ public sealed partial class MarketDataCollector
     // cannot leave successful discovery permanently stopped between two sessions.
     private void FinishCollection(CollectionJob job, bool emptySession = false, bool receivedCandles = false)
     {
+        if (job.AvailabilityRunId is not null)
+        {
+            Commit(_state with
+            {
+                Jobs = _state.Jobs.Select(existing => existing.Id == job.Id
+                    ? job with { DiscoveryEmptySessions = null, AvailabilityCheckPending = false } : existing).ToArray(),
+                ContinuityGaps = job.Status == CollectionJobStatus.Complete && job.RequestedFromUtc is null && job.RequestedThroughUtc is null
+                    ? _state.ContinuityGaps.SelectMany(gap => RemoveRepairedSession(gap, job)).ToArray() : _state.ContinuityGaps,
+            });
+            return;
+        }
         bool progressive = job.DiscoveryAsOfDate is not null;
         bool continueDiscovery = !progressive || job.Status == CollectionJobStatus.Complete ||
             receivedCandles || job.ReceivedCandlesThisRun || job.SessionDate == job.DiscoveryAsOfDate ||

@@ -120,8 +120,11 @@ public sealed class CollectionContinuityTests : IDisposable
         Assert.Equal(originalBytes, File.ReadAllBytes(Path.Combine(_directory, original.RelativePath)));
     }
 
-    [Fact]
-    public async Task ChangedOverlappingCandle_FailsWithoutReplacingSavedRevision()
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    [InlineData(10)]
+    public async Task ChangedOverlappingCandle_UpdatesValuesAndPreservesArchivedSnapshot(int? volume)
     {
         HistoricalDatasetInfo original = Assert.Single(Library.Save(Download() with
         {
@@ -132,7 +135,7 @@ public sealed class CollectionContinuityTests : IDisposable
         {
             Respond = request => Response(request) with
             {
-                Candles = [FullDay[17], FullDay[18] with { Close = FullDay[18].Close + .01m }],
+                Candles = [FullDay[17], FullDay[18] with { Open = 0, Close = FullDay[18].Close + .01m, Volume = volume }],
             },
         };
         MarketDataCollector collector = CreateCollector(provider);
@@ -140,10 +143,36 @@ public sealed class CollectionContinuityTests : IDisposable
         await RunAsync(collector);
 
         CollectionJob job = Assert.Single(collector.State.Jobs);
-        Assert.Equal(CollectionJobStatus.Failed, job.Status);
-        Assert.Contains("overlapping", job.Error);
-        Assert.Equal(original.DatasetHash, Assert.Single(Library.Scan().Datasets).DatasetHash);
-        Assert.Equal(originalBytes, File.ReadAllBytes(Path.Combine(_directory, original.RelativePath)));
+        Assert.Equal(CollectionJobStatus.Complete, job.Status);
+        HistoricalDataset current = Library.Read(Assert.Single(Library.Scan().Datasets).DatasetHash);
+        Assert.NotEqual(original.DatasetHash, current.DatasetHash);
+        Assert.Equal(1560, current.Candles.Count);
+        Assert.Equal(FullDay[18] with { Close = FullDay[18].Close + .01m, Volume = volume is > 0 ? volume : FullDay[18].Volume },
+            current.Candles.Single(candle => candle.StartsAtUtc == FullDay[18].StartsAtUtc));
+        Assert.Equal(FullDay[18], Library.Read(original.DatasetHash).Candles.Single(candle => candle.StartsAtUtc == FullDay[18].StartsAtUtc));
+        Assert.Equal(originalBytes, File.ReadAllBytes(Path.Combine(_directory, ".archive", original.DatasetHash + ".json")));
+    }
+
+    [Fact]
+    public async Task OnlyZeroPricePlaceholders_DoNotSaveOrReportUsableHistory()
+    {
+        var provider = new Provider
+        {
+            Respond = request => Response(request) with
+            {
+                Candles = [FullDay[0] with { Open = 0, High = 0, Low = 0, Close = 0, Volume = 0 }],
+            },
+        };
+        MarketDataCollector collector = CreateCollector(provider);
+
+        await RunAsync(collector);
+
+        CollectionJob job = Assert.Single(collector.State.Jobs);
+        Assert.Equal(CollectionJobStatus.Unavailable, job.Status);
+        Assert.Null(job.ActualSourceIntervalSeconds);
+        Assert.False(job.ReceivedCandlesThisRun);
+        Assert.Empty(job.DatasetHashes);
+        Assert.Empty(Library.Scan().Datasets);
     }
 
     [Fact]
