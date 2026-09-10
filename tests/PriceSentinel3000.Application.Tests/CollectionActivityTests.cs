@@ -41,7 +41,7 @@ public sealed class CollectionActivityTests
         Assert.Null(fixture.Collector.Activity);
         Assert.False(fixture.Collector.IsBusy);
         Assert.True(idleNotified);
-        Assert.Equal(4, fixture.Store.SaveCount); // Queue, saved coverage, downloading and complete; activity is transient.
+        Assert.Equal(5, fixture.Store.SaveCount); // Queue, saved coverage, active selection, downloading and complete; activity is transient.
     }
 
     [Theory]

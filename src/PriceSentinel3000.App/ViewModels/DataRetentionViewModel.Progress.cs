@@ -202,7 +202,7 @@ public sealed partial class DataRetentionViewModel
         {
             CollectionState state = Collector.State;
             DateTimeOffset? retry = state.Jobs.Where(j => j.Status == CollectionJobStatus.Pending &&
-                (!j.IsAutomatic || state.Settings.AutomaticDownloadsEnabled) && j.RetryAfterUtc is not null)
+                state.ActiveJobIds.Contains(j.Id) && j.RetryAfterUtc is not null)
                 .Select(j => j.RetryAfterUtc).Min();
             if (retry is { } at && at - now < delay)
                 delay = at > now ? at - now : TimeSpan.FromMilliseconds(1);
@@ -332,11 +332,13 @@ public sealed partial class DataRetentionViewModel
             }
             else
             {
-                bool retryWaiting = eligible.All(j => j.RetryAfterUtc > now);
+                CollectionJob[] active = eligible.Where(j => state.ActiveJobIds.Contains(j.Id)).ToArray();
+                CollectionJob[] next = active.Length > 0 ? active : eligible;
+                bool retryWaiting = next.All(j => j.RetryAfterUtc > now);
                 heading = retryWaiting ? "Waiting to retry" : "Continuing queued downloads";
                 detail = retryWaiting
-                    ? $"The broker request will be retried after {eligible.Min(j => j.RetryAfterUtc)!.Value.ToLocalTime():HH:mm:ss}. Queued work is kept."
-                    : $"{eligible.Length} date/equity downloads remain. Requests run one at a time with brief pacing between them.";
+                    ? $"The broker request will be retried after {next.Min(j => j.RetryAfterUtc)!.Value.ToLocalTime():HH:mm:ss}. Queued work is kept."
+                    : $"{eligible.Length} date/equity downloads remain. Up to 8 items are active; the rest wait until an item finishes. Requests run one at a time with brief pacing between them.";
             }
         }
         else if (pending.Length > 0)

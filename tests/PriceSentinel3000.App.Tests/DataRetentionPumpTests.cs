@@ -163,6 +163,26 @@ public sealed partial class SessionWorkflowTests
         Assert.Equal(1, fixture.Provider.MaximumConcurrentCalls);
     });
 
+    [Fact]
+    public Task DownloadPump_ActiveRetryWindowIgnoresWaitingQueueDeadlines() => host.RunAsync(async () =>
+    {
+        var clock = new TestClock { Now = new(2026, 9, 7, 22, 0, 0, TimeSpan.Zero) };
+        CollectionJob[] jobs = Enumerable.Range(0, 9).Select(index => new CollectionJob
+        {
+            Symbol = $"STOCK{(char)('A' + index)}",
+            RetryAfterUtc = index < 8 ? clock.Now.AddSeconds(10) : clock.Now.AddMinutes(-1),
+        }).ToArray();
+        await using var fixture = new DownloadPumpFixture(clock: clock, jobs: jobs);
+        fixture.ViewModel.Start();
+        await WaitForPumpAsync(() => !fixture.ViewModel.IsBusy && fixture.Collector.State.ActiveJobIds.Count == 8);
+        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+
+        Assert.Empty(fixture.Provider.Requests);
+        Assert.Equal("Waiting to retry", fixture.ViewModel.DownloadHeading);
+        Assert.Contains("Next queue check in 10s.", fixture.ViewModel.DownloadTiming);
+        Assert.All(fixture.Collector.State.Jobs, job => Assert.Equal(CollectionJobStatus.Pending, job.Status));
+    });
+
     private static async Task WaitForPumpAsync(Func<bool> condition)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));

@@ -56,6 +56,7 @@ public sealed record CollectionState
     public int SchemaVersion { get; init; } = 1;
     public CollectionSettings Settings { get; init; } = new();
     public IReadOnlyList<CollectionJob> Jobs { get; init; } = [];
+    public IReadOnlyList<Guid> ActiveJobIds { get; init; } = [];
     public IReadOnlyList<CollectionContinuityGap> ContinuityGaps { get; init; } = [];
     public DateTimeOffset? LastScheduledOccurrenceUtc { get; init; }
     public CollectionAvailabilityRun? AvailabilityRun { get; init; }

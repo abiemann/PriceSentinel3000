@@ -122,9 +122,9 @@ public sealed partial class MarketDataCollector
             QueueScheduled();
             if (!isConnected) return CollectionBatchResult.Disconnected;
             int remaining = _options.MaximumRequestsPerTick;
-            foreach (CollectionJob job in _state.Jobs.Where(j => j.Status == CollectionJobStatus.Pending &&
-                (!j.IsAutomatic || _state.Settings.AutomaticDownloadsEnabled) &&
-                (j.RetryAfterUtc is null || j.RetryAfterUtc <= _clock.GetUtcNow())).OrderByDescending(j => j.SessionDate).ThenBy(j => j.LastAttemptAtUtc).ThenBy(j => j.QueuedAtUtc).ToArray())
+            foreach (CollectionJob job in AdmitActiveJobs().Where(j =>
+                j.RetryAfterUtc is null || j.RetryAfterUtc <= _clock.GetUtcNow())
+                .OrderByDescending(j => j.SessionDate).ThenBy(j => j.LastAttemptAtUtc).ThenBy(j => j.QueuedAtUtc).ToArray())
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (remaining == 0) break;
@@ -136,8 +136,7 @@ public sealed partial class MarketDataCollector
             }
             cancellationToken.ThrowIfCancellationRequested();
             bool discoveryReady = AdvanceAvailabilityDiscovery(cancellationToken);
-            CollectionJob[] pending = _state.Jobs.Where(j => j.Status == CollectionJobStatus.Pending &&
-                (!j.IsAutomatic || _state.Settings.AutomaticDownloadsEnabled)).ToArray();
+            CollectionJob[] pending = AdmitActiveJobs();
             return discoveryReady || pending.Any(j => j.RetryAfterUtc is null || j.RetryAfterUtc <= _clock.GetUtcNow())
                 ? CollectionBatchResult.Ready : pending.Length > 0
                     ? CollectionBatchResult.WaitingForRetry : CollectionBatchResult.Idle;
@@ -427,6 +426,8 @@ public sealed partial class MarketDataCollector
                 .OrderByDescending(j => j.LastAttemptAtUtc ?? j.QueuedAtUtc).Take(10_000).Select(j => j.Id).ToHashSet();
             state = state with { Jobs = state.Jobs.Where(j => j.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading || retain.Contains(j.Id)).ToArray() };
         }
+        HashSet<Guid> eligible = state.Jobs.Where(j => IsEligibleForActiveQueue(j, state)).Select(j => j.Id).ToHashSet();
+        state = state with { ActiveJobIds = state.ActiveJobIds.Where(eligible.Contains).Distinct().Take(MaximumActiveJobs).ToArray() };
         _store.Save(state);
         Volatile.Write(ref _state, state);
         StateChanged?.Invoke(this, EventArgs.Empty);
@@ -451,6 +452,7 @@ public sealed partial class MarketDataCollector
         Settings = state.Settings with { Lists = state.Settings.Lists.Select(l => l with { Members = l.Members.ToArray() }).ToArray() },
         Jobs = state.Jobs.Select(j => j with { DatasetHashes = j.DatasetHashes.ToArray() }).ToArray(),
         ContinuityGaps = state.ContinuityGaps.ToArray(),
+        ActiveJobIds = state.ActiveJobIds.ToArray(),
         AvailabilityRun = state.AvailabilityRun is { } run
             ? run with { Members = run.Members.ToArray(), CurrentJobIds = run.CurrentJobIds.ToArray() } : null,
     };
