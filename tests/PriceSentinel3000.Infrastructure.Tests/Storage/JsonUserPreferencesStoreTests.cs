@@ -45,6 +45,7 @@ public sealed class JsonUserPreferencesStoreTests
             ReplayTime = "13:52",
             ReplayEndTime = "15:52",
             ReplaySpeed = 25m,
+            LiveRiskAcknowledged = true,
         };
 
         try
@@ -80,6 +81,7 @@ public sealed class JsonUserPreferencesStoreTests
             TradingSessionSettings loaded = Assert.IsType<TradingSessionSettings>(store.Load());
 
             Assert.Equal("15:52", loaded.ReplayEndTime);
+            Assert.False(loaded.LiveRiskAcknowledged);
             Assert.Equal(300, loaded.ReconciliationLookbackSeconds);
             Assert.Equal(30, loaded.ReconciliationCompletionDelaySeconds);
         }

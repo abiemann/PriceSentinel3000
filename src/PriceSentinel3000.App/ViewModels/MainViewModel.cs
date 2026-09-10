@@ -179,6 +179,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
         _replayTime = defaults.ReplayTime;
         _replayEndTime = defaults.ReplayEndTime;
         _replaySpeed = defaults.ReplaySpeed;
+        _liveRiskAcknowledged = defaults.LiveRiskAcknowledged;
         _paperBuyingPower = defaults.StartingBalance;
         _paperEquity = defaults.StartingBalance;
         _statusMessage = "Choose Replay, Paper Trader, or LIVE on the rotary selector to begin.";
@@ -694,8 +695,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
             return;
         }
 
-        _liveRiskAcknowledged = true;
         _modeState = _modeState.ActivateLiveDisarmed();
+        _liveRiskAcknowledged = true;
+        SavePreferences();
         CancellationToken cancellationToken = _sessionCoordinator.Begin();
         SetStartingSession(true);
         StatusMessage = "LIVE mode is effective and disarmed. Verifying the Robinhood connection...";
@@ -1025,6 +1027,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
         ReplayTime = ReplayTime,
         ReplayEndTime = ReplayEndTime,
         ReplaySpeed = ReplaySpeed,
+        LiveRiskAcknowledged = LiveRiskAcknowledged,
     };
 
     private void InitializeJournal()

@@ -16,9 +16,10 @@
         Background="{StaticResource WindowBrush}"
         FontFamily="Segoe UI"
         StateChanged="Window_StateChanged">
+    <!-- WindowChrome uses an ellipse diameter; 16 matches the 8-DIP visible border radius. -->
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="36"
-                            CornerRadius="0"
+                            CornerRadius="16"
                             GlassFrameThickness="0"
                             ResizeBorderThickness="6"
                             UseAeroCaptionButtons="False" />
@@ -233,5 +234,23 @@
         </Grid>
 
         <views:AppStatusBarView Grid.Row="3" />
+
+        <Border Grid.RowSpan="4"
+                Panel.ZIndex="100"
+                BorderBrush="#C6C6C6"
+                BorderThickness="1"
+                IsHitTestVisible="False"
+                SnapsToDevicePixels="True">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="CornerRadius" Value="8" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
+                            <Setter Property="CornerRadius" Value="0" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+        </Border>
     </Grid>
 </Window>

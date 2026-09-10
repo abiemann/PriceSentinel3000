@@ -22,8 +22,6 @@
     <ProjectReference Include="..\..\src\PriceSentinel3000.Core\PriceSentinel3000.Core.csproj" />
     <Content Include="..\..\research\strategies\OriginalConfirmation.thinkscript"
              Link="Strategies\OriginalConfirmation.thinkscript" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="..\..\research\strategies\Alex Special.thinkscript"
-             Link="Strategies\Alex Special.thinkscript" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\research\strategies\validation\validation-fixtures.json"
              Link="Strategies\validation-fixtures.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

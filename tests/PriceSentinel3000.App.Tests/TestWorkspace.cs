@@ -13,10 +13,11 @@ namespace PriceSentinel3000.App.Tests;
 
 internal sealed class TestWorkspace : IAsyncDisposable
 {
-    public TestWorkspace(IStrategyCatalog? strategyCatalog = null, TradingSessionSettings? preferences = null)
+    public TestWorkspace(IStrategyCatalog? strategyCatalog = null, TradingSessionSettings? preferences = null,
+        IUserPreferencesStore? preferencesStore = null)
     {
         Journal = new SqliteTradingJournal(Path.Combine(Path.GetTempPath(), $"pricesentinel-ui-{Guid.NewGuid():N}.db"));
-        ViewModel = new(Broker, Broker, Broker, Broker, Journal, new Preferences(preferences), Clock, strategyCatalog);
+        ViewModel = new(Broker, Broker, Broker, Broker, Journal, preferencesStore ?? new Preferences(preferences), Clock, strategyCatalog);
     }
 
     public FakeBroker Broker { get; } = new();

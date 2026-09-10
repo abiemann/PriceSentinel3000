@@ -142,6 +142,7 @@ public sealed class FileSystemStrategyCatalog : IStrategyCatalog
                 {
                     "originalconfirmation.thinkscript" => "Original Confirmation - experimental",
                     "nflxconfirmation.thinkscript" => "Netflix (NFLX) Confirmation - experimental",
+                    "alex special.thinkscript" => "Alex Special - experimental",
                     _ => Path.GetFileNameWithoutExtension(fileName),
                 },
                 fileName,

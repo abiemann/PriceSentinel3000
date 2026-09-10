@@ -151,7 +151,7 @@ LIVE is intentionally fail-closed:
 
 1. The application always starts in OFF, and selecting LIVE leaves execution
    disarmed.
-2. The user must acknowledge the loss warning and explicitly start LIVE.
+2. The user acknowledges the loss warning once; acceptance is saved in local preferences across app restarts. Each LIVE session still requires an explicit start.
 3. Account value, buying power, symbol tradability, the selected symbol's position,
    and its open orders are queried before arming. An open order for that symbol
    blocks LIVE startup. Missing or malformed position/order collections and

@@ -6,7 +6,7 @@ All repository `.thinkscript` files live here. Application documentation is in
 
 | Location | Contents |
 | --- | --- |
-| This directory | Fourteen named stock/fund profiles, Alex Special, and the original example. |
+| This directory | Fourteen named stock/fund profiles and the original example. |
 | [candidates](candidates/) | Fifteen trial scripts, grouped by the study that evaluated them. |
 | [validation](validation/) | Source provenance, synthetic decision fixtures, recorded compatibility results, and the validation program. |
 
@@ -22,21 +22,7 @@ interval. This is separate from the source data resolution. See the
 for selection and override behavior. The frozen trial scripts in `candidates`
 retain their original bytes; their test configuration stays in the study records.
 
-**Alex Special** is an equity-independent strategy using simple RSI(14), matching
-PriceSentinel's chart at its tested **15-second** interval. It proposes a buy
-when RSI is **10 or below**, or on the **third separate crossing below 30**
-since RSI last reached **60**. It proposes a sell at **60 or above**, which also
-resets the dip count. Staying below 30 counts as one dip. Buys are ignored while
-already holding a long position; host stop-loss and other risk controls can exit
-earlier or block an entry. The counter starts with available history and restarts
-on a new session or data gap. Synthetic rule tests verify behavior, not profitability.
-
-Alex Special uses the app's `CountSince` extension and requires the updated
-PriceSentinel runtime; it is not directly portable to thinkorswim. Select it after
-refreshing the installed scripts. Its interval annotation selects 15 seconds;
-set the chart to 15 seconds too when comparing the displayed RSI with signals.
-
-To use a stock profile or Alex Special, copy its `.thinkscript` file directly into
+To use a stock profile, copy its `.thinkscript` file directly into
 `%LOCALAPPDATA%\PriceSentinel3000\Strategies`, then refresh and select it in the app.
 The app does not scan nested folders. Use the stock/fund ticker in the filename
 when choosing the session symbol; the script itself does not enforce the symbol.

@@ -175,7 +175,8 @@ public sealed partial class MainViewModel
             var names = new HashSet<string>(StringComparer.Ordinal);
             foreach (JsonProperty property in patch.EnumerateObject())
             {
-                if (!merged.ContainsKey(property.Name) || !names.Add(property.Name) || property.Value.ValueKind is JsonValueKind.Null)
+                if (property.Name == "liveRiskAcknowledged" || !merged.ContainsKey(property.Name) ||
+                    !names.Add(property.Name) || property.Value.ValueKind is JsonValueKind.Null)
                     throw new ArgumentException($"Unknown, duplicate, or null setting: {property.Name}.");
                 merged[property.Name] = JsonNode.Parse(property.Value.GetRawText());
             }

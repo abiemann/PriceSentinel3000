@@ -75,59 +75,61 @@
             </Style>
         </Grid.Style>
         <StackPanel>
-            <StackPanel x:Name="SessionInputs"
-                        IsEnabled="{Binding IsSessionConfigurationEditable}">
-                <views:AccountConfigurationView />
+            <StackPanel x:Name="SessionInputs">
+                <views:AccountConfigurationView IsEnabled="{Binding IsSessionConfigurationEditable}" />
                 <Border Margin="0,12,0,0" Style="{StaticResource CardStyle}">
                     <StackPanel>
-                        <TextBlock Style="{StaticResource SectionLabelStyle}" Text="STRATEGY" />
-                        <ComboBox x:Name="StrategySelector" Margin="0,12,0,0"
-                                  Style="{StaticResource InputComboBoxStyle}"
-                                  ItemsSource="{Binding AvailableStrategies}"
-                                  DisplayMemberPath="Name" SelectedValuePath="Id"
-                                  SelectedItem="{Binding SelectedStrategy, Mode=OneWay}"
-                                  SelectionChanged="StrategySelector_SelectionChanged"
-                                  DropDownOpened="StrategySelector_DropDownOpened"
-                                  ToolTip="Shared by Paper, LIVE, and Replay. Copy a compatible thinkScript strategy into the scripts folder." />
-                        <Grid Margin="0,10,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="10" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Button Content="SCRIPTS FOLDER" Style="{StaticResource SecondaryButtonStyle}"
-                                    Command="{Binding OpenScriptsFolderCommand}" ToolTip="{Binding ScriptsDirectory}" />
-                            <Button Grid.Column="2" Content="REFRESH" Style="{StaticResource SecondaryButtonStyle}"
-                                    Command="{Binding RefreshScriptsCommand}" />
-                        </Grid>
-                        <StackPanel Margin="0,12,0,0" IsEnabled="{Binding IsExternalStrategySelected}">
-                            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Script candle interval" />
-                            <ComboBox x:Name="ScriptBarIntervalSelector" ItemsSource="{Binding ScriptBarIntervalOptions}"
+                        <StackPanel x:Name="StrategyInputs" IsEnabled="{Binding IsSessionConfigurationEditable}">
+                            <TextBlock Style="{StaticResource SectionLabelStyle}" Text="STRATEGY" />
+                            <ComboBox x:Name="StrategySelector" Margin="0,12,0,0"
                                       Style="{StaticResource InputComboBoxStyle}"
-                                      DisplayMemberPath="Label" SelectedValuePath="Value"
-                                      SelectedValue="{Binding ScriptBarIntervalSeconds, Mode=TwoWay}"
-                                      ToolTip="Scripts evaluate completed price candles. This interval is independent of the chart display." />
-                            <TextBlock x:Name="TestedScriptIntervalText" Text="{Binding TestedScriptIntervalLabel}"
-                                       TextWrapping="Wrap" Margin="0,6,0,0" FontSize="11" Foreground="#AFC5DE"
-                                       ToolTip="Declared in the script's PriceSentinel metadata. Selecting a script applies this interval; changing the chart interval does not change it." />
-                            <TextBlock x:Name="ScriptIntervalWarningText" Text="{Binding ScriptIntervalWarning}"
-                                       TextWrapping="Wrap" Margin="0,6,0,0" FontSize="11" Foreground="#FFCA80">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding HasScriptIntervalMismatch}" Value="True">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
+                                      ItemsSource="{Binding AvailableStrategies}"
+                                      DisplayMemberPath="Name" SelectedValuePath="Id"
+                                      SelectedItem="{Binding SelectedStrategy, Mode=OneWay}"
+                                      SelectionChanged="StrategySelector_SelectionChanged"
+                                      DropDownOpened="StrategySelector_DropDownOpened"
+                                      ToolTip="Shared by Paper, LIVE, and Replay. Copy a compatible thinkScript strategy into the scripts folder." />
+                            <Grid Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button Content="SCRIPTS FOLDER" Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding OpenScriptsFolderCommand}" ToolTip="{Binding ScriptsDirectory}" />
+                                <Button Grid.Column="2" Content="REFRESH" Style="{StaticResource SecondaryButtonStyle}"
+                                        Command="{Binding RefreshScriptsCommand}" />
+                            </Grid>
+                            <StackPanel Margin="0,12,0,0" IsEnabled="{Binding IsExternalStrategySelected}">
+                                <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Script candle interval" />
+                                <ComboBox x:Name="ScriptBarIntervalSelector" ItemsSource="{Binding ScriptBarIntervalOptions}"
+                                          Style="{StaticResource InputComboBoxStyle}"
+                                          DisplayMemberPath="Label" SelectedValuePath="Value"
+                                          SelectedValue="{Binding ScriptBarIntervalSeconds, Mode=TwoWay}"
+                                          ToolTip="Scripts evaluate completed price candles. This interval is independent of the chart display." />
+                                <TextBlock x:Name="TestedScriptIntervalText" Text="{Binding TestedScriptIntervalLabel}"
+                                           TextWrapping="Wrap" Margin="0,6,0,0" FontSize="11" Foreground="#AFC5DE"
+                                           ToolTip="Declared in the script's PriceSentinel metadata. Selecting a script applies this interval; changing the chart interval does not change it." />
+                                <TextBlock x:Name="ScriptIntervalWarningText" Text="{Binding ScriptIntervalWarning}"
+                                           TextWrapping="Wrap" Margin="0,6,0,0" FontSize="11" Foreground="#FFCA80">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasScriptIntervalMismatch}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
                         </StackPanel>
-                        <TextBlock Text="{Binding ScriptDiagnostics}" TextWrapping="Wrap" Margin="0,8,0,0"
-                                   FontSize="11" Foreground="#FFCA80" MaxHeight="150">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
+                        <ScrollViewer x:Name="ScriptDiagnosticsScrollViewer" Margin="0,8,0,0" MaxHeight="150"
+                                      VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                      Background="Transparent">
+                            <ScrollViewer.Style>
+                                <Style TargetType="ScrollViewer">
                                     <Setter Property="Visibility" Value="Collapsed" />
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding HasScriptDiagnostics}" Value="True">
@@ -135,13 +137,55 @@
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
-                            </TextBlock.Style>
-                            <TextBlock.ToolTip><TextBlock Text="{Binding ScriptDiagnostics}" TextWrapping="Wrap" MaxWidth="600" /></TextBlock.ToolTip>
-                        </TextBlock>
+                            </ScrollViewer.Style>
+                            <ScrollViewer.ContextMenu>
+                                <ContextMenu Background="{StaticResource ControlSurfaceBrush}"
+                                             Foreground="{StaticResource PrimaryTextBrush}"
+                                             BorderBrush="{StaticResource SecondaryControlBorderBrush}"
+                                             BorderThickness="1" Padding="4" MinWidth="100" FontSize="12">
+                                    <ContextMenu.Template>
+                                        <ControlTemplate TargetType="ContextMenu">
+                                            <Border Background="{TemplateBinding Background}"
+                                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                                    Padding="{TemplateBinding Padding}" CornerRadius="6">
+                                                <ItemsPresenter />
+                                            </Border>
+                                        </ControlTemplate>
+                                    </ContextMenu.Template>
+                                    <ContextMenu.Resources>
+                                        <Style TargetType="MenuItem">
+                                            <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}" />
+                                            <Setter Property="Padding" Value="10,6" />
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="MenuItem">
+                                                        <Border x:Name="MenuItemSurface" Padding="{TemplateBinding Padding}"
+                                                                Background="Transparent" CornerRadius="3">
+                                                            <ContentPresenter ContentSource="Header" RecognizesAccessKey="True" />
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsHighlighted" Value="True">
+                                                                <Setter TargetName="MenuItemSurface" Property="Background"
+                                                                        Value="{StaticResource SecondaryControlSurfaceBrush}" />
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </ContextMenu.Resources>
+                                    <MenuItem Header="Copy" Click="CopyScriptDiagnostics_Click" />
+                                    <MenuItem Header="Cancel" />
+                                </ContextMenu>
+                            </ScrollViewer.ContextMenu>
+                            <TextBlock x:Name="ScriptDiagnosticsText" Text="{Binding ScriptDiagnostics}"
+                                       TextWrapping="Wrap" Margin="0,0,8,0" FontSize="11" Foreground="#FFCA80" />
+                        </ScrollViewer>
                     </StackPanel>
                 </Border>
-                <views:RiskControlsView />
-                <views:DataTimingView />
+                <views:RiskControlsView IsEnabled="{Binding IsSessionConfigurationEditable}" />
+                <views:DataTimingView IsEnabled="{Binding IsSessionConfigurationEditable}" />
             </StackPanel>
 
             <Grid Margin="0,14,0,0">

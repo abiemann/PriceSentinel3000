@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using PriceSentinel3000.App.ViewModels;
@@ -47,6 +48,20 @@ public partial class TradingConfigurationPanel : UserControl
         if (DataContext is MainViewModel viewModel &&
             StrategySelector.SelectedItem is StrategyDescriptor selected)
             viewModel.SelectedStrategyId = selected.Id;
+    }
+
+    private void CopyScriptDiagnostics_Click(object sender, RoutedEventArgs e)
+    {
+        ScriptDiagnosticsScrollViewer.ContextMenu.IsOpen = false;
+        try
+        {
+            Clipboard.SetText(ScriptDiagnosticsText.Text);
+        }
+        catch (ExternalException)
+        {
+            MessageBox.Show(Window.GetWindow(this), "The clipboard is busy. Please try Copy again.",
+                "Copy strategy messages", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
     }
 
     private bool CommitInputs()

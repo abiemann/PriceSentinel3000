@@ -41,3 +41,6 @@ robinhood-client.dat
 # OS files
 .DS_Store
 Thumbs.db
+
+# Local strategy under development
+/research/strategies/Alex Special.thinkscript

@@ -34,6 +34,7 @@ public sealed record TradingSessionSettings
     public int ReplayDurationMinutes { get; init; }
 
     public decimal ReplaySpeed { get; init; } = 10m;
+    public bool LiveRiskAcknowledged { get; init; }
 
     public static TradingSessionSettings Default { get; } = new();
 

@@ -260,10 +260,10 @@
             <Grid Margin="0,14,0,0" Style="{StaticResource ReplayOnlyGridStyle}">
                 <CheckBox x:Name="ReplayOfflineOnlyCheckBox"
                           Style="{StaticResource PaperCheckBoxStyle}"
-                          Content="Replay from local files only"
+                          Content="Replay from local files only (offline)"
                           IsChecked="{Binding DataRetention.ReplayOfflineOnly, Mode=TwoWay}"
                           IsEnabled="{Binding IsSessionConfigurationEditable}"
-                          AutomationProperties.Name="Replay from local files only"
+                          AutomationProperties.Name="Replay from local files only (offline)"
                           ToolTip="Use saved data without contacting the broker. Leave unchecked to use saved data first and request missing history from Robinhood."
                           ToolTipService.ShowOnDisabled="True" />
             </Grid>

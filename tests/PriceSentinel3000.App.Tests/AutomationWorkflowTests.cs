@@ -1,6 +1,7 @@
 using System.Text.Json;
 using PriceSentinel3000.App.ViewModels;
 using PriceSentinel3000.Application.Automation;
+using PriceSentinel3000.Core.Configuration;
 using PriceSentinel3000.Core.Modes;
 
 namespace PriceSentinel3000.App.Tests;
@@ -64,6 +65,49 @@ public sealed partial class SessionWorkflowTests
         Assert.True((await Automate(vm, "configure", new { mode = "PaperTrader" })).Success);
         Assert.False((await Automate(vm, "start", new { fast = true })).Success);
         Assert.False((await Automate(vm, "start", new { pauseAfterObservations = 1 })).Success);
+        Assert.Equal(0, workspace.Broker.Connections);
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task Automation_CannotChangeLiveRiskAcknowledgement(bool acknowledged) => host.RunAsync(async () =>
+    {
+        await using var workspace = new TestWorkspace(preferences: TradingSessionSettings.Default with
+        {
+            LiveRiskAcknowledged = acknowledged,
+        });
+        MainViewModel vm = workspace.ViewModel;
+        AutomationResponse rejected = await Automate(vm, "configure", new
+        {
+            mode = "PaperTrader", settings = new { liveRiskAcknowledged = !acknowledged },
+        });
+
+        Assert.False(rejected.Success);
+        Assert.Equal("invalid_arguments", rejected.ErrorCode);
+        Assert.Equal(acknowledged, vm.LiveRiskAcknowledged);
+        Assert.Equal(TradingMode.Off, vm.SelectedMode);
+        Assert.Equal(0, workspace.Broker.Connections);
+    });
+
+    [Fact]
+    public Task Automation_ConfigurationPreservesLiveRiskAcknowledgement() => host.RunAsync(async () =>
+    {
+        await using var workspace = new TestWorkspace(preferences: TradingSessionSettings.Default with
+        {
+            LiveRiskAcknowledged = true,
+        });
+        MainViewModel vm = workspace.ViewModel;
+        AutomationResponse configured = await Automate(vm, "configure", new
+        {
+            mode = "PaperTrader", settings = new { symbol = "AAPL" },
+        });
+
+        Assert.True(configured.Success);
+        Assert.Equal("AAPL", vm.Symbol);
+        Assert.True(vm.LiveRiskAcknowledged);
+        Assert.True(configured.Result!.Value.GetProperty("settings").GetProperty("liveRiskAcknowledged").GetBoolean());
+        Assert.False(vm.LiveArmed);
         Assert.Equal(0, workspace.Broker.Connections);
     });
 
