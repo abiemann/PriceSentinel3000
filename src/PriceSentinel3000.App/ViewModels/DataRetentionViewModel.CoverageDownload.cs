@@ -19,7 +19,8 @@ public sealed partial class DataRetentionViewModel
     }
     public event EventHandler? CoverageDownloadUpdated;
 
-    public Task DownloadCoverageAsync(LibraryCoverageTimeline timeline, LibraryCoverageBlock selected)
+    public Task DownloadCoverageAsync(LibraryCoverageTimeline timeline, LibraryCoverageBlock selected,
+        string? libraryRootPath = null)
     {
         if (!CanDownloadCoverage || timeline.GetConnectedMissingRange(selected, _clock.GetUtcNow()) is not { } range)
             return Task.CompletedTask;
@@ -33,7 +34,7 @@ public sealed partial class DataRetentionViewModel
             {
                 _coverageDownloadRevision = "";
                 _coverageDownloadIds = await Collector.QueueRangeAsync(timeline.Symbol,
-                    range.FromUtc, range.ThroughUtc, _lifetime.Token);
+                    range.FromUtc, range.ThroughUtc, _lifetime.Token, libraryRootPath);
                 if (_coverageDownloadIds.Count == 0)
                 {
                     CoverageDownloadStatus = "No completed trading candles to download in this range.";
@@ -66,7 +67,14 @@ public sealed partial class DataRetentionViewModel
         _coverageDownloadRevision = revision;
         try
         {
-            await ScanLibraryAsync();
+            string currentRoot = System.IO.Path.TrimEndingDirectorySeparator(
+                System.IO.Path.GetFullPath(Collector.State.Settings.LibraryRootPath));
+            foreach (string root in jobs.Select(job => System.IO.Path.TrimEndingDirectorySeparator(
+                System.IO.Path.GetFullPath(job.LibraryRootPath))).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                if (string.Equals(root, currentRoot, StringComparison.OrdinalIgnoreCase)) await ScanLibraryAsync();
+                else await Collector.ScanLibraryAsync(_libraryFactory(root), cancellationToken: _lifetime.Token);
+            }
             CoverageDownloadStatus = jobs.Any(job => job.Status == CollectionJobStatus.Failed)
                 ? "Download failed. Saved data is kept; select DOWNLOAD to retry."
                 : jobs.Any(job => job.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading)

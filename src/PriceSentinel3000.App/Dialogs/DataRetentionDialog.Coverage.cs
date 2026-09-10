@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using PriceSentinel3000.App.ViewModels;
+using PriceSentinel3000.Application.MarketDataLibrary;
 
 namespace PriceSentinel3000.App.Dialogs;
 
@@ -11,6 +12,7 @@ public partial class DataRetentionDialog
     private IInputElement? _coveragePreviousFocus;
     private DataRetentionViewModel? _coverageViewModel;
     private LibraryDaySummary? _coverageDay;
+    private CollectionJob? _coverageJob;
     private bool _coverageDownloadRequested;
     private int _coverageSelectionVersion;
     private int? _coverageDownloadSelectionVersion;
@@ -34,7 +36,34 @@ public partial class DataRetentionDialog
         }
     }
 
-    internal async Task ShowLibraryCoverageAsync(LibraryDaySummary day)
+    private async void DownloadJobsGrid_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject source &&
+            ItemsControl.ContainerFromElement(DownloadJobsGrid, source) is DataGridRow { Item: DownloadJobViewModel job })
+        {
+            e.Handled = true;
+            await ShowDownloadCoverageAsync(job);
+        }
+    }
+
+    private async void DownloadJobsGrid_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && DownloadJobsGrid.SelectedItem is DownloadJobViewModel job)
+        {
+            e.Handled = true;
+            await ShowDownloadCoverageAsync(job);
+        }
+    }
+
+    internal Task ShowDownloadCoverageAsync(DownloadJobViewModel row)
+    {
+        if (DataContext is not DataRetentionViewModel viewModel ||
+            viewModel.Collector.State.Jobs.FirstOrDefault(job => job.Id == row.Id) is not { } job)
+            return Task.CompletedTask;
+        return ShowLibraryCoverageAsync(new(row.Symbol, row.SessionDate, "15", "", null, null, ""), job);
+    }
+
+    internal async Task ShowLibraryCoverageAsync(LibraryDaySummary day, CollectionJob? job = null)
     {
         if (DataContext is not DataRetentionViewModel viewModel) return;
         CloseDownloadInfo(restoreFocus: false);
@@ -42,6 +71,7 @@ public partial class DataRetentionDialog
         _coveragePreviousFocus = Keyboard.FocusedElement;
         _coverageViewModel = viewModel;
         _coverageDay = day;
+        _coverageJob = job;
         _coverageDownloadRequested = false;
         _coverageDownloadSelectionVersion = null;
         LibraryCoverageDownloadStatus.Text = string.Empty;
@@ -57,7 +87,9 @@ public partial class DataRetentionDialog
         LibraryCoverageCloseButton.Focus();
         try
         {
-            LibraryCoverageTimeline timeline = await viewModel.LoadLibraryCoverageAsync(day, cancellation.Token);
+            LibraryCoverageTimeline timeline = _coverageJob is { } queued
+                ? await viewModel.LoadDownloadCoverageAsync(queued, cancellation.Token)
+                : await viewModel.LoadLibraryCoverageAsync(day, cancellation.Token);
             if (!ReferenceEquals(_coverageCancellation, cancellation)) return;
             LibraryCoverageContent.DataContext = timeline;
             LibraryCoverageContent.Visibility = Visibility.Visible;
@@ -87,7 +119,7 @@ public partial class DataRetentionDialog
         _coverageDownloadSelectionVersion = selectionVersion;
         CancellationTokenSource? popup = _coverageCancellation;
         LibraryCoverageDownloadStatus.Text = "Downloading connected missing blocks…";
-        await viewModel.DownloadCoverageAsync(timeline, selected);
+        await viewModel.DownloadCoverageAsync(timeline, selected, _coverageJob?.LibraryRootPath);
         if (ReferenceEquals(_coverageCancellation, popup) && _coverageSelectionVersion == selectionVersion)
             LibraryCoverageDownloadStatus.Text = viewModel.CoverageDownloadStatus;
     }
@@ -99,7 +131,9 @@ public partial class DataRetentionDialog
         int? selectionVersion = _coverageDownloadSelectionVersion;
         try
         {
-            LibraryCoverageTimeline timeline = await viewModel.LoadLibraryCoverageAsync(day, cancellation.Token);
+            LibraryCoverageTimeline timeline = _coverageJob is { } queued
+                ? await viewModel.LoadDownloadCoverageAsync(queued, cancellation.Token)
+                : await viewModel.LoadLibraryCoverageAsync(day, cancellation.Token);
             if (!ReferenceEquals(_coverageCancellation, cancellation)) return;
             // Keep the latest selection if the user moved while coverage was loading.
             DateTimeOffset? selectedFrom = LibraryCoverageTimeline.SelectedBlock?.FromUtc;
@@ -135,6 +169,7 @@ public partial class DataRetentionDialog
         if (_coverageViewModel is { } viewModel) viewModel.CoverageDownloadUpdated -= OnCoverageDownloadUpdated;
         _coverageViewModel = null;
         _coverageDay = null;
+        _coverageJob = null;
         _coverageDownloadRequested = false;
         _coverageDownloadSelectionVersion = null;
         _coverageCancellation?.Cancel();

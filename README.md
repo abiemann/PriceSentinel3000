@@ -25,15 +25,15 @@ Open **Tools > Retain Hi-Res Data** to create download lists, import individual 
 
 **DOWNLOAD GAPS NOW** and scheduled runs always queue every included equity for today, then work backward one date at a time. Older dates are checked against saved candles and recorded attempts before being added to the queue. Complete coverage and gaps already attempted twice are skipped. The first older regular trading day whose entire gap check returns no broker candles stops that equity's backward search, even when local candles are saved. Its daily JSON remembers the boundary for later normal runs while the other equities continue. Compatible saved candles are reused across regular, premarket, after-hours, and overnight trading. See the [market-data library guide](docs/market-data-library.md) for the stopping rule and request limits.
 
-Current source keeps at most eight unfinished stock/date items active in the download queue. Each item keeps its place through request chunks, retry waits, pauses, and restarts; another queued item takes its place when checking finishes. Robinhood requests still run one at a time. All queued equities for the current date finish before the collector moves backward, using the existing market calendar.
+The queue keeps at most eight unfinished stock/date items active in the download queue. Each item keeps its place through request chunks, retry waits, pauses, and restarts; another queued item takes its place when checking finishes. Robinhood requests still run one at a time. All queued equities for the current date finish before the collector moves backward, using the existing market calendar.
 
-In current source, daily **Schedule & downloads > State** coverage uses the same completed-time rule as **Local library**: saved 15-second candles divided by expected completed trading candles at the coverage check. Future candles and market closures are excluded. Download updates, **RESCAN LIBRARY**, and clock changes refresh coverage from validated metadata; selected-range downloads keep their range, and the original download cutoff stays fixed. Failed or unavailable attempts still display **0%**.
+Daily **Schedule & downloads > State** coverage uses the same completed-time rule as **Local library**: saved 15-second candles divided by expected completed trading candles at the coverage check. Future candles and market closures are excluded. Download updates, **RESCAN LIBRARY**, and clock changes refresh coverage from validated metadata; selected-range downloads keep their range, and the original download cutoff stays fixed. Failed or unavailable attempts still display **0%**.
 
 Each daily JSON keeps its candles, unavailable ranges, and per-range attempt counts together. Older gaps receive at most two normal attempts; **FORCED DOWNLOAD** bypasses that limit. Successfully saved ranges are removed from the attempt records. Today is always queued, with known unavailable ranges eligible again after 15 minutes. Errors count as attempts but do not prove that history is unavailable. **CLEAR** removes finished queue entries only when idle, preserving saved candles and their collection records.
 
 The library stores one current 15-second file per equity and **Eastern market date** under year / numbered English month / ticker folders. Candle timestamps are UTC; daily grouping remains Eastern for consistent sharing. Compatible imported history participates in coverage checks and Replay. When returned 15-second candles overlap saved history, newer valid prices and positive volumes update the current file; zero, null, or empty values keep the saved values. Superseded snapshots remain available by exact hash in the archive. Gap downloads still skip complete coverage. Automatic collection requires the app to stay open and connected; copied history can be replayed offline.
 
-In **LOCAL LIBRARY**, **RESCAN LIBRARY** shows processing progress and the total size of active candle files in MB. Library rows and the download table support primary sorting and Shift-click secondary sorting. Local-library coverage excludes market closures and future candles, so today's denominator stops at the latest completed candle. Click a library row for a timeline of that **Eastern date**, with its boundaries displayed as local dates and times. For example, September 10 Eastern spans September 9 at 21:00 through September 10 at 21:00 Pacific daylight time. Confirmed non-overnight equities show the 04:00–20:00 Eastern extended-hours span in local time. Click a 15-minute block for details; a selected black **Missing** block offers **DOWNLOAD** for that block and its connected missing neighbors. Green means complete, light green partial, striped gray market closed, and blue future time.
+In **LOCAL LIBRARY**, **RESCAN LIBRARY** shows processing progress and the total size of active candle files in MB. Library rows and the download table support primary sorting and Shift-click secondary sorting. Local-library coverage excludes market closures and future candles, so today's denominator stops at the latest completed candle. Click a row in **SCHEDULE & DOWNLOADS** or **LOCAL LIBRARY** for the same saved-coverage timeline of that **Eastern date**, with its boundaries displayed as local dates and times. Both tables highlight selected rows in green. A download row uses its original library folder for coverage and any selected-block download, even after the saved folder changes. For example, September 10 Eastern spans September 9 at 21:00 through September 10 at 21:00 Pacific daylight time. Confirmed non-overnight equities show the 04:00–20:00 Eastern extended-hours span in local time. Click a 15-minute block for details; a selected black **Missing** block offers **DOWNLOAD** for that block and its connected missing neighbors. Green means complete, light green partial, striped gray market closed, and blue future time.
 
 Replay keeps an existing Robinhood connection available for symbol autocomplete, including after playback from saved files. Local-only Replay can still run without connecting. Selecting OFF does not open a connection; background downloads can continue using an existing one.
 
@@ -105,13 +105,12 @@ folder strategies, the local candle library, and optional MCP/CLI app control:
 - Replay accepts a ticker plus an exact local date/time and checks saved history
   before provider history at 15 seconds, 30 seconds, then one minute. It preserves
   the source duration and can be paused, resumed, or stopped without losing the
-  captured chart and paper-account state. In current source, selecting a different
+  captured chart and paper-account state. Selecting a different
   symbol while idle clears the old chart, prices, and paper-account display;
   completed journal records and structured session results remain available
 - Replay local start/end range (up to 24 hours) and playback speed are tunable.
-  Current source supports 1x-500x with a **MAX** button to select 500x.
+  Paced Replay supports 1x-500x with a **MAX** button to select 500x.
   Speeds outside 1x-500x are set to the nearest limit when you leave the field or press START.
-  The published 1.3 build supports 1x-100x
 - Built-In analyzes a tunable 5-15 minute rolling buffer as individual one-minute
   blocks and as a whole, retaining at least 16 observations for RSI when slow
   polling would otherwise leave too little history. Scripts use completed candles
@@ -525,14 +524,23 @@ dotnet test PriceSentinel3000.sln --configuration Release --no-build
 The Windows CI workflow runs the same Release build with warnings promoted to
 errors and executes the complete test suite on every pull request and push to
 `main`.
-The September 10, 2026 source review for the **1.3 rebuild** includes daily gap
-attempt records and candle revisions, persistent older-history stopping boundaries,
-resumable discovery progress and pause handling, and Eastern-date coverage timelines
-shown in local time. The current source passed all **1,495 tests** and a local
-Release build with zero warnings or errors. Refreshed Windows CI, installer
-packaging, checksums, and source-provenance verification were still pending at
-this source review; their final results belong to the rebuilt release's workflow
-and provenance record.
+The September 10, 2026 source review for the **1.3 rebuild** includes the earlier
+daily gap records, candle revisions, persisted history boundaries, resumable
+discovery, and Eastern-date timelines displayed in local time. It also includes
+1x-500x paced Replay with **MAX** and speed clamping, the relocated **CHECK**
+button, autocomplete through an existing Replay connection, and clearing the
+previous symbol's display when changing symbols while idle. Retained downloads
+keep eight unfinished items active, refresh coverage through the latest completed
+candle, and open the same coverage popup from either table with green selection
+and downloads pinned to the original library folder.
+
+This source passed all **1,545 tests** and a clean local Release build with zero
+warnings or errors. The retention UI was checked at normal and minimum window
+sizes. Refreshed Windows CI, installer packaging, checksums, and source-provenance
+verification were pending at this source review; final results belong to the
+rebuilt release's workflow and provenance record. The earlier September 10 source
+at `dff0b41` passed **1,495 tests** and a local Release build with zero warnings or
+errors; that validation is historical.
 
 The initial 1.3 publication from `1bea13a` passed **1,404 tests**. Its historical
 [Windows CI](https://github.com/abiemann/PriceSentinel3000/actions/runs/34422818384)

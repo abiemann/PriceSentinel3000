@@ -264,7 +264,7 @@ exact strategy inputs; use captures to check drawing, clipping, and labels.
 
 Real-time Paper Trader validation during an open market remains outstanding;
 passing historical Replay checks does not complete it. The remaining release
-checks are tracked in [TODO](../TODO.md#next-release-verification).
+checks are tracked in [TODO](../TODO.md#release-13-validation-and-remaining-runtime-checks).
 
 The [MCP telemetry validation](../archive/app/automation-telemetry-validation-2026-09-06.md)
 records exact candle aggregation, indicator warmup, event correlation, host

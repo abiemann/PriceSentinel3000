@@ -4,7 +4,7 @@ public sealed partial class MarketDataCollector
 {
     /// <summary>Retries only the selected interval, preserving saved candles and stopping at its boundaries.</summary>
     public async Task<IReadOnlyList<Guid>> QueueRangeAsync(string symbol, DateTimeOffset fromUtc,
-        DateTimeOffset throughUtc, CancellationToken cancellationToken = default)
+        DateTimeOffset throughUtc, CancellationToken cancellationToken = default, string? libraryRootPath = null)
     {
         string normalized = CollectionSettings.NormalizeSymbol(symbol);
         const long intervalTicks = 15 * TimeSpan.TicksPerSecond;
@@ -14,6 +14,7 @@ public sealed partial class MarketDataCollector
         var ids = new List<Guid>();
         await MutateAsync(() =>
         {
+            string root = Path.GetFullPath(libraryRootPath ?? _state.Settings.LibraryRootPath);
             DateTimeOffset now = _clock.GetUtcNow();
             DateTimeOffset cutoff = throughUtc < now ? throughUtc : now;
             cutoff = new(cutoff.UtcTicks - cutoff.UtcTicks % intervalTicks, TimeSpan.Zero);
@@ -35,7 +36,7 @@ public sealed partial class MarketDataCollector
                 var next = new CollectionJob
                 {
                     Symbol = normalized, ProviderInstrumentId = member?.ProviderInstrumentId,
-                    SessionDate = date, SessionBounds = bounds, LibraryRootPath = _state.Settings.LibraryRootPath,
+                    SessionDate = date, SessionBounds = bounds, LibraryRootPath = root,
                     RequestedFromUtc = overlap[0].FromUtc, RequestedThroughUtc = overlap[^1].ThroughUtc,
                     IgnoreKnownGaps = true, QueuedAtUtc = now,
                 };

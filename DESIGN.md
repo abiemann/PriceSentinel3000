@@ -38,12 +38,11 @@ Replay availability calendar described below are also implemented.
 
 The main window has a one-pixel light-gray edge and rounded restored corners;
 maximized corners are square. The border does not intercept input or change
-window dragging and resizing. Current source supports paced Replay from 1x to
+window dragging and resizing. Rebuilt 1.3 supports paced Replay from 1x to
 500x, clamping entered speeds to that range when committed. **MAX** beside
 the speed input selects 500x and follows the existing session
 configuration lock. **CHECK** sits to the left of the Replay availability guidance.
-These controls are changes after the published 1.3 rebuild. Local Replay now also
-preserves an existing Robinhood connection for autocomplete instead of treating
+Local Replay preserves an existing Robinhood connection for autocomplete instead of treating
 local history as a disconnect. Disconnected local playback requires no login;
 selecting OFF opens no connection and leaves shared background downloads available.
 Changing the symbol while idle clears the retained chart, prices, source display,
@@ -183,7 +182,7 @@ Manual lists accept pasted symbols. Connected resolution validates equities and 
 
 The collector persists settings, queue membership, progress, and a shared date frontier in `collection-state.json`. Scheduled runs and **DOWNLOAD GAPS NOW** always queue today for the saved included equities, through a captured completed 15-second boundary. Once that date is processed, older dates are prechecked against compatible saved files and daily attempt metadata before queueing. Complete days and capped gaps require no queue row or broker request. A fresh run replaces prior availability rows for those equities; explicit manual work and saved history are preserved. There is no rolling lookback cutoff.
 
-After the published 1.3 rebuild, collection also persists an ordered active selection of at most eight unfinished stock/date jobs. Pending retries retain their slots, and pause or restart resumes the same selection. A finished, removed, or disabled automatic job releases its slot; pending jobs fill available slots in newest-date and queue order. The collector dispatches only ready jobs within that selection and waits for their retry deadlines when none are ready. The existing serial broker request pacing, per-tick request budget, market calendar, and shared date frontier still apply.
+Collection persists an ordered active selection of at most eight unfinished stock/date jobs. Pending retries retain their slots, and pause or restart resumes the same selection. A finished, removed, or disabled automatic job releases its slot; pending jobs fill available slots in newest-date and queue order. The collector dispatches only ready jobs within that selection and waits for their retry deadlines when none are ready. The existing serial broker request pacing, per-tick request budget, market calendar, and shared date frontier still apply.
 
 For each older date, the oldest eligible missing range is checked in windows of up to one hour. Empty results advance through that date's gaps. Returned candles are saved immediately; once availability is established, remaining gaps use batches of up to six hours. Nearby gaps can be grouped when intervening saved coverage is at most five minutes. Requests stay inside trading windows and the captured cutoff, and never bridge an exhausted range during normal collection. Returned overlaps accept newer valid price and volume corrections while retaining saved values for zero or missing fields. Revision-only responses are saved; identical responses do not create redundant files. Retention has no coarse-candle fallback.
 
@@ -225,9 +224,9 @@ Library scans cache bounded validated metadata and revalidate new or changed fil
 
 Library rows use Eastern dates. Day coverage counts unique saved eligible native candles against expected completed trading slots at that native interval, excluding market closures and future candles. Today's denominator advances with the clock; the **Candles** column still counts saved coverage for the whole date. Mixed intervals or incompatible identities show unavailable totals rather than misleading combined counts.
 
-After the published 1.3 rebuild, download-table **State** uses the same completed-time rule as Local library: daily jobs divide unique saved completed 15-second candles by expected completed trading slots through the current coverage check. Both saved spans and expected windows are clipped to the last completed candle; market closures and future candles are excluded. Targeted timeline jobs remain scoped to their selected range. Per-job validated metadata is retained in memory and refreshed during collection, initial saved-queue loading, and explicit library rescans. Rescans and collection updates share the collector gate, preventing an older scan from replacing a newer download result. The existing 15-second clock refresh recalculates displayed percentages from cached metadata without scanning disk or saving queue state. Display time never changes a job's captured request cutoff. Failed and unavailable attempts retain the **0%** indicator while existing files remain intact; unknown coverage or a range with no completed candles displays **--**. Request progress measures checked work separately.
+Download-table **State** uses the same completed-time rule as Local library: daily jobs divide unique saved completed 15-second candles by expected completed trading slots through the current coverage check. Both saved spans and expected windows are clipped to the last completed candle; market closures and future candles are excluded. Targeted timeline jobs remain scoped to their selected range. Per-job validated metadata is retained in memory and refreshed during collection, initial saved-queue loading, and explicit library rescans. Rescans and collection updates share the collector gate, preventing an older scan from replacing a newer download result. The existing 15-second clock refresh recalculates displayed percentages from cached metadata without scanning disk or saving queue state. Display time never changes a job's captured request cutoff. Failed and unavailable attempts retain the **0%** indicator while existing files remain intact; unknown coverage or a range with no completed candles displays **--**. Request progress measures checked work separately.
 
-Clicking a library row opens a timeline anchored to that Eastern calendar date, with explicit local dates and times for its boundaries. Confirmed 24-hour equities show the full Eastern day, respecting daylight-saving transitions; other confirmed equities show 04:00–20:00 Eastern converted to local time. Unknown eligibility uses the full Eastern day with an explanation. The selected date is not reinterpreted as a local calendar date, and adjacent Eastern dates are not joined to build a local day. For example, September 10 Eastern spans September 9 at 21:00 through September 10 at 21:00 Pacific daylight time, keeping completed overnight candles visible before Pacific midnight. Each 15-minute block is green for complete, light green for partial, black for missing, striped gray for market closed, or blue for future time. Existing calendar rules classify market closures and early closes within the displayed span. Future and closed slots do not count as missing. Timeline counts can still differ from the library row because the timeline uses confirmed session eligibility and native 15-second candles, while the row uses the sessions and native intervals represented in saved files. Click outside, press Escape, or use the close button to dismiss the dialog.
+Clicking a row in either Schedule & Downloads or Local Library, or pressing Enter on a selected row, opens the same coverage popup. Both tables use the same green row selection. A download row resolves its queued job and reads fresh saved-file metadata from that job's pinned library folder; opening the popup neither downloads candles nor starts authorization. The popup and any selected Missing-block download keep that folder even when the configured library folder changes. The timeline is anchored to the row's Eastern calendar date, with explicit local dates and times for its boundaries. Confirmed 24-hour equities show the full Eastern day, respecting daylight-saving transitions; other confirmed equities show 04:00–20:00 Eastern converted to local time. Unknown eligibility uses the full Eastern day with an explanation. The selected date is not reinterpreted as a local calendar date, and adjacent Eastern dates are not joined to build a local day. For example, September 10 Eastern spans September 9 at 21:00 through September 10 at 21:00 Pacific daylight time, keeping completed overnight candles visible before Pacific midnight. Each 15-minute block is green for complete, light green for partial, black for missing, striped gray for market closed, or blue for future time. Existing calendar rules classify market closures and early closes within the displayed span. Future and closed slots do not count as missing. Timeline counts can still differ from the library row because the timeline uses confirmed session eligibility and native 15-second candles, while the row uses the sessions and native intervals represented in saved files. Click outside, press Escape, or use the close button to dismiss the dialog.
 
 A selected block shows counts and times in a fixed selected-block panel. Selecting **Missing** offers **DOWNLOAD** at its top right for the block and touching missing neighbors, stopping at partial, complete, closed, or future blocks. The action retries remembered empty ranges only within that completed span and splits local time into the appropriate Eastern daily files. It does not start older-day discovery. The button is disabled while other queued or downloading work remains. Completion refreshes coverage while retaining selection; status stays inside the panel at bottom left and clears on a different selection, including a late result from the previous block.
 
@@ -367,14 +366,17 @@ and MCP companion are shipped in 1.3. Their validation covers:
 3. **Data and automation:** portable files, revisions, queues, empty-range indexing,
    recovery and retries, local-time coverage, offline Replay, native-resolution
    composition, exact stepping, bounded telemetry, and fake-broker isolation.
-4. **Delivery:** the September 10 rebuild source passed all 1,495 tests and a local
-   Release build with zero warnings or errors. This includes regressions for daily
-   gap attempts and candle corrections, persisted empty-day boundaries and resume,
-   discovery progress and pause handling, and Eastern-date timelines in local time.
-   Refreshed CI, packaging, checksums, and provenance verification were pending at
-   this source review. The initial 1.3 publication from `1bea13a` passed 1,404 tests;
-   its successful workflows and verified assets are historical validation, not
-   evidence for the rebuilt source. No real broker order is part of automated validation.
+4. **Delivery:** the latest September 10 rebuild source passed all 1,545 tests and
+   a clean local Release build with zero warnings or errors. Coverage includes
+   daily gap attempts and candle corrections, persisted boundaries and resume,
+   500x Replay and symbol display resets, eight active download items, coverage
+   updates through completed candles, and shared row popups with pinned folders.
+   The retention UI was checked at normal and minimum window sizes. Refreshed CI,
+   packaging, checksums, and provenance verification were pending at this source
+   review. The earlier September 10 source at `dff0b41` passed 1,495 tests; the
+   initial 1.3 publication from `1bea13a` passed 1,404 tests. Those earlier checks,
+   workflows, and assets are historical validation. No real broker order is part
+   of automated validation.
 
 Open-market Paper Trader testing and an interactive packaged-1.3 smoke check
 remain outstanding in [TODO](TODO.md#release-13-validation-and-remaining-runtime-checks).
