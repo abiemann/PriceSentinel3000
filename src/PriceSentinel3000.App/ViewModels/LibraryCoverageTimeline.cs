@@ -60,9 +60,11 @@ public sealed record LibraryCoverageTimeline(
         IEnumerable<HistoricalDatasetInfo> datasets, DateTimeOffset now)
     {
         bool fullDay = overnight != false;
-        DateTimeOffset from = CollectionSchedule.ResolveDailyOccurrence(date, new(fullDay ? 0 : 6, 0), timezone.Id);
+        // The selected library row is an Eastern calendar date; the display zone
+        // changes labels only, never which saved day's candles are inspected.
+        DateTimeOffset from = CollectionSchedule.ResolveDailyOccurrence(date, new(fullDay ? 0 : 4, 0), Eastern.Id);
         DateTimeOffset through = CollectionSchedule.ResolveDailyOccurrence(
-            fullDay ? date.AddDays(1) : date, new(fullDay ? 0 : 17, 0), timezone.Id);
+            fullDay ? date.AddDays(1) : date, new(fullDay ? 0 : 20, 0), Eastern.Id);
         var saved = new Dictionary<long, (string Provider, string Instrument, string Policy, string Basis)>();
         bool observedOvernight = false;
         foreach (HistoricalDatasetInfo dataset in datasets.Where(dataset =>
@@ -132,8 +134,8 @@ public sealed record LibraryCoverageTimeline(
         for (DateTimeOffset at = from; at <= through; at = at.AddMinutes(15))
         {
             DateTimeOffset local = TimeZoneInfo.ConvertTime(at, timezone);
-            if (at != through && (local.Minute != 0 || fullDay && local.Hour % 2 != 0)) continue;
-            string label = fullDay && at == through ? "24:00" : local.ToString("HH:mm", CultureInfo.CurrentCulture);
+            if (at != through && (at - from).TotalMinutes % (fullDay ? 120 : 60) != 0) continue;
+            string label = local.ToString("HH:mm", CultureInfo.CurrentCulture);
             if (timezone.IsAmbiguousTime(local.DateTime)) label += $" ({local:zzz})";
             ticks.Add(new((at - from).TotalSeconds / (through - from).TotalSeconds, label));
         }
@@ -149,19 +151,20 @@ public sealed record LibraryCoverageTimeline(
                 $"({(100m * totalSaved / totalExpected).ToString("0.##", CultureInfo.CurrentCulture)}%).";
         summary += " Market closures and future candles are excluded.";
         string? notice = overnight is null && !observedOvernight
-            ? "24-hour eligibility is unknown. The full local day is shown so overnight gaps are not hidden."
+            ? "24-hour eligibility is unknown. The full Eastern day is shown in local time so overnight gaps are not hidden."
             : null;
         return new(symbol, date, zoneLabel,
-            $"{date:yyyy-MM-dd} · {(fullDay ? "00:00–24:00" : "06:00–17:00")} local time",
+            $"{LocalTime(from, timezone)} – {LocalTime(through, timezone)} local time",
             summary, notice, from, through, blocks.AsReadOnly(), ticks.AsReadOnly());
     }
 
     private static string LocalTime(DateTimeOffset at, TimeZoneInfo timezone)
     {
         DateTimeOffset local = TimeZoneInfo.ConvertTime(at, timezone);
-        return timezone.IsAmbiguousTime(local.DateTime)
+        string time = timezone.IsAmbiguousTime(local.DateTime)
             ? local.ToString("HH:mm (zzz)", CultureInfo.CurrentCulture)
             : local.ToString("HH:mm", CultureInfo.CurrentCulture);
+        return local.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + " " + time;
     }
 
     private static IEnumerable<CollectionSessionWindow> CoveredRanges(HistoricalCoverage coverage)

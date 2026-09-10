@@ -9,10 +9,10 @@ public sealed partial class SessionWorkflowTests
     private static readonly DateOnly CoverageLoadDay = new(2026, 9, 9);
 
     [Theory]
-    [InlineData(true, 24, "00:00")]
-    [InlineData(false, 11, "06:00")]
-    public Task LibraryCoverageLoad_ProviderEligibilityControlsLocalRangeWithoutDownloading(
-        bool overnight, int hours, string firstTick) => host.RunAsync(async () =>
+    [InlineData(true, 24)]
+    [InlineData(false, 16)]
+    public Task LibraryCoverageLoad_ProviderEligibilityControlsEasternRangeWithoutDownloading(
+        bool overnight, int hours) => host.RunAsync(async () =>
     {
         await using var fixture = new CoverageLoadFixture();
         fixture.Provider.Eligible = overnight;
@@ -21,10 +21,10 @@ public sealed partial class SessionWorkflowTests
             CoverageLoadRow(), CancellationToken.None);
 
         Assert.Equal(hours, (result.ThroughUtc - result.FromUtc).TotalHours);
-        Assert.Equal(firstTick, result.Ticks[0].Label);
-        Assert.Equal(CoverageLoadDay,
-            DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(result.FromUtc, TimeZoneInfo.Local).DateTime));
-        Assert.Equal(overnight ? 0 : 6, TimeZoneInfo.ConvertTime(result.FromUtc, TimeZoneInfo.Local).Hour);
+        DateTimeOffset expectedFrom = new(2026, 9, 9, overnight ? 4 : 8, 0, 0, TimeSpan.Zero);
+        Assert.Equal(expectedFrom, result.FromUtc);
+        Assert.Equal(TimeZoneInfo.ConvertTime(expectedFrom, TimeZoneInfo.Local).ToString("HH:mm"), result.Ticks[0].Label);
+        Assert.Equal(CoverageLoadDay, result.Date);
         Assert.Equal(1, fixture.Provider.EligibilityCalls);
         Assert.Equal("AAPL", fixture.Provider.RequestedSymbol);
         Assert.Null(result.Notice);
@@ -32,7 +32,7 @@ public sealed partial class SessionWorkflowTests
     });
 
     [Fact]
-    public Task LibraryCoverageLoad_UsesAdjacentEasternMetadataForTheLocalCalendarDay() => host.RunAsync(async () =>
+    public Task LibraryCoverageLoad_ClipsAdjacentMetadataToTheSelectedEasternDay() => host.RunAsync(async () =>
     {
         await using var fixture = new CoverageLoadFixture();
         fixture.Provider.Eligible = true;
@@ -56,7 +56,7 @@ public sealed partial class SessionWorkflowTests
             CoverageLoadRow(), CancellationToken.None);
 
         DateTimeOffset expectedFrom = CollectionSchedule.ResolveDailyOccurrence(
-            CoverageLoadDay, TimeOnly.MinValue, TimeZoneInfo.Local.Id);
+            CoverageLoadDay, TimeOnly.MinValue, eastern.Id);
         Assert.Equal(expectedFrom, result.FromUtc);
         Assert.Equal(expectedFrom.AddDays(1), result.ThroughUtc);
         Assert.Equal(5760, result.Blocks.Sum(block => block.SavedCandleCount));

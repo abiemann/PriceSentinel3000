@@ -7,8 +7,8 @@ public sealed partial class DataRetentionViewModel
     public async Task<LibraryCoverageTimeline> LoadLibraryCoverageAsync(
         LibraryDaySummary day, CancellationToken cancellationToken)
     {
-        // Use the same validated inventory as the table, including adjacent Eastern
-        // files that overlap this local calendar day. Opening a row never downloads candles.
+        // Use the same validated inventory and Eastern date as the table.
+        // Opening a row never downloads candles.
         HistoricalDatasetInfo[] datasets = Datasets.Where(dataset =>
             string.Equals(dataset.Symbol, day.Symbol, StringComparison.OrdinalIgnoreCase)).ToArray();
         using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token, cancellationToken);

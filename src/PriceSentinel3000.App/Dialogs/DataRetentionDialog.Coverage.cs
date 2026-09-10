@@ -48,7 +48,7 @@ public partial class DataRetentionDialog
         viewModel.CoverageDownloadUpdated += OnCoverageDownloadUpdated;
         var cancellation = new CancellationTokenSource();
         _coverageCancellation = cancellation;
-        LibraryCoverageTitle.Text = $"{day.Symbol} · {day.TradingDate:yyyy-MM-dd}";
+        LibraryCoverageTitle.Text = $"{day.Symbol} · {day.TradingDate:yyyy-MM-dd} Eastern";
         LibraryCoverageMessage.Text = "Loading saved coverage…";
         LibraryCoverageMessage.Visibility = Visibility.Visible;
         LibraryCoverageContent.Visibility = Visibility.Collapsed;

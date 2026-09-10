@@ -79,20 +79,20 @@ public sealed class LibraryCoverageMissingRangeTests
     }
 
     [Fact]
-    public void LocalDayMissingRangeCanCrossEasternDailyFileBoundary()
+    public void LocalDisplayMissingRangeStaysWithinSelectedEasternDailyFileBoundary()
     {
         TimeZoneInfo pacific = TimeZoneInfo.FindSystemTimeZoneById("America/Los_Angeles");
         LibraryCoverageTimeline timeline = LibraryCoverageTimeline.Create(
             "AAPL", new DateOnly(2026, 9, 9), pacific, true, [],
             new DateTimeOffset(2026, 9, 10, 12, 0, 0, TimeSpan.Zero));
         LibraryCoverageBlock selected = Assert.Single(timeline.Blocks,
-            block => block.FromUtc == new DateTimeOffset(2026, 9, 10, 4, 0, 0, TimeSpan.Zero));
+            block => block.FromUtc == new DateTimeOffset(2026, 9, 9, 7, 0, 0, TimeSpan.Zero));
 
         var range = timeline.GetConnectedMissingRange(selected, Finished.AddDays(1));
 
         Assert.Equal((timeline.FromUtc, timeline.ThroughUtc), range);
-        Assert.Equal(new DateTimeOffset(2026, 9, 9, 7, 0, 0, TimeSpan.Zero), range!.Value.FromUtc);
-        Assert.Equal(new DateTimeOffset(2026, 9, 10, 7, 0, 0, TimeSpan.Zero), range.Value.ThroughUtc);
+        Assert.Equal(new DateTimeOffset(2026, 9, 9, 4, 0, 0, TimeSpan.Zero), range!.Value.FromUtc);
+        Assert.Equal(new DateTimeOffset(2026, 9, 10, 4, 0, 0, TimeSpan.Zero), range.Value.ThroughUtc);
     }
 
     private static LibraryCoverageBlock Missing(DateTimeOffset from) =>

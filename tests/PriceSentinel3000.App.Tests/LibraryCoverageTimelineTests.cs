@@ -14,7 +14,7 @@ public sealed class LibraryCoverageTimelineTests
     [Fact]
     public void BlocksDistinguishCompletePartialAndMissingNativeCandles()
     {
-        DateTimeOffset from = Local(Day, 6);
+        DateTimeOffset from = EasternTime(Day, 4);
         HistoricalDatasetInfo piece = Piece(from, from.AddMinutes(30));
         piece = piece with { Coverage = piece.Coverage with
         {
@@ -36,7 +36,7 @@ public sealed class LibraryCoverageTimelineTests
     [Fact]
     public void OverlappingCompatibleFilesCountEachCandleOnce()
     {
-        DateTimeOffset from = Local(Day, 6);
+        DateTimeOffset from = EasternTime(Day, 4);
         HistoricalDatasetInfo first = Piece(from, from.AddMinutes(10));
         HistoricalDatasetInfo second = Piece(from.AddMinutes(5), from.AddMinutes(15));
 
@@ -52,7 +52,7 @@ public sealed class LibraryCoverageTimelineTests
     [InlineData("basis")]
     public void IncompatibleOverlappingSourcesAreRejectedInsteadOfShownAsComplete(string change)
     {
-        DateTimeOffset from = Local(Day, 6);
+        DateTimeOffset from = EasternTime(Day, 4);
         HistoricalDatasetInfo first = Piece(from, from.AddMinutes(15));
         HistoricalDatasetInfo second = change switch
         {
@@ -67,7 +67,7 @@ public sealed class LibraryCoverageTimelineTests
     [Fact]
     public void CoveredBoundariesAndGapsDoNotInventMissingEdgesOrCountCoarseCandles()
     {
-        DateTimeOffset from = Local(Day, 6);
+        DateTimeOffset from = EasternTime(Day, 4);
         HistoricalDatasetInfo saved = Piece(from, from.AddMinutes(45));
         saved = saved with { Coverage = saved.Coverage with
         {
@@ -86,7 +86,7 @@ public sealed class LibraryCoverageTimelineTests
     [Fact]
     public void MisalignedNativeCoverageCannotProduceFalseCompleteBlocks()
     {
-        DateTimeOffset from = Local(Day, 6);
+        DateTimeOffset from = EasternTime(Day, 4);
         HistoricalDatasetInfo piece = Piece(from, from.AddMinutes(15));
         piece = piece with { Coverage = piece.Coverage with { CoveredFromUtc = from.AddSeconds(1) } };
         Assert.Throws<InvalidDataException>(() => Create(false, [piece]));
@@ -95,7 +95,7 @@ public sealed class LibraryCoverageTimelineTests
     [Fact]
     public void TodayExcludesUnfinishedCandlesAndExplainsTheCurrentBlock()
     {
-        DateTimeOffset from = Local(Day, 6);
+        DateTimeOffset from = EasternTime(Day, 4);
         HistoricalDatasetInfo piece = Piece(from, from.AddMinutes(30));
         LibraryCoverageTimeline result = Create(false, [piece], from.AddMinutes(5).AddSeconds(7));
 
@@ -112,14 +112,14 @@ public sealed class LibraryCoverageTimelineTests
     }
 
     [Fact]
-    public void NonOvernightStocksUseSixToSeventeenLocalWithHourlyTicks()
+    public void NonOvernightStocksPreserveEasternExtendedHoursWithLocalHourlyTicks()
     {
         LibraryCoverageTimeline result = Create(false, []);
-        Assert.Equal(Local(Day, 6), result.FromUtc);
-        Assert.Equal(Local(Day, 17), result.ThroughUtc);
-        Assert.Equal(44, result.Blocks.Count);
-        Assert.Equal(12, result.Ticks.Count);
-        Assert.Equal("06:00", result.Ticks[0].Label);
+        Assert.Equal(EasternTime(Day, 4), result.FromUtc);
+        Assert.Equal(EasternTime(Day, 20), result.ThroughUtc);
+        Assert.Equal(64, result.Blocks.Count);
+        Assert.Equal(17, result.Ticks.Count);
+        Assert.Equal("01:00", result.Ticks[0].Label);
         Assert.Equal("17:00", result.Ticks[^1].Label);
         Assert.Equal(0, result.Ticks[0].Position);
         Assert.Equal(1, result.Ticks[^1].Position);
@@ -128,15 +128,15 @@ public sealed class LibraryCoverageTimelineTests
     }
 
     [Fact]
-    public void OvernightStocksUseTheEntireLocalDayWithTwoHourlyTicks()
+    public void OvernightStocksPreserveEasternDayWithLocalTwoHourlyTicks()
     {
         LibraryCoverageTimeline result = Create(true, []);
-        Assert.Equal(Local(Day, 0), result.FromUtc);
-        Assert.Equal(Local(Day.AddDays(1), 0), result.ThroughUtc);
+        Assert.Equal(EasternTime(Day, 0), result.FromUtc);
+        Assert.Equal(EasternTime(Day.AddDays(1), 0), result.ThroughUtc);
         Assert.Equal(96, result.Blocks.Count);
         Assert.Equal(13, result.Ticks.Count);
-        Assert.Equal("00:00", result.Ticks[0].Label);
-        Assert.Equal("24:00", result.Ticks[^1].Label);
+        Assert.Equal("21:00", result.Ticks[0].Label);
+        Assert.Equal("21:00", result.Ticks[^1].Label);
         Assert.Null(result.Notice);
     }
 
@@ -150,13 +150,13 @@ public sealed class LibraryCoverageTimelineTests
         HistoricalDatasetInfo regularOnly = Piece(Local(Day, 6), Local(Day, 7)) with { SessionBounds = "24_5" };
         Assert.NotNull(Create(null, [regularOnly]).Notice);
 
-        HistoricalDatasetInfo overnight = Piece(Local(Day, 21), Local(Day, 22));
+        HistoricalDatasetInfo overnight = Piece(EasternTime(Day, 0), EasternTime(Day, 1));
         Assert.Null(Create(null, [overnight]).Notice);
         Assert.NotNull(Create(null, [overnight with { SourceIntervalSeconds = 60 }]).Notice);
     }
 
     [Fact]
-    public void AdjacentEasternDailyFilesAreClippedAndCombinedIntoOnePacificCalendarDay()
+    public void AdjacentEasternDailyFilesAreClippedToTheSelectedEasternDay()
     {
         DateTimeOffset easternMidnight = CollectionSchedule.ResolveDailyOccurrence(Day, TimeOnly.MinValue, Eastern.Id);
         HistoricalDatasetInfo first = Piece(easternMidnight, easternMidnight.AddDays(1));
@@ -167,8 +167,8 @@ public sealed class LibraryCoverageTimelineTests
         Assert.Equal(Day, result.Date);
         Assert.Equal(5760, result.Blocks.Sum(block => block.SavedCandleCount));
         Assert.All(result.Blocks, block => Assert.Equal(LibraryCoverageBlockState.Complete, block.State));
-        Assert.Equal(Local(Day.AddDays(1), 0), result.Blocks[^1].ThroughUtc);
-        Assert.Equal(60, Create(true, [next]).Blocks[^1].SavedCandleCount);
+        Assert.Equal(EasternTime(Day.AddDays(1), 0), result.Blocks[^1].ThroughUtc);
+        Assert.Equal(0, Create(true, [next]).Blocks.Sum(block => block.SavedCandleCount));
     }
 
     [Fact]
@@ -177,8 +177,8 @@ public sealed class LibraryCoverageTimelineTests
         DateOnly friday = new(2026, 9, 11);
         LibraryCoverageTimeline result = LibraryCoverageTimeline.Create(
             "AAPL", friday, Pacific, true, [], Finished.AddDays(3));
-        Assert.Equal(LibraryCoverageBlockState.Missing, result.Blocks[67].State); // 16:45 Pacific.
-        Assert.All(result.Blocks.Skip(68), block =>
+        Assert.Equal(LibraryCoverageBlockState.Missing, result.Blocks[79].State); // 19:45 Eastern / 16:45 Pacific.
+        Assert.All(result.Blocks.Skip(80), block =>
         {
             Assert.Equal(LibraryCoverageBlockState.Closed, block.State); // Friday closes at 17:00 Pacific.
             Assert.Equal(0, block.ExpectedCandleCount);
@@ -193,7 +193,7 @@ public sealed class LibraryCoverageTimelineTests
     [Theory]
     [InlineData(2026, 3, 8, 23, 92)]
     [InlineData(2026, 11, 1, 25, 100)]
-    public void DaylightSavingChangesPreserveElapsedTimeAndLocalCalendarBoundaries(
+    public void DaylightSavingChangesPreserveElapsedTimeAndEasternCalendarBoundaries(
         int year, int month, int day, int hours, int blockCount)
     {
         DateOnly date = new(year, month, day);
@@ -201,9 +201,9 @@ public sealed class LibraryCoverageTimelineTests
             "AAPL", date, Pacific, true, [], Local(date.AddDays(2), 0));
         Assert.Equal(hours, (result.ThroughUtc - result.FromUtc).TotalHours);
         Assert.Equal(blockCount, result.Blocks.Count);
-        Assert.Equal(0, TimeZoneInfo.ConvertTime(result.FromUtc, Pacific).Hour);
-        Assert.Equal(date.AddDays(1), DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(result.ThroughUtc, Pacific).DateTime));
-        Assert.Equal("24:00", result.Ticks[^1].Label);
+        Assert.Equal(0, TimeZoneInfo.ConvertTime(result.FromUtc, Eastern).Hour);
+        Assert.Equal(date.AddDays(1), DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(result.ThroughUtc, Eastern).DateTime));
+        Assert.Equal("21:00", result.Ticks[^1].Label);
         Assert.Equal(1, result.Ticks[^1].Position);
         Assert.True(result.Ticks.Zip(result.Ticks.Skip(1)).All(pair => pair.First.Position < pair.Second.Position));
         Assert.All(result.Blocks, block => Assert.Equal(15, (block.ThroughUtc - block.FromUtc).TotalMinutes));
@@ -215,6 +215,9 @@ public sealed class LibraryCoverageTimelineTests
 
     private static DateTimeOffset Local(DateOnly day, int hour) =>
         CollectionSchedule.ResolveDailyOccurrence(day, new(hour, 0), Pacific.Id);
+
+    private static DateTimeOffset EasternTime(DateOnly day, int hour) =>
+        CollectionSchedule.ResolveDailyOccurrence(day, new(hour, 0), Eastern.Id);
 
     private static HistoricalDatasetInfo Piece(DateTimeOffset from, DateTimeOffset through)
     {
