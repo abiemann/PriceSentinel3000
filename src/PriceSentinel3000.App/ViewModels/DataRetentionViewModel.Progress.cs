@@ -102,6 +102,8 @@ public sealed partial class DataRetentionViewModel
     private bool _connecting;
     private bool _downloadsPaused;
     private bool _loadedJobRows;
+    private bool _checkingOlderHistory;
+    private bool _hasHistoryDiscovery;
     private DateTimeOffset? _nextDownloadCheckAt;
     private DateTimeOffset? _lastDownloadProgressAt;
     private string? _collectionError;
@@ -113,7 +115,7 @@ public sealed partial class DataRetentionViewModel
     public bool CanEditPlan => !IsBusy && !_disposed;
     public bool IsConnecting => _connecting;
     public bool IsDownloadActive => _connecting || Collector.IsBusy || _downloadCancellation is not null;
-    public bool HasDownloadWork => IsDownloadActive || Jobs.Any(j =>
+    public bool HasDownloadWork => IsDownloadActive || _hasHistoryDiscovery || Jobs.Any(j =>
         j.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading);
     public string DownloadState => _downloadState;
     public string DownloadHeading => _downloadHeading;
@@ -124,6 +126,8 @@ public sealed partial class DataRetentionViewModel
     public double DownloadProgressPercent => DownloadTotal == 0 ? 0 : Math.Clamp(Jobs.Sum(job =>
         job.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading
             ? job.CheckedProgressPercent : 100d) / DownloadTotal, 0d, 100d);
+    public bool IsDownloadProgressIndeterminate => DownloadState == "Working" &&
+        (_checkingOlderHistory || DownloadProgressPercent is <= 0 or >= 100);
     public string DownloadInteractionHint => _downloadsPaused
         ? "Downloads stay paused until you resume or restart the app. Saved files are kept. You can browse, edit settings, or close this window."
         : "You can switch tabs, scroll, edit drafts, or close this window while downloading. Save actions wait until downloads are idle. Keep PriceSentinel open.";
@@ -172,7 +176,7 @@ public sealed partial class DataRetentionViewModel
     }
 
     private bool CanToggleDownloadPause() => !_disposed && (_downloadsPaused ? !IsBusy :
-        _downloadCancellation is not null || Jobs.Any(j => j.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading));
+        _downloadCancellation is not null || _hasHistoryDiscovery || Jobs.Any(j => j.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading));
 
     private async Task ToggleDownloadPauseAsync()
     {
@@ -241,6 +245,10 @@ public sealed partial class DataRetentionViewModel
         DateTimeOffset now = _clock.GetUtcNow();
         CollectionState state = Collector.State;
         CollectionActivity? activity = Collector.Activity;
+        _checkingOlderHistory = activity?.Stage == "CheckingOlderHistory";
+        CollectionAvailabilityRun? discovery = state.AvailabilityRun;
+        _hasHistoryDiscovery = discovery is not null && discovery.Members.Count > 0 &&
+            !state.Jobs.Any(job => discovery.CurrentJobIds.Contains(job.Id) && job.Status == CollectionJobStatus.Failed);
         CollectionJob[] pending = state.Jobs.Where(j => j.Status is CollectionJobStatus.Pending or CollectionJobStatus.Downloading).ToArray();
         CollectionJob[] eligible = pending.Where(j => !j.IsAutomatic || state.Settings.AutomaticDownloadsEnabled).ToArray();
         int partials = state.Jobs.Count(j => j.Status == CollectionJobStatus.Partial);
@@ -267,13 +275,15 @@ public sealed partial class DataRetentionViewModel
                 "CheckingSchedule" => ("Checking saved coverage…", "Finding today's completed candles and earlier missing history for the saved equity lists."),
                 "CheckingLocalHistory" => (activity.Symbol is null ? "Checking local library…" : $"Checking {target}",
                     "Reading saved candles before requesting missing 15-second data."),
+                "CheckingOlderHistory" => ($"Checking older history · {target}",
+                    "Checking saved candles and previous attempts before adding older dates. More downloads may be added."),
                 "CheckingBrokerAvailability" => ($"Checking availability · {target}",
                     "Checking missing hours for genuine 15-second candles before queuing the rest of this date."),
                 "WaitingForRateLimit" => ($"Waiting briefly · {target}", "Spacing requests to the broker. Downloads will continue automatically."),
                 "Saving" => ($"Saving {target}", "Validating and writing the returned candles to the local library."),
                 _ => ($"Downloading {target}", "Waiting for Robinhood to return 15-second candles. This request is still active."),
             };
-            if (activity.FromUtc is { } from && activity.ThroughUtc is { } through)
+            if (!_checkingOlderHistory && activity.FromUtc is { } from && activity.ThroughUtc is { } through)
             {
                 DateTimeOffset localFrom = TimeZoneInfo.ConvertTime(from, DownloadEastern);
                 DateTimeOffset localThrough = TimeZoneInfo.ConvertTime(through, DownloadEastern);
@@ -287,6 +297,30 @@ public sealed partial class DataRetentionViewModel
         else if (_collectionError is not null)
         {
             status = "Attention"; heading = "Download error"; detail = _collectionError;
+        }
+        else if (_hasHistoryDiscovery && eligible.Length == 0)
+        {
+            if (discovery!.IsAutomatic && !state.Settings.AutomaticDownloadsEnabled)
+            {
+                status = "Paused"; heading = "Automatic history checks paused";
+                detail = "Older history checks are unfinished. Enable and save automatic downloads, or use Download gaps now.";
+            }
+            else if (!_isConnected())
+            {
+                status = "Waiting"; heading = "Waiting for Robinhood connection";
+                detail = "Older history checks are unfinished. Reconnect Robinhood to continue; saved discovery progress is kept.";
+            }
+            else if (IsDownloadActive)
+            {
+                _checkingOlderHistory = true;
+                status = "Working"; heading = "Checking older history…";
+                detail = "Checking saved candles and previous attempts before adding older dates. More downloads may be added.";
+            }
+            else
+            {
+                status = "Waiting"; heading = "Continuing older history checks";
+                detail = "The current queue is checked, but older dates still need checking. Discovery continues automatically.";
+            }
         }
         else if (eligible.Length > 0)
         {
@@ -329,7 +363,7 @@ public sealed partial class DataRetentionViewModel
             bool availabilityChecked = state.Jobs.Any(j => j.IsAvailabilityProbe);
             heading = availabilityChecked ? "Available-history check complete" : "All queued downloads complete";
             detail = availabilityChecked
-                ? "The availability check finished. Dates were checked from newest to oldest; each ticker stops after an older trading day is wholly unavailable after two attempts. Download again to collect newer completed candles."
+                ? "The availability check finished. Dates were checked from newest to oldest; each ticker stops when an older trading day's entire gap check returns no broker candles. Saved local candles are kept. That boundary is remembered for later runs; Forced download can recheck it. Download again to collect newer completed candles."
                 : "Completed history is saved in the local library. You can replay it or close this window.";
         }
         else
@@ -343,14 +377,14 @@ public sealed partial class DataRetentionViewModel
             : "No collection progress since this window's data was loaded.";
         if (activity is not null) timing = (now - activity.SinceUtc < TimeSpan.FromSeconds(1)
             ? "Current step just started. " : $"Current step: {Elapsed(now - activity.SinceUtc)}. ") + timing;
-        else if (!IsDownloadActive && !_downloadsPaused && eligible.Length > 0 && _started && _nextDownloadCheckAt is { } next)
+        else if (!IsDownloadActive && !_downloadsPaused && (eligible.Length > 0 || _hasHistoryDiscovery && status == "Waiting") && _started && _nextDownloadCheckAt is { } next)
             timing += $" Next queue check in {Math.Max(0, (int)Math.Ceiling((next - now).TotalSeconds))}s.";
         SetProgressText(ref _downloadState, status, nameof(DownloadState));
         SetProgressText(ref _downloadHeading, heading, nameof(DownloadHeading));
         SetProgressText(ref _downloadDetail, detail, nameof(DownloadDetail));
         SetProgressText(ref _downloadTiming, timing, nameof(DownloadTiming));
         Changed(nameof(IsConnecting)); Changed(nameof(IsDownloadActive)); Changed(nameof(HasDownloadWork)); Changed(nameof(DownloadTotal)); Changed(nameof(DownloadProcessed));
-        Changed(nameof(DownloadProgressPercent)); Changed(nameof(DownloadInteractionHint)); Changed(nameof(PauseDownloadsLabel));
+        Changed(nameof(IsDownloadProgressIndeterminate)); Changed(nameof(DownloadProgressPercent)); Changed(nameof(DownloadInteractionHint)); Changed(nameof(PauseDownloadsLabel));
     }
 
     private static string Elapsed(TimeSpan time) => time.TotalMinutes >= 1

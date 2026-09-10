@@ -121,13 +121,9 @@
                                      <DataTrigger Binding="{Binding DataRetention.DownloadState}" Value="Paused">
                                          <Setter Property="Foreground" Value="#E8AB4D" />
                                      </DataTrigger>
-                                     <MultiDataTrigger>
-                                         <MultiDataTrigger.Conditions>
-                                             <Condition Binding="{Binding DataRetention.DownloadState}" Value="Working" />
-                                             <Condition Binding="{Binding DataRetention.DownloadProgressPercent}" Value="0" />
-                                         </MultiDataTrigger.Conditions>
+                                     <DataTrigger Binding="{Binding DataRetention.IsDownloadProgressIndeterminate}" Value="True">
                                          <Setter Property="IsIndeterminate" Value="True" />
-                                     </MultiDataTrigger>
+                                     </DataTrigger>
                                  </Style.Triggers>
                              </Style>
                          </ProgressBar.Style>

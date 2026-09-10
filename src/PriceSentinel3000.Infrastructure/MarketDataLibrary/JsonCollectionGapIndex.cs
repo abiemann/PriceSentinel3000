@@ -18,6 +18,9 @@ public sealed class JsonCollectionGapIndex(string rootPath, string providerIdent
     public void ResolveSavedRanges(CollectionGapKey key, IReadOnlyList<HistoricalGap> savedRanges) =>
         _library.ResolveCollectionSaved(key, providerIdentity, savedRanges);
 
+    public void RecordDiscoveryUnavailable(CollectionGapKey key, DateTimeOffset checkedAtUtc) =>
+        _library.RecordCollectionDiscoveryUnavailable(key, providerIdentity, checkedAtUtc);
+
     public void RecordAttempt(CollectionGapKey key, DateTimeOffset fromUtc, DateTimeOffset throughUtc,
         IReadOnlyList<HistoricalGap> unavailableRanges, bool receivedCandles, DateTimeOffset checkedAtUtc, DateTimeOffset? retryAfterUtc) =>
         _library.RecordCollectionObservation(key, providerIdentity, fromUtc, throughUtc, unavailableRanges, receivedCandles, checkedAtUtc, retryAfterUtc);

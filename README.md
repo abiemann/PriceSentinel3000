@@ -23,7 +23,7 @@ pause/step boundaries and fast playback.
 
 Open **Tools > Retain Hi-Res Data** to create download lists, import individual equities from Robinhood lists, and choose a daily collection time and time zone. New lists show **SAVE LIST**; existing lists show **UPDATE LIST** only while edits are unsaved. **EXPORT LISTS** backs up saved list names, symbols, and inclusion choices to JSON; it does not export candles or unsaved edits.
 
-**DOWNLOAD GAPS NOW** and scheduled runs always queue every included equity for today, then work backward one date at a time. Older dates are checked against saved candles and recorded attempts before being added to the queue. Complete coverage and gaps already attempted twice are skipped. A wholly unavailable older date stops that equity's backward search while the other equities continue. Compatible saved candles are reused across regular, premarket, after-hours, and overnight trading. See the [market-data library guide](docs/market-data-library.md) for the stopping rule and request limits.
+**DOWNLOAD GAPS NOW** and scheduled runs always queue every included equity for today, then work backward one date at a time. Older dates are checked against saved candles and recorded attempts before being added to the queue. Complete coverage and gaps already attempted twice are skipped. The first older regular trading day whose entire gap check returns no broker candles stops that equity's backward search, even when local candles are saved. Its daily JSON remembers the boundary for later normal runs while the other equities continue. Compatible saved candles are reused across regular, premarket, after-hours, and overnight trading. See the [market-data library guide](docs/market-data-library.md) for the stopping rule and request limits.
 
 Each daily JSON keeps its candles, unavailable ranges, and per-range attempt counts together. Older gaps receive at most two normal attempts; **FORCED DOWNLOAD** bypasses that limit. Successfully saved ranges are removed from the attempt records. Today is always queued, with known unavailable ranges eligible again after 15 minutes. Errors count as attempts but do not prove that history is unavailable. **CLEAR** removes finished queue entries only when idle, preserving saved candles and their collection records.
 
@@ -35,7 +35,7 @@ Replay checks disk first and fills missing coverage from supported broker histor
 
 In Replay, press **Enter** after entering a date or time, click **CHECK**, or choose a calendar date to check coverage before starting. Dark green means complete local 15-second data, light green means verified broker 15-second data, orange means 30–60-second data, and red means two-minute data. Neutral dates have details explaining unchecked, partial, or unavailable coverage.
 
-Downloads continue when you close the retention window. The **Retain Hi-Res Data** button shows a compact progress bar and reopens the current download status. Nearby gaps are grouped into bounded requests to reduce broker calls. The status shows the current request range and progress checking that stock/date, separately from saved-data coverage. Ready batches continue without a fixed pause; keep PriceSentinel open for background collection.
+Downloads continue when you close the retention window. The **Retain Hi-Res Data** button shows a compact progress bar and reopens the current download status. Nearby gaps are grouped into bounded requests to reduce broker calls. The status shows the current request range and progress checking that stock/date, separately from saved-data coverage. **Checking older history** keeps both progress bars visibly busy while local ticker/date checks find more work. **PAUSE DOWNLOADS** also stops between those checks, preserving the queue. Ready batches continue without a fixed pause; keep PriceSentinel open for background collection.
 
 ## Reviewer tour
 
@@ -515,12 +515,21 @@ dotnet test PriceSentinel3000.sln --configuration Release --no-build
 The Windows CI workflow runs the same Release build with warnings promoted to
 errors and executes the complete test suite on every pull request and push to
 `main`.
-Release 1.3 passed all **1,404 tests**, with zero build warnings or errors. Its
+The September 10, 2026 source review for the **1.3 rebuild** includes daily gap
+attempt records and candle revisions, persistent older-history stopping boundaries,
+resumable discovery progress and pause handling, and Eastern-date coverage timelines
+shown in local time. The current source passed all **1,495 tests** and a local
+Release build with zero warnings or errors. Refreshed Windows CI, installer
+packaging, checksums, and source-provenance verification were still pending at
+this source review; their final results belong to the rebuilt release's workflow
+and provenance record.
+
+The initial 1.3 publication from `1bea13a` passed **1,404 tests**. Its historical
 [Windows CI](https://github.com/abiemann/PriceSentinel3000/actions/runs/34422818384)
 and [release packaging](https://github.com/abiemann/PriceSentinel3000/actions/runs/34422844466)
-workflows succeeded, and the published checksums and source provenance were verified.
-Open-market Paper testing and interactive packaged-app smoke checks remain tracked
-in [TODO](TODO.md).
+workflows succeeded, and its published checksums and source provenance were verified.
+Those runs do not validate the rebuilt source. Open-market Paper testing and
+interactive packaged-app smoke checks remain tracked in [TODO](TODO.md).
 
 The app footer and MCP companion use the version embedded at build time.
 GitHub release builds display their release tag without a leading `v`, including
@@ -540,7 +549,7 @@ with the same names requires the explicit replacement option.
 For an older tag that predates the packaging files, the workflow uses the exact
 workflow commit for the installer definition and artwork while compiling only
 the tagged application source. Both commits are recorded in the provenance
-asset; the tag itself is never moved or rewritten.
+asset. The packaging workflow itself does not move or rewrite tags.
 
 The workspace always starts OFF, whether a Robinhood connection is restored,
 login succeeds, or **USE OFFLINE** is selected.

@@ -64,11 +64,31 @@
               Style="{StaticResource SecondaryButtonStyle}" Content="i" AutomationProperties.Name="Download information"
               AutomationProperties.HelpText="Hover or click to open download information. Scroll inside; click outside or press Escape to close."
               MouseEnter="DownloadInfo_MouseEnter" Click="DownloadInfo_Click" />
+      <Viewbox x:Name="DownloadBusyIndicator" DockPanel.Dock="Left" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"
+               AutomationProperties.Name="Processing download work">
+       <Viewbox.Style><Style TargetType="Viewbox"><Setter Property="Visibility" Value="Hidden" /><Style.Triggers>
+        <DataTrigger Binding="{Binding DownloadState}" Value="Working"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+       </Style.Triggers></Style></Viewbox.Style>
+       <Grid Width="16" Height="16">
+        <Ellipse Stroke="{StaticResource SubtleBorderBrush}" StrokeThickness="2" Margin="1" />
+        <Path Data="M 8,1 A 7,7 0 0 1 15,8" Stroke="{StaticResource AccentBrush}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" RenderTransformOrigin="0.5,0.5">
+         <Path.RenderTransform><RotateTransform /></Path.RenderTransform>
+         <Path.Style><Style TargetType="Path"><Style.Triggers>
+          <MultiDataTrigger><MultiDataTrigger.Conditions>
+           <Condition Binding="{Binding IsVisible, RelativeSource={RelativeSource Self}}" Value="True" />
+           <Condition Binding="{Binding Source={x:Static SystemParameters.ClientAreaAnimation}}" Value="True" />
+          </MultiDataTrigger.Conditions><MultiDataTrigger.EnterActions>
+           <BeginStoryboard x:Name="DownloadBusyRotation"><Storyboard><DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)" From="0" To="360" Duration="0:0:1" RepeatBehavior="Forever" /></Storyboard></BeginStoryboard>
+          </MultiDataTrigger.EnterActions><MultiDataTrigger.ExitActions><RemoveStoryboard BeginStoryboardName="DownloadBusyRotation" /></MultiDataTrigger.ExitActions></MultiDataTrigger>
+         </Style.Triggers></Style></Path.Style>
+        </Path>
+       </Grid>
+      </Viewbox>
       <TextBlock x:Name="DownloadActivityHeading" Style="{StaticResource DownloadStateText}" FontSize="13"
                  TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Text="{Binding DownloadHeading}" AutomationProperties.LiveSetting="Polite" />
      </DockPanel>
      <TextBlock Margin="0,3,0,0" FontSize="11" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" Text="{Binding JobSummary}" />
-     <ProgressBar x:Name="DownloadProgress" Height="4" Margin="0,6,0,0" Minimum="0" Maximum="100" Value="{Binding DownloadProgressPercent, Mode=OneWay}"
+     <ProgressBar x:Name="DownloadProgress" Height="4" Margin="0,6,0,0" Minimum="0" Maximum="100" Value="{Binding DownloadProgressPercent, Mode=OneWay}" IsIndeterminate="{Binding IsDownloadProgressIndeterminate, Mode=OneWay}"
                   Foreground="{StaticResource AccentBrush}" Background="{StaticResource WindowBrush}" AutomationProperties.Name="Download jobs checked" AutomationProperties.HelpText="{Binding JobSummary}" />
     </StackPanel>
     <Button x:Name="PauseDownloadsButton" Grid.Column="2" Height="32" VerticalAlignment="Center" Padding="8,4" Content="{Binding PauseDownloadsLabel}"
@@ -187,7 +207,7 @@
        <TextBlock x:Name="DownloadInteractionGuidance" FontSize="12" Margin="0,10,0,0" Text="{Binding DownloadInteractionHint}" />
        <Separator Margin="0,12" />
        <TextBlock FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource PrimaryTextBrush}" Text="How downloads work" />
-       <TextBlock x:Name="DownloadAvailableGuidance" Margin="0,6,0,0" FontSize="12" Text="Queue today, then check older days. Saved candles are reused. Older gaps get two attempts, recorded in the daily JSON; Forced download can recheck them. Today's unavailable ranges can be retried after 15 minutes." />
+       <TextBlock x:Name="DownloadAvailableGuidance" Margin="0,6,0,0" FontSize="12" Text="Queue today, then check older days. Saved candles are reused. Each ticker stops when an older trading day's entire gap check returns no broker candles, even if local candles are saved. Gaps in productive days get up to two attempts. Daily JSON remembers these checks; Forced download can recheck them. Today's unavailable ranges can be retried after 15 minutes." />
        <TextBlock x:Name="DownloadCoverageGuidance" Margin="0,10,0,0" FontSize="12" Text="All available trading hours, including overnight. Only completed 15-second candles are saved. Market closures are excluded from expected coverage." />
        <TextBlock x:Name="ScheduleHelpText" Margin="0,10,0,0" FontSize="12" Text="{Binding ScheduleHelp}" />
        <TextBlock Margin="0,10,0,0" FontSize="12" Text="{Binding ContinuityWarnings}" />

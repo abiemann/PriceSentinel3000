@@ -19,7 +19,8 @@ public sealed class AvailabilityDayQueueTests
         fixture.Save("MSFT", Yesterday, 1);
         fixture.Index.Seed(fixture.Key("MSFT", Yesterday), 2, unavailable: true);
         foreach (string symbol in fixture.Symbols)
-            fixture.Index.Seed(fixture.Key(symbol, Yesterday.AddDays(-1)), 2, unavailable: true);
+            foreach (DateOnly date in new[] { Yesterday.AddDays(-1), new DateOnly(2026, 9, 4) })
+                fixture.Index.Seed(fixture.Key(symbol, date), 2, unavailable: true);
 
         await fixture.Collector.QueueAvailableAsync();
         Assert.Equal(2, fixture.Collector.State.Jobs.Count);
@@ -41,14 +42,14 @@ public sealed class AvailabilityDayQueueTests
         await fixture.Drain();
 
         Assert.Equal(Yesterday, fixture.Provider.Requests.Where(request => request.Symbol == "AAPL").Min(Date));
-        Assert.Equal(Yesterday.AddDays(-1), fixture.Provider.Requests.Where(request => request.Symbol == "MSFT").Min(Date));
+        Assert.Equal(new DateOnly(2026, 9, 4), fixture.Provider.Requests.Where(request => request.Symbol == "MSFT").Min(Date));
         DateOnly[] dates = fixture.Provider.Requests.Select(Date).ToArray();
         Assert.Equal(dates.OrderDescending(), dates);
         Assert.Null(fixture.Collector.State.AvailabilityRun);
     }
 
     [Fact]
-    public async Task OlderEmptyDayGetsTwoPasses_ThenNoOlderRowsOrThirdRequests()
+    public async Task OlderEmptyDayGetsOnePass_ThenNoOlderRowsOrRepeatRequests()
     {
         using var fixture = new Fixture("AAPL");
         fixture.Provider.Oldest["AAPL"] = Today;
@@ -57,7 +58,7 @@ public sealed class AvailabilityDayQueueTests
 
         HistoricalDataRequest[] older = fixture.Provider.Requests.Where(request => Date(request) == Yesterday).ToArray();
         Assert.NotEmpty(older);
-        Assert.All(older.GroupBy(request => (request.FromUtc, request.ThroughUtc)), group => Assert.Equal(2, group.Count()));
+        Assert.All(older.GroupBy(request => (request.FromUtc, request.ThroughUtc)), group => Assert.Single(group));
         Assert.DoesNotContain(fixture.Collector.State.Jobs, job => job.SessionDate < Yesterday);
         int requests = fixture.Provider.Requests.Count;
         await fixture.Collector.QueueAvailableAsync();
@@ -138,6 +139,101 @@ public sealed class AvailabilityDayQueueTests
         Assert.Equal(requests, fixture.Provider.Requests.Count);
     }
 
+    [Fact]
+    public async Task OlderPrequeueChecksPublishCurrentTickerWhileFinishedRowsRemainVisible_ThenClearActivity()
+    {
+        using var fixture = new Fixture("AAPL", "MSFT");
+        foreach (string symbol in fixture.Symbols)
+        {
+            fixture.Save(symbol, Today, 1);
+            fixture.Index.Seed(fixture.Key(symbol, Yesterday), 2, unavailable: true);
+        }
+        var firstEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var releaseFirst = new ManualResetEventSlim();
+        using var releaseSecond = new ManualResetEventSlim();
+        fixture.CollectionLibrary = new ObservedLibrary(fixture.Library, query =>
+        {
+            if (DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(query.FromUtc, Eastern).DateTime) != Yesterday) return;
+            TaskCompletionSource entered = query.Symbol == "AAPL" ? firstEntered : secondEntered;
+            ManualResetEventSlim release = query.Symbol == "AAPL" ? releaseFirst : releaseSecond;
+            entered.TrySetResult();
+            if (!release.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException("The held older-history query was not released.");
+        });
+        fixture.Restart();
+        var published = new System.Collections.Concurrent.ConcurrentQueue<CollectionActivity>();
+        fixture.Collector.StateChanged += (_, _) =>
+        {
+            if (fixture.Collector.Activity is { Stage: "CheckingOlderHistory" } activity) published.Enqueue(activity);
+        };
+        await fixture.Collector.QueueAvailableAsync();
+        Task<CollectionBatchResult> tick = fixture.Collector.TickAsync(true);
+        try
+        {
+            await firstEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            AssertPlanning("AAPL");
+            releaseFirst.Set();
+            await secondEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            AssertPlanning("MSFT");
+        }
+        finally
+        {
+            releaseFirst.Set();
+            releaseSecond.Set();
+            await tick.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+
+        Assert.Equal(CollectionBatchResult.Idle, await tick);
+        Assert.False(fixture.Collector.IsBusy);
+        Assert.Null(fixture.Collector.Activity);
+        Assert.Null(fixture.Collector.State.AvailabilityRun);
+        Assert.Empty(fixture.Provider.Requests);
+
+        void AssertPlanning(string symbol)
+        {
+            Assert.True(fixture.Collector.IsBusy);
+            CollectionActivity activity = Assert.IsType<CollectionActivity>(fixture.Collector.Activity);
+            Assert.Equal("CheckingOlderHistory", activity.Stage);
+            Assert.Equal(symbol, activity.Symbol);
+            Assert.Equal(Yesterday, activity.SessionDate);
+            CollectionSessionWindow day = CollectionSchedule.GetSessionWindow(Yesterday, "24_5");
+            Assert.Equal(day.FromUtc, activity.FromUtc);
+            Assert.Equal(day.ThroughUtc, activity.ThroughUtc);
+            Assert.Contains(published, item => item.Stage == activity.Stage && item.Symbol == symbol && item.SessionDate == Yesterday);
+            Assert.Equal(2, fixture.Collector.State.Jobs.Count);
+            Assert.All(fixture.Collector.State.Jobs, job =>
+            {
+                Assert.Equal(Today, job.SessionDate);
+                Assert.Equal(CollectionJobStatus.Complete, job.Status);
+            });
+        }
+    }
+
+    [Fact]
+    public async Task PauseDuringOlderPrecheckStopsBeforeTheNextTickerAndDoesNotQueueMoreDates()
+    {
+        using var fixture = new Fixture("AAPL", "MSFT");
+        using var cancellation = new CancellationTokenSource();
+        foreach (string symbol in fixture.Symbols) fixture.Save(symbol, Today, 1);
+        var checkedSymbols = new List<string>();
+        fixture.CollectionLibrary = new ObservedLibrary(fixture.Library, query =>
+        {
+            if (DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(query.FromUtc, Eastern).DateTime) != Yesterday) return;
+            checkedSymbols.Add(query.Symbol);
+            cancellation.Cancel();
+        });
+        fixture.Restart();
+        await fixture.Collector.QueueAvailableAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => fixture.Collector.TickAsync(true, cancellation.Token));
+
+        Assert.Equal(new[] { "AAPL" }, checkedSymbols);
+        Assert.Empty(fixture.Provider.Requests);
+        Assert.All(fixture.Collector.State.Jobs, job => Assert.Equal(Today, job.SessionDate));
+        Assert.False(fixture.Collector.IsBusy);
+        Assert.Null(fixture.Collector.Activity);
+    }
+
     private static DateOnly Date(HistoricalDataRequest request) =>
         DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(request.FromUtc, Eastern).DateTime);
 
@@ -158,6 +254,7 @@ public sealed class AvailabilityDayQueueTests
         }
         public string[] Symbols { get; }
         public JsonMarketDataLibrary Library { get; }
+        public IMarketDataLibrary? CollectionLibrary { get; set; }
         public MemoryStore Store { get; } = new();
         public Clock Clock { get; } = new();
         public AttemptIndex Index { get; } = new();
@@ -165,7 +262,7 @@ public sealed class AvailabilityDayQueueTests
         public MarketDataCollector Collector { get; private set; } = null!;
         public CollectionGapKey Key(string symbol, DateOnly day) => new(symbol, symbol + "-id", day,
             "24_5", "split", "robinhood-split-unversioned");
-        public void Restart() => Collector = new(Store, Provider, _ => Library, Clock, new()
+        public void Restart() => Collector = new(Store, Provider, _ => CollectionLibrary ?? Library, Clock, new()
         {
             MaximumRequestsPerTick = 2, MinimumRequestInterval = TimeSpan.Zero, RetryDelay = TimeSpan.Zero,
         }, _ => Index);
@@ -190,6 +287,19 @@ public sealed class AvailabilityDayQueueTests
         public void Dispose()
         {
             if (Directory.Exists(Library.RootPath)) Directory.Delete(Library.RootPath, true);
+        }
+    }
+
+    private sealed class ObservedLibrary(IMarketDataLibrary inner, Action<HistoricalDataQuery> beforeQuery) : IMarketDataLibrary
+    {
+        public string RootPath => inner.RootPath;
+        public MarketDataLibraryScan Scan() => inner.Scan();
+        public IReadOnlyList<HistoricalDatasetInfo> Save(HistoricalDownload download) => inner.Save(download);
+        public HistoricalDataset Read(string datasetHash) => inner.Read(datasetHash);
+        public HistoricalDataQueryResult Query(HistoricalDataQuery query)
+        {
+            beforeQuery(query);
+            return inner.Query(query);
         }
     }
 

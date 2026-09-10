@@ -9,13 +9,13 @@ public sealed partial class MarketDataCollector
 
     /// <summary>Collects missing genuine 15-second candles, discovering each equity's older availability.</summary>
     public Task QueueAvailableAsync(CancellationToken cancellationToken = default) =>
-        MutateAsync(() => QueueAvailable(automatic: false), cancellationToken);
+        MutateAsync(() => QueueAvailable(automatic: false, cancellationToken: cancellationToken), cancellationToken);
 
     /// <summary>Retries genuine missing candles, including ranges previously reported empty.</summary>
     public Task QueueForcedAvailableAsync(CancellationToken cancellationToken = default) =>
-        MutateAsync(() => QueueAvailable(automatic: false, ignoreKnownGaps: true), cancellationToken);
+        MutateAsync(() => QueueAvailable(automatic: false, ignoreKnownGaps: true, cancellationToken: cancellationToken), cancellationToken);
 
-    private void QueueAvailable(bool automatic, bool ignoreKnownGaps = false)
+    private void QueueAvailable(bool automatic, bool ignoreKnownGaps = false, CancellationToken cancellationToken = default)
     {
         DownloadListMember[] members = _state.Settings.Lists.Where(l => l.IsEnabled).SelectMany(l => l.Members)
             .Where(m => m.IsIncluded).GroupBy(m => m.Symbol, StringComparer.Ordinal)
@@ -26,6 +26,8 @@ public sealed partial class MarketDataCollector
             throw new ArgumentException("Save a list with at least one included equity before downloading.");
         }
         bool tracksAttempts = GetGapIndex(_state.Settings.LibraryRootPath)?.SupportsAttemptTracking == true;
+        // Preserve the old run's completed no-data evidence before replacing its rows.
+        if (tracksAttempts) ReconcileUnavailableDiscoveryBoundaries(cancellationToken, force: true);
         DateTimeOffset now = _clock.GetUtcNow();
         string bounds = CollectionSettings.AllAvailableSessionBounds;
         DateOnly today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(now, CollectionEastern).DateTime);

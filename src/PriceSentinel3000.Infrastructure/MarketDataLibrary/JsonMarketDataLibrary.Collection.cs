@@ -24,7 +24,20 @@ public sealed partial class JsonMarketDataLibrary
             .Select(item => ClipCollectionGap(item.Gap, from, through)).OfType<HistoricalGap>().ToArray();
         var counts = scope.AttemptedRanges.Select(item => new { Gap = ClipCollectionGap(item.Gap, from, through), item.Attempts })
             .Where(item => item.Gap is not null).Select(item => new CollectionGapAttempt(item.Gap!, item.Attempts)).ToArray();
-        return new(UnionCollectionGaps(unavailable), scope.HasReturnedCandles) { AttemptedRanges = counts };
+        return new(UnionCollectionGaps(unavailable), scope.HasReturnedCandles)
+        {
+            AttemptedRanges = counts, BrokerHistoryUnavailableAtUtc = scope.BrokerHistoryUnavailableAtUtc,
+        };
+    }
+
+    internal void RecordCollectionDiscoveryUnavailable(CollectionGapKey key, string provider, DateTimeOffset checkedAt)
+    {
+        ValidateCollectionRange(key, DayStart(key.SessionDate), DayStart(key.SessionDate.AddDays(1)));
+        DateTimeOffset observed = checkedAt.ToUniversalTime();
+        ValidateUtc(observed);
+        if (key.SessionDate >= EasternDate(observed))
+            throw new ArgumentException("A broker history boundary must belong to a completed older date.", nameof(key));
+        MutateCollection(key, provider, observed, scope => scope with { BrokerHistoryUnavailableAtUtc = observed });
     }
 
     internal void RecordCollectionDownload(CollectionGapKey key, string provider,
@@ -71,7 +84,12 @@ public sealed partial class JsonMarketDataLibrary
             // Observations do not clear omitted spans. Only successfully saved candles do.
             foreach (HistoricalGap gap in unavailable)
                 foreach (long slot in CollectionSlots(gap)) slots[slot] = retryAfter?.ToUniversalTime();
-            return scope with { HasReturnedCandles = scope.HasReturnedCandles || received, UnavailableRanges = PackUnavailable(slots) };
+            return scope with
+            {
+                HasReturnedCandles = scope.HasReturnedCandles || received, UnavailableRanges = PackUnavailable(slots),
+                BrokerHistoryUnavailableAtUtc = received ? null : scope.BrokerHistoryUnavailableAtUtc,
+                LastBrokerCandlesAtUtc = received ? checkedAt.ToUniversalTime() : scope.LastBrokerCandlesAtUtc,
+            };
         });
     }
 
@@ -163,6 +181,13 @@ public sealed partial class JsonMarketDataLibrary
                 scope.AttemptedRanges is null || scope.UnavailableRanges is null ||
                 scope.AttemptedRanges.Count > 6000 || scope.UnavailableRanges.Count > 6000)
                 throw new InvalidDataException("Collection metadata must match its daily candle identity.");
+            if (scope.LastBrokerCandlesAtUtc is { } returnedAt) ValidateUtc(returnedAt);
+            if (scope.BrokerHistoryUnavailableAtUtc is { } boundary)
+            {
+                ValidateUtc(boundary);
+                if (scope.Key.SessionDate >= EasternDate(boundary))
+                    throw new InvalidDataException("A broker history boundary must follow the completed collection date.");
+            }
             long lastEnd = 0;
             foreach (CollectionGapAttempt attempt in scope.AttemptedRanges)
             {
@@ -205,8 +230,18 @@ public sealed partial class JsonMarketDataLibrary
                         ? previous is null || retry is null ? null : previous > retry ? previous : retry
                         : retry;
             }
+            DateTimeOffset? boundary = group.Max(item => item.BrokerHistoryUnavailableAtUtc);
+            DateTimeOffset? returnedAt = group.Max(item => item.LastBrokerCandlesAtUtc);
+            // Older copied snapshots must not restore a boundary disproved by a newer
+            // candle download. Existing local candles alone do not disprove it.
+            if (boundary is { } observed && (returnedAt >= observed ||
+                sources.Any(item => item.Candles.Count > 0 && item.FetchedAtUtc > observed &&
+                    item.Collection?.Any(scope => scope.Key.SessionBounds == group.Key.Key.SessionBounds &&
+                        scope.BrokerHistoryUnavailableAtUtc is not null) != true)))
+                boundary = null;
             merged.Add(ClearCollectionSaved(new(group.Key.Key, group.Key.Provider, group.Any(item => item.HasReturnedCandles),
-                PackAttempts(counts), PackUnavailable(unavailable)), saved));
+                PackAttempts(counts), PackUnavailable(unavailable))
+                { BrokerHistoryUnavailableAtUtc = boundary, LastBrokerCandlesAtUtc = returnedAt }, saved));
         }
         return merged.OrderBy(item => item.Key.SessionBounds, StringComparer.Ordinal).ToArray();
     }

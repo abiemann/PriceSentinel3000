@@ -1,3 +1,5 @@
+using PriceSentinel3000.Core.MarketData;
+
 namespace PriceSentinel3000.Application.MarketDataLibrary;
 
 public sealed partial class MarketDataCollector
@@ -42,6 +44,23 @@ public sealed partial class MarketDataCollector
             if (gapIndex?.SupportsAttemptTracking == true)
                 gapIndex.ResolveSavedRanges(GapKey(job), SavedCandleRanges(saved.Candles, requestedFrom, through));
             CollectionGapSnapshot known = gapIndex?.Query(GapKey(job), requestedFrom, through, _clock.GetUtcNow()) ?? new([], false);
+            // Recheck the remembered boundary on resume as well as before queueing.
+            // Older app versions may have persisted a redundant second empty-day pass.
+            if (job.AvailabilityRunId is not null && !job.IgnoreKnownGaps &&
+                job.SessionDate < job.DiscoveryAsOfDate && requestedFrom == day.FromUtc && through == day.ThroughUtc &&
+                UsEquityTradingCalendar.IsTradingDay(job.SessionDate) &&
+                (known.BrokerHistoryUnavailableAtUtc is not null || saved.Candles.Count == 0 && missing.Length > 0 &&
+                    ExcludeKnownGaps(missing, known.UnavailableRanges).Length == 0))
+            {
+                FinishCollection(job with
+                {
+                    Status = saved.Candles.Count > 0 ? CollectionJobStatus.Partial : CollectionJobStatus.Unavailable,
+                    ActualSourceIntervalSeconds = saved.Candles.Count > 0 ? 15 : null,
+                    DatasetHashes = saved.Datasets.Select(dataset => dataset.DatasetHash).ToArray(),
+                    Error = BrokerHistoryBoundaryMessage,
+                }, emptySession: true);
+                return (0, false);
+            }
             HistoricalGap[] blocked = AttemptLimitedRanges(job, gapIndex, known);
             HistoricalGap[] requestable = ExcludeKnownGaps(missing, blocked);
             HistoricalGap? next = requestable.FirstOrDefault(gap =>

@@ -118,6 +118,7 @@ public sealed partial class MarketDataCollector
         {
             SetActivity("CheckingSchedule");
             LoadSavedCoverage();
+            ReconcileUnavailableDiscoveryBoundaries(cancellationToken);
             QueueScheduled();
             if (!isConnected) return CollectionBatchResult.Disconnected;
             int remaining = _options.MaximumRequestsPerTick;
@@ -134,7 +135,7 @@ public sealed partial class MarketDataCollector
                 if (result.ConnectionLost) return CollectionBatchResult.Disconnected;
             }
             cancellationToken.ThrowIfCancellationRequested();
-            bool discoveryReady = AdvanceAvailabilityDiscovery();
+            bool discoveryReady = AdvanceAvailabilityDiscovery(cancellationToken);
             CollectionJob[] pending = _state.Jobs.Where(j => j.Status == CollectionJobStatus.Pending &&
                 (!j.IsAutomatic || _state.Settings.AutomaticDownloadsEnabled)).ToArray();
             return discoveryReady || pending.Any(j => j.RetryAfterUtc is null || j.RetryAfterUtc <= _clock.GetUtcNow())

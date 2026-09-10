@@ -12,6 +12,9 @@ The [project history index](../README.md) also links past app audits and validat
 | [USO](uso-2026-09-06/README.md) | Oil-fund strategy experiment. |
 | [SOXL and SOXX](semiconductors-2026-09-06/README.md) | Semiconductor-fund experiments. |
 | [NFLX initial replay](nflx-replay-2026-09-06.md) | Netflix script development and validation. |
+| [Installed strategies, August 24–28](installed-strategies-2026-08-24-to-28.md) | Fourteen installed profiles replayed across five dates, with source identities and coverage caveats. |
+| [NFLX start-time comparison](nflx-week-start-times-2026-09-06.md) | Fresh-session comparisons for two start times and available historical dates. |
+| [NFLX noon cutoff](nflx-noon-cutoff-2026-09-06.md) | Follow-up comparing a noon cutoff with the earlier full-day runs. |
 | [Strategy sources and compatibility](strategy-sources-and-compatibility.md) | Source selection, provenance, and interpreter compatibility investigation. |
 
 Script sources are in [strategies](../../research/strategies/README.md); runnable analysis
