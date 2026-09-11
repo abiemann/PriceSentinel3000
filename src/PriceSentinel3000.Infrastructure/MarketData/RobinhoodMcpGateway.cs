@@ -17,6 +17,7 @@ public sealed partial class RobinhoodMcpGateway :
     IInstrumentSearchSource,
     ILiveBrokerGateway
 {
+    private const string ClientDisplayName = "PriceSentinel";
     private const string TwentyFourHourMarketWatchlistName = "24 Hour Market";
     private static readonly Uri Endpoint =
         new("https://agent.robinhood.com/mcp/trading");
@@ -118,7 +119,7 @@ public sealed partial class RobinhoodMcpGateway :
                 DynamicClientRegistration = registration is null
                     ? new DynamicClientRegistrationOptions
                     {
-                        ClientName = "PriceSentinel 3000",
+                        ClientName = ClientDisplayName,
                         ClientUri = new Uri(
                             "https://github.com/abiemann/PriceSentinel3000"),
                         ApplicationType = "native",
@@ -137,13 +138,7 @@ public sealed partial class RobinhoodMcpGateway :
 
             try
             {
-                var clientOptions = new McpClientOptions
-                {
-                    ProtocolVersion = RobinhoodProtocolVersion,
-                    InitializationTimeout = allowInteractiveAuthorization
-                        ? InteractiveAuthorizationTimeout
-                        : CachedAuthorizationTimeout,
-                };
+                McpClientOptions clientOptions = CreateClientOptions(allowInteractiveAuthorization);
                 _client = await McpClient.CreateAsync(
                         transport,
                         clientOptions,
@@ -161,6 +156,20 @@ public sealed partial class RobinhoodMcpGateway :
             _connectionGate.Release();
         }
     }
+
+    internal static McpClientOptions CreateClientOptions(bool allowInteractiveAuthorization) => new()
+    {
+        ClientInfo = new Implementation
+        {
+            Name = ClientDisplayName,
+            Title = ClientDisplayName,
+            Version = PriceSentinel3000.Application.BuildVersion.Display(typeof(RobinhoodMcpGateway).Assembly),
+        },
+        ProtocolVersion = RobinhoodProtocolVersion,
+        InitializationTimeout = allowInteractiveAuthorization
+            ? InteractiveAuthorizationTimeout
+            : CachedAuthorizationTimeout,
+    };
 
     private static Task<AuthorizationResult?>
         DeclineInteractiveAuthorizationAsync(

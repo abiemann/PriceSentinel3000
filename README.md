@@ -433,6 +433,12 @@ independently written example, not a claim of profitable performance.
 Robinhood is connected through the official Streamable HTTP MCP endpoint and OAuth
 authorization flow. PriceSentinel dynamically registers as a native desktop client
 and uses a loopback callback; there is no separate developer-app registration page.
+Each MCP connection explicitly identifies its name and display title as
+**PriceSentinel**, together with the app build version. New OAuth registrations
+also use **PriceSentinel**. Existing saved registrations and tokens are retained;
+this change does not rename the stored OAuth registration. Robinhood controls its
+connected-agent labels, so an existing **Agent** card is not guaranteed to change.
+
 The client pins Robinhood's currently supported MCP `2025-11-25` handshake instead
 of probing the newer `server/discover` method.
 The app allows up to five minutes for interactive browser authorization. While the

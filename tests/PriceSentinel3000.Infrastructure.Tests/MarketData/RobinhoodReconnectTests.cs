@@ -17,6 +17,24 @@ public sealed class RobinhoodReconnectTests : IDisposable
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    public async Task Initialization_IdentifiesPriceSentinelForInteractiveAndCachedConnections(bool allowInteractive)
+    {
+        var transport = new FakeTransport();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await using McpClient client = await McpClient.CreateAsync(transport,
+            RobinhoodMcpGateway.CreateClientOptions(allowInteractive), cancellationToken: cancellation.Token);
+
+        JsonRpcRequest request = Assert.IsType<JsonRpcRequest>(transport.InitializeRequest);
+        Assert.Equal("PriceSentinel", request.Params!["clientInfo"]!["name"]!.GetValue<string>());
+        Assert.Equal("PriceSentinel", request.Params["clientInfo"]!["title"]!.GetValue<string>());
+        Assert.Equal(PriceSentinel3000.Application.BuildVersion.Display(typeof(RobinhoodMcpGateway).Assembly),
+            request.Params["clientInfo"]!["version"]!.GetValue<string>());
+        Assert.Equal(RobinhoodMcpGateway.RobinhoodProtocolVersion, request.Params["protocolVersion"]!.GetValue<string>());
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
     public async Task ExplicitReconnect_RejectsActiveLibraryAndMarketCallsWithoutDisposingThem(bool libraryCall)
     {
         var transports = new List<FakeTransport>();
@@ -209,6 +227,7 @@ public sealed class RobinhoodReconnectTests : IDisposable
         public string Name => "Synthetic reconnect test";
         public string? SessionId => null;
         public ChannelReader<JsonRpcMessage> MessageReader => _messages.Reader;
+        public JsonRpcRequest? InitializeRequest { get; private set; }
         public bool Disposed { get; private set; }
         public bool HoldTools { get; set; }
         public Func<string, object>? ToolReply { get; set; }
@@ -219,11 +238,14 @@ public sealed class RobinhoodReconnectTests : IDisposable
         {
             if (message is not JsonRpcRequest request) return Task.CompletedTask;
             if (request.Method == "initialize")
+            {
+                InitializeRequest = request;
                 Reply(request, new
                 {
                     protocolVersion = RobinhoodMcpGateway.RobinhoodProtocolVersion,
                     capabilities = new { tools = new { } }, serverInfo = new { name = "synthetic", version = "1" },
                 });
+            }
             else if (request.Method == "tools/call")
             {
                 if (HoldTools) _held = request;
