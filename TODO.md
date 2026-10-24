@@ -2,6 +2,16 @@
 
 Reviewed September 10, 2026 for rebuilding the published [release 1.3](https://github.com/abiemann/PriceSentinel3000/releases/tag/1.3) from the current source. PriceSentinel provides broker-isolated Paper Trader and Replay modes, real Robinhood market data, documented bid/ask and replay-close fills, risk controls, SQLite WAL journaling, optional immediate or weekday T+1 settlement, external strategies, and MCP control with candle/indicator/event telemetry. Historical Replay preserves the actual source duration when falling back from 15-second to 30-second or one-minute data. The rebuilt 1.3 includes the implemented controls and retention changes below. The roadmap separates completed source validation from pending publication checks, supervised runtime checks, and future work.
 
+## Chart overlays in current source
+
+- [x] Add independently toggled EMA50/100/200 and regular-session VWAP overlays,
+  matching legend colors and enabled-overlay autoscaling. Keep chart warmup
+  separate from trading inputs and show unavailable VWAP when complete session
+  history or genuine volume is missing. This is a source change after published 1.3.
+- [x] October 23 source validation: all 1,593 tests pass and the Release build has
+  zero warnings/errors. Isolated chart previews passed at 480, 600, and 1,100 pixels,
+  including toggle behavior. These checks do not validate a live broker session.
+
 ## Release 1.3 validation and remaining runtime checks
 
 At this September 10 source review, refreshed Windows CI, release packaging, checksums, and source-provenance verification were pending for the newly selected source. The [rebuilt release](https://github.com/abiemann/PriceSentinel3000/releases/tag/1.3) and its attached provenance record provide the final publication results; local validation and the historical runs below do not complete those checks.

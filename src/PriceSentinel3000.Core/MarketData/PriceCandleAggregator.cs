@@ -9,7 +9,9 @@ public sealed record PriceCandle(
     decimal Low,
     decimal Close,
     decimal Volume,
-    bool IsSynthetic = false);
+    bool IsSynthetic = false,
+    bool HasKnownVolume = true,
+    bool HasCompleteHistory = false);
 
 public static class PriceCandleAggregator
 {
@@ -105,6 +107,7 @@ public static class PriceCandleAggregator
         TimeSpan interval,
         IReadOnlyList<MarketQuote> members)
     {
+        members = ExcludeReconciledSamples(members);
         MarketQuote first = members[0];
         MarketQuote last = members[^1];
         return new(
@@ -115,6 +118,53 @@ public static class PriceCandleAggregator
             members.Max(quote => quote.CandleHigh),
             members.Min(quote => quote.CandleLow),
             last.CandleClose,
-            members.Sum(quote => quote.Volume));
+            members.Sum(quote => quote.Volume),
+            HasKnownVolume: members.All(quote => quote.HasKnownVolume && quote.Volume >= 0m),
+            HasCompleteHistory: HasCompleteHistory(startsAtUtc, startsAtUtc + interval, members));
+    }
+
+    private static IReadOnlyList<MarketQuote> ExcludeReconciledSamples(IReadOnlyList<MarketQuote> members)
+    {
+        if (members.All(IsHistoricalBar) || members.All(quote => !IsHistoricalBar(quote)))
+            return members;
+
+        MarketQuote[] history = members.Where(quote =>
+            IsHistoricalBar(quote) && quote.SourceEndsAtUtc <= quote.ObservedAtUtc).ToArray();
+        if (history.Length == 0) return members;
+        var retained = new List<MarketQuote>(members.Count);
+        int historyIndex = 0;
+        foreach (MarketQuote quote in members)
+        {
+            if (IsHistoricalBar(quote))
+            {
+                retained.Add(quote);
+                continue;
+            }
+            while (historyIndex < history.Length && history[historyIndex].SourceEndsAtUtc <= quote.SourceTimestampUtc)
+                historyIndex++;
+            if (historyIndex == history.Length || history[historyIndex].SourceTimestampUtc > quote.SourceTimestampUtc)
+                retained.Add(quote);
+        }
+        return retained;
+    }
+
+    private static bool IsHistoricalBar(MarketQuote quote) =>
+        quote.OpenPrice.HasValue && quote.HighPrice.HasValue &&
+        quote.LowPrice.HasValue && quote.ClosePrice.HasValue;
+
+    private static bool HasCompleteHistory(
+        DateTimeOffset from,
+        DateTimeOffset through,
+        IReadOnlyList<MarketQuote> members)
+    {
+        DateTimeOffset next = from;
+        foreach (MarketQuote quote in members)
+        {
+            if (!IsHistoricalBar(quote) || quote.SourceTimestampUtc != next ||
+                quote.SourceEndsAtUtc > quote.ObservedAtUtc)
+                return false;
+            next = quote.SourceEndsAtUtc;
+        }
+        return next == through;
     }
 }

@@ -28,7 +28,7 @@ public sealed partial class SessionWorkflowTests
         workspace.Invoke("PrepareDataSession", instrument, settings, TradingMode.PaperTrader, null!);
         PriceRingBuffer chart = workspace.Get<PriceRingBuffer>("_chartRingBuffer");
         PriceRingBuffer execution = workspace.Get<PriceRingBuffer>("_ringBuffer");
-        Assert.Equal(TimeSpan.FromMinutes(bufferMinutes * 8 + 28), chart.Retention);
+        Assert.Equal(TimeSpan.FromMinutes(bufferMinutes * 8 + 400), chart.Retention);
         Assert.Equal(TimeSpan.FromMinutes(bufferMinutes), execution.Retention);
 
         MarketQuote[] quotes = Enumerable.Range(0, 961).Select(index =>

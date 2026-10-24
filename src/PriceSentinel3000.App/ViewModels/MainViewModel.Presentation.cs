@@ -46,6 +46,7 @@ public sealed partial class MainViewModel
         _lastProjectedHistory = null;
         _automationChartSessionId = null;
         ChartPoints.Clear();
+        OnPropertyChanged(nameof(VwapAvailabilityText));
         _chartScaleResetVersion++;
         OnPropertyChanged(nameof(ChartScaleResetVersion));
         _resolvedReplayHistory = null;
@@ -124,8 +125,11 @@ public sealed partial class MainViewModel
             BufferMinutes,
             ChartCandleIntervalSeconds);
         TimeSpan interval = TimeSpan.FromSeconds(ChartCandleIntervalSeconds);
-        IReadOnlyList<PriceCandle> candles = PriceCandleAggregator.Aggregate(chartSnapshot, interval);
-        var refreshedPoints = new List<PricePointViewModel>(candles.Count);
+        IReadOnlyList<PriceCandle> candles = PriceCandleAggregator.Aggregate(retainedChartSnapshot, interval);
+        IReadOnlyList<ChartOverlayPoint> overlays = ChartOverlayCalculator.Calculate(candles);
+        DateTimeOffset firstDisplayedCandle = PriceCandleAggregator.AlignToInterval(
+            chartSnapshot[0].SourceTimestampUtc, interval);
+        var refreshedPoints = new List<PricePointViewModel>();
         var candleMarkers = new Dictionary<DateTimeOffset, MarketQuote>();
         if (_tradeMarkers.Count > 0)
         {
@@ -138,8 +142,11 @@ public sealed partial class MainViewModel
             }
         }
 
-        foreach (PriceCandle candle in candles)
+        for (int index = 0; index < candles.Count; index++)
         {
+            PriceCandle candle = candles[index];
+            if (candle.StartsAtUtc < firstDisplayedCandle) continue;
+            ChartOverlayPoint overlay = overlays[index];
             candleMarkers.TryGetValue(candle.StartsAtUtc, out MarketQuote? markedQuote);
             ChartTradeMarker marker = markedQuote is null
                 ? ChartTradeMarker.None
@@ -152,10 +159,16 @@ public sealed partial class MainViewModel
                 candle.Close,
                 marker,
                 markedQuote?.Last,
-                candle.IsSynthetic));
+                candle.IsSynthetic,
+                overlay.Ema50,
+                overlay.Ema100,
+                overlay.Ema200,
+                overlay.Vwap,
+                overlay.VwapStatus));
         }
 
         SynchronizeChartPoints(refreshedPoints);
+        OnPropertyChanged(nameof(VwapAvailabilityText));
         _lastProjectedHistory = retainedChartSnapshot;
         _lastProjectedBufferMinutes = BufferMinutes;
         _lastProjectedCandleInterval = ChartCandleIntervalSeconds;
@@ -183,7 +196,7 @@ public sealed partial class MainViewModel
             ChartCandleIntervalOptions.Max(option => option.Value);
         return PriceChartViewportCalculator.GetVisibleDuration(
             maximumCandleIntervalSeconds, bufferMinutes) +
-            PriceChartHistoryCalculator.GetRsiLookback(
+            PriceChartHistoryCalculator.GetOverlayLookback(
                 maximumCandleIntervalSeconds);
     }
 

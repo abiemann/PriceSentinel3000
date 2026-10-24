@@ -1,3 +1,5 @@
+using PriceSentinel3000.Core.Charting;
+
 namespace PriceSentinel3000.App.ViewModels;
 
 public enum ChartTradeMarker
@@ -15,4 +17,9 @@ public sealed record PricePointViewModel(
     decimal Close,
     ChartTradeMarker Marker = ChartTradeMarker.None,
     decimal? MarkerPrice = null,
-    bool IsSynthetic = false);
+    bool IsSynthetic = false,
+    decimal? Ema50 = null,
+    decimal? Ema100 = null,
+    decimal? Ema200 = null,
+    decimal? Vwap = null,
+    VwapStatus VwapStatus = VwapStatus.IncompleteSession);

@@ -65,6 +65,43 @@ public sealed class PriceRingBufferTests
     }
 
     [Fact]
+    public void Merge_AcceptsHistoricalCompletionEvenWhenPricesAndVolumeAreUnchanged()
+    {
+        var buffer = new PriceRingBuffer(Instrument, TimeSpan.FromMinutes(7));
+        MarketQuote forming = Quote(Start, 10m, Start.AddSeconds(14)) with
+        {
+            OpenPrice = 10m, HighPrice = 10m, LowPrice = 10m, ClosePrice = 10m,
+        };
+        buffer.Merge([forming]);
+
+        QuoteMergeResult completed = buffer.Merge([forming with { ObservedAtUtc = forming.SourceEndsAtUtc }]);
+        QuoteMergeResult later = buffer.Merge([forming with { ObservedAtUtc = forming.SourceEndsAtUtc.AddMinutes(1) }]);
+
+        Assert.Equal(1, completed.Corrected);
+        Assert.Equal(0, completed.Duplicates);
+        Assert.Equal(1, later.Duplicates);
+        Assert.Equal(forming.SourceEndsAtUtc, Assert.Single(buffer.Snapshot()).ObservedAtUtc);
+        Assert.True(Assert.Single(PriceCandleAggregator.Aggregate(buffer.Snapshot(), TimeSpan.FromSeconds(15)))
+            .HasCompleteHistory);
+    }
+
+    [Fact]
+    public void Merge_TreatsChangedVolumeAvailabilityAsACorrection()
+    {
+        var buffer = new PriceRingBuffer(Instrument, TimeSpan.FromMinutes(7));
+        MarketQuote unknown = Quote(Start, 10m, Start) with { Volume = 0m, HasKnownVolume = false };
+        buffer.Merge([unknown]);
+
+        QuoteMergeResult result = buffer.Merge([
+            unknown with { ObservedAtUtc = Start.AddSeconds(1), HasKnownVolume = true },
+        ]);
+
+        Assert.Equal(1, result.Corrected);
+        Assert.Equal(0, result.Duplicates);
+        Assert.True(Assert.Single(buffer.Snapshot()).HasKnownVolume);
+    }
+
+    [Fact]
     public void Merge_TrimsQuotesOutsideRetentionWindow()
     {
         var buffer = new PriceRingBuffer(Instrument, TimeSpan.FromMinutes(2));

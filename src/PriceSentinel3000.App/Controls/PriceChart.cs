@@ -10,7 +10,7 @@ using PriceSentinel3000.Core.Indicators;
 
 namespace PriceSentinel3000.App.Controls;
 
-public sealed class PriceChart : FrameworkElement
+public sealed partial class PriceChart : FrameworkElement
 {
     private static readonly Color UpCandleColor = Color.FromRgb(90, 203, 60);
     private static readonly Color DownCandleColor = Color.FromRgb(255, 90, 31);
@@ -172,8 +172,7 @@ public sealed class PriceChart : FrameworkElement
             return;
         }
 
-        decimal observedMinimum = visiblePoints.Min(point => point.Low);
-        decimal observedMaximum = visiblePoints.Max(point => point.High);
+        GetObservedPriceRange(visiblePoints, out decimal observedMinimum, out decimal observedMaximum);
         decimal openingPrice = visiblePoints[0].Open;
         PriceChartScale automaticScale = PriceChartScaleCalculator.CreateAutomatic(
             observedMinimum,
@@ -262,6 +261,16 @@ public sealed class PriceChart : FrameworkElement
             plotWidth,
             plotHeight);
 
+        DrawPriceIndicators(
+            drawingContext,
+            visiblePoints,
+            candleInterval,
+            minimum,
+            range,
+            firstTimestamp,
+            lastTimestamp,
+            plotBounds);
+
         DrawTradeMarkers(
             drawingContext,
             visiblePoints,
@@ -275,6 +284,7 @@ public sealed class PriceChart : FrameworkElement
             plotWidth,
             plotHeight);
 
+        DrawIndicatorLegend(drawingContext, visiblePoints[^1], plotBounds);
         drawingContext.Pop();
 
         DrawPointerReadout(
@@ -1190,8 +1200,7 @@ public sealed class PriceChart : FrameworkElement
             return false;
         }
 
-        decimal observedMinimum = visiblePoints.Min(point => point.Low);
-        decimal observedMaximum = visiblePoints.Max(point => point.High);
+        GetObservedPriceRange(visiblePoints, out decimal observedMinimum, out decimal observedMaximum);
         PriceChartRange fittedRange = PriceChartScaleCalculator.FitToObserved(
             observedMinimum,
             observedMaximum,

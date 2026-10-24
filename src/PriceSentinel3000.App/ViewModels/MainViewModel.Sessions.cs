@@ -511,6 +511,7 @@ public sealed partial class MainViewModel
         _chartScaleResetVersion++;
         OnPropertyChanged(nameof(ChartScaleResetVersion));
         ChartPoints.Clear();
+        OnPropertyChanged(nameof(VwapAvailabilityText));
         SetHistoricalSourceInterval(historicalSourceIntervalSeconds);
         _hasMarketData = false;
         _currentPrice = "--";

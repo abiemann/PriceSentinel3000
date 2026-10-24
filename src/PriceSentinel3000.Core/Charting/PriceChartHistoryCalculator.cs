@@ -4,6 +4,12 @@ namespace PriceSentinel3000.Core.Charting;
 
 public static class PriceChartHistoryCalculator
 {
+    public static TimeSpan GetOverlayLookback(int candleIntervalSeconds)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(candleIntervalSeconds);
+        return TimeSpan.FromSeconds(candleIntervalSeconds * 200d);
+    }
+
     public static TimeSpan GetRsiLookback(int candleIntervalSeconds)
     {
         if (candleIntervalSeconds <= 0)

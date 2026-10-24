@@ -23,8 +23,8 @@ public sealed partial class SessionWorkflowTests
         await using var workspace = new TestWorkspace(catalog);
         workspace.Clock.Now = new(2026, 9, 3, 16, 0, 0, TimeSpan.Zero);
         DateTimeOffset now = workspace.Clock.Now;
-        workspace.Broker.History = Enumerable.Range(0, 592)
-            .Select(index => Bar(now.AddMinutes(-148).AddSeconds(index * 15),
+        workspace.Broker.History = Enumerable.Range(0, 2080)
+            .Select(index => Bar(now.AddMinutes(-520).AddSeconds(index * 15),
                 9m + index * 0.001m + (index % 7) * 0.01m)).ToArray();
         var vm = workspace.ViewModel;
         vm.BufferMinutes = 15;
@@ -53,8 +53,8 @@ public sealed partial class SessionWorkflowTests
             Assert.Equal(previous.LastEvaluation!.Proposal.Indicators.ToArray(),
                 actual.LastEvaluation!.Proposal.Indicators.ToArray());
             Assert.Equal(previous.LastEvaluation.Proposal.Action, actual.LastEvaluation.Proposal.Action);
-            Assert.Equal(593, workspace.Get<PriceRingBuffer>("_chartRingBuffer").Count);
-            Assert.Equal(TimeSpan.FromMinutes(148),
+            Assert.Equal(2081, workspace.Get<PriceRingBuffer>("_chartRingBuffer").Count);
+            Assert.Equal(TimeSpan.FromMinutes(520),
                 workspace.Get<MarketDataRequest>("_marketDataRequest").WarmStartDuration);
             Assert.True(actual.Bars.Snapshot()[0].StartsAtUtc > workspace.Broker.History[0].SourceTimestampUtc);
         }

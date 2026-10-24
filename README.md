@@ -89,14 +89,15 @@ saved authorization.
 
 ## Status
 
-Release **1.3** includes single-symbol Replay, Paper Trader, guarded LIVE execution,
+The current source builds on release **1.3** with single-symbol Replay, Paper Trader, guarded LIVE execution,
 folder strategies, the local candle library, and optional MCP/CLI app control:
 
 - OFF / Replay / Paper Trader / LIVE rotary mode selection, with OFF at startup
 - Paper Trader polls real Robinhood quotes at the configured interval, evaluates
   the selected Built-In or folder script strategy, and can never submit a real order
-- Warm-start history covers the chart window plus the RSI(14) lookback required
-  by every selectable chart candle interval, expanding for a selected script's
+- Warm-start history covers the chart window plus 200 candles at the widest
+  selectable interval for the chart EMAs (also covering RSI(14)),
+  expanding for a selected script's
   warmup when needed; configurable delayed-lookback
   reconciliation uses real 15-second Robinhood equity bars
 - Chart candles keep the same width when changing display interval. With a
@@ -143,6 +144,16 @@ folder strategies, the local candle library, and optional MCP/CLI app control:
   buying power, equity, position, realized/unrealized P&L, and entry count
 - Optional RSI(14), minute-by-minute time labels, cursor crosshairs, and Auto or
   drag-adjusted Manual Y-axis scaling support visual inspection
+- **EMA 50**, **EMA 100**, **EMA 200**, and **VWAP** toggles independently show
+  colored price overlays and their latest values. EMA periods follow the displayed
+  candle interval and start from the first available close; synthetic gap candles
+  do not advance them. VWAP uses typical price `(high + low + close) / 3`, weighted
+  by volume, from 9:30 AM Eastern to the regular market close, including early
+  closes. It resets each trading day and requires complete historical candles
+  with known volume from the open. Missing history, sampled quotes, or unknown
+  volume leave VWAP unavailable, with the reason shown above the chart. In Replay,
+  only processed candles contribute, so start at or before the session open for
+  VWAP. Overlay visibility and chart intervals do not change strategy execution.
 - OFF collapses the configuration tiles under the rotary selector. Selecting
   Replay, Paper Trader, or an acknowledged LIVE mode reveals the relevant controls;
   LIVE retains polling/buffer controls while hiding Replay-only date and speed fields
@@ -237,7 +248,7 @@ and
    choose **Built-In** or a compatible script, configure the risk and timing
    settings, then click **Start Paper Trader**.
 3. The app requests real 15-second warm-start history covering the widest chart
-   view plus 28 minutes for chart RSI(14). A 15-minute buffer needs 148 minutes of
+   view plus 400 minutes for the longest chart EMA. A 15-minute buffer requests 520 minutes of
    chart history so switching to two-minute candles can show two hours. The
    request expands further when the script needs more warmup. Chart-only history
    does not extend the strategy's seed window: scripts retain the longer of the

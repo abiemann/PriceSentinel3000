@@ -93,7 +93,10 @@ public sealed class PriceRingBuffer
         left.HighPrice == right.HighPrice &&
         left.LowPrice == right.LowPrice &&
         left.ClosePrice == right.ClosePrice &&
-        left.SourceIntervalSeconds == right.SourceIntervalSeconds;
+        left.SourceIntervalSeconds == right.SourceIntervalSeconds &&
+        left.HasKnownVolume == right.HasKnownVolume &&
+        (left.OpenPrice is null ||
+         (left.SourceEndsAtUtc <= left.ObservedAtUtc) == (right.SourceEndsAtUtc <= right.ObservedAtUtc));
 
     private static bool HasValidMarketPrices(MarketQuote quote) =>
         (quote.HasTwoSidedMarket || quote.Bid == 0m && quote.Ask == 0m) &&

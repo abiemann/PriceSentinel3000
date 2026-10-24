@@ -52,6 +52,29 @@ Selected table rows use a green background without
 cell focus outlines. Compact download status uses the same layout across the
 retention window's tabs, keeping tab positions stable as status text changes.
 
+## Chart overlays in current source (October 23, 2026)
+
+The price chart has independent EMA50/100/200 and regular-session VWAP toggles.
+One Core calculation pass produces overlays from retained chart candles, before
+projection to the visible window and RSI lookback. The renderer consumes those
+values without recalculating indicators during pointer movement. Enabled overlays
+participate in automatic price scaling and the initial manual fit; manual dragging
+still controls its own bounds. The legend maps each colored line to its latest value.
+
+EMAs use chart-interval closes, the first available real close as their seed, and
+`2 / (period + 1)` smoothing. Synthetic gap candles neither advance the EMA nor
+draw an invented indicator point. Chart retention covers the widest view plus
+200 chart candles; the execution buffer and script seed remain independent.
+Replay uses processed history only, with no future-price warmup.
+
+VWAP weights typical chart-candle price `(high + low + close) / 3` by historical
+volume. It starts at 09:30 America/New_York and ends at the calendar's regular or
+early close. A valid value requires complete source-bar coverage and known volume
+from that session's open. Known zero volume is distinct from missing volume.
+Unavailable or incomplete data produces a gap and a UI availability message;
+sampled quotes do not supply candle volume. Reconciled historical bars supersede
+covered quote samples in chart aggregation, without changing the strategy stream.
+
 ## Language and compatibility decision
 
 The early specification proposed arbitrary C# source compiled with Roslyn. The

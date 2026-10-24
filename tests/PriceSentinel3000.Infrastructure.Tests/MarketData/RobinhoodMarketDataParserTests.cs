@@ -39,6 +39,8 @@ public sealed class RobinhoodMarketDataParserTests
         Assert.Equal(16.21m, quote.Last);
         Assert.Equal(16.20m, quote.Bid);
         Assert.Equal(16.25m, quote.Ask);
+        Assert.Equal(0m, quote.Volume);
+        Assert.False(quote.HasKnownVolume);
         Assert.Equal(
             DateTimeOffset.Parse("2026-07-31T23:59:15Z"),
             quote.SourceTimestampUtc);
@@ -98,6 +100,46 @@ public sealed class RobinhoodMarketDataParserTests
         Assert.Equal(16.39m, quotes[0].CandleOpen);
         Assert.All(quotes, quote => Assert.Equal(0m, quote.Bid));
         Assert.All(quotes, quote => Assert.Equal(15, quote.SourceIntervalSeconds));
+        Assert.All(quotes, quote => Assert.True(quote.HasKnownVolume));
+    }
+
+    [Theory]
+    [InlineData("", false, 0)]
+    [InlineData(", \"volume\": null", false, 0)]
+    [InlineData(", \"volume\": 0", true, 0)]
+    [InlineData(", \"volume\": 125", true, 125)]
+    public void ParseHistory_PreservesKnownAndUnknownVolume(
+        string volumeProperty, bool expectedKnown, decimal expectedVolume)
+    {
+        using JsonDocument document = JsonDocument.Parse($$"""
+            {
+              "data": {
+                "results": [{
+                  "symbol": "MSFT",
+                  "interval": "15second",
+                  "bars": [{
+                    "begins_at": "2026-10-23T13:30:00Z",
+                    "open_price": "425.00",
+                    "high_price": "425.50",
+                    "low_price": "424.75",
+                    "close_price": "425.25"{{volumeProperty}}
+                  }]
+                }]
+              }
+            }
+            """);
+
+        MarketQuote quote = Assert.Single(RobinhoodMarketDataParser.ParseHistory(
+            document.RootElement,
+            new Instrument("MSFT", AssetClass.Equity),
+            DateTimeOffset.Parse("2026-10-23T13:31:00Z")));
+
+        Assert.Equal(expectedKnown, quote.HasKnownVolume);
+        Assert.Equal(expectedVolume, quote.Volume);
+        Assert.Equal(425.00m, quote.OpenPrice);
+        Assert.Equal(425.50m, quote.HighPrice);
+        Assert.Equal(424.75m, quote.LowPrice);
+        Assert.Equal(425.25m, quote.ClosePrice);
     }
 
     [Theory]

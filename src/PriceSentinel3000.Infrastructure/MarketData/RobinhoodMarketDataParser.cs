@@ -54,7 +54,8 @@ internal static class RobinhoodMarketDataParser
             ParseDecimal(quote, "bid_price"),
             ParseDecimal(quote, "ask_price"),
             last,
-            0m);
+            0m,
+            HasKnownVolume: false);
     }
 
     public static IReadOnlyList<MarketQuote> ParseHistory(
@@ -100,9 +101,9 @@ internal static class RobinhoodMarketDataParser
             decimal open = ParseDecimalOrDefault(bar, "open_price", close);
             decimal high = ParseDecimalOrDefault(bar, "high_price", close);
             decimal low = ParseDecimalOrDefault(bar, "low_price", close);
-            decimal volume = bar.TryGetProperty("volume", out JsonElement volumeNode)
-                ? volumeNode.GetDecimal()
-                : 0m;
+            bool hasKnownVolume = bar.TryGetProperty("volume", out JsonElement volumeNode) &&
+                volumeNode.ValueKind is not JsonValueKind.Null;
+            decimal volume = hasKnownVolume ? volumeNode.GetDecimal() : 0m;
             quotes.Add(new(
                 instrument,
                 observedAtUtc.ToUniversalTime(),
@@ -115,7 +116,8 @@ internal static class RobinhoodMarketDataParser
                 high,
                 low,
                 close,
-                sourceIntervalSeconds));
+                sourceIntervalSeconds,
+                HasKnownVolume: hasKnownVolume));
         }
 
         return quotes

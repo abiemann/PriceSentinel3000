@@ -15,6 +15,7 @@
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
                 <Grid>
@@ -73,7 +74,38 @@
                                FontSize="16"
                                Text="{Binding BidAskDisplay}" />
                 </Grid>
-                <Border Grid.Row="1"
+                <WrapPanel Grid.Row="1" Margin="0,8,0,0">
+                    <ToggleButton Margin="0,0,8,4"
+                                  Style="{StaticResource ChartScaleToggleStyle}"
+                                  Foreground="#F4C95D"
+                                  Content="EMA 50"
+                                  IsChecked="{Binding ShowEma50, Mode=TwoWay}"
+                                  ToolTip="50-period exponential moving average of chart candle closes. Periods follow the selected chart interval. Seeded from the first available close; synthetic gap candles are skipped." />
+                    <ToggleButton Margin="0,0,8,4"
+                                  Style="{StaticResource ChartScaleToggleStyle}"
+                                  Foreground="#6DB8FF"
+                                  Content="EMA 100"
+                                  IsChecked="{Binding ShowEma100, Mode=TwoWay}"
+                                  ToolTip="100-period exponential moving average of chart candle closes. Periods follow the selected chart interval. Seeded from the first available close; synthetic gap candles are skipped." />
+                    <ToggleButton Margin="0,0,8,4"
+                                  Style="{StaticResource ChartScaleToggleStyle}"
+                                  Foreground="#C29AFF"
+                                  Content="EMA 200"
+                                  IsChecked="{Binding ShowEma200, Mode=TwoWay}"
+                                  ToolTip="200-period exponential moving average of chart candle closes. Periods follow the selected chart interval. Seeded from the first available close; synthetic gap candles are skipped." />
+                    <ToggleButton Margin="0,0,12,4"
+                                  Style="{StaticResource ChartScaleToggleStyle}"
+                                  Foreground="#FF92B4"
+                                  Content="VWAP"
+                                  IsChecked="{Binding ShowVwap, Mode=TwoWay}"
+                                  ToolTip="Regular-session VWAP resets at 9:30 AM Eastern and ends at the market close, including early closes. Uses typical price (high + low + close) / 3 weighted by candle volume. Requires complete historical candles with known volume from the session open; sampled quotes and incomplete history do not produce a VWAP." />
+                    <TextBlock Margin="0,0,0,4"
+                               VerticalAlignment="Center"
+                               Foreground="{StaticResource SubtleTextBrush}"
+                               FontSize="10"
+                               Text="{Binding VwapAvailabilityText}" />
+                </WrapPanel>
+                <Border Grid.Row="2"
                         Margin="0,8,0,0"
                         Background="#0C131C"
                         BorderBrush="#253447"
@@ -87,6 +119,10 @@
                                              Points="{Binding ChartPoints}"
                                              ScaleResetVersion="{Binding ChartScaleResetVersion}"
                                              ShowRsi="{Binding IsChecked, ElementName=RsiToggle}"
+                                             ShowEma50="{Binding ShowEma50}"
+                                             ShowEma100="{Binding ShowEma100}"
+                                             ShowEma200="{Binding ShowEma200}"
+                                             ShowVwap="{Binding ShowVwap}"
                                              WindowMinutes="{Binding BufferMinutes}" />
                         <StackPanel HorizontalAlignment="Center"
                                     VerticalAlignment="Center">
